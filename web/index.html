@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Hello Tuk-Tuk ride app">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Hello Tuk-Tuk">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>Hello Tuk-Tuk</title>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    window.hillaMapsReady = false;
+    window.hillaMapsInitPromise = null;
+
+    window.initHillaMaps = function() {
+      window.hillaMapsReady = true;
+      window.hillaGetPlacesService();
+    };
+
+    window.hillaEnsureMapsReady = function() {
+      if (window.hillaMapsReady && window.google && google.maps) {
+        return Promise.resolve(true);
+      }
+      if (window.hillaMapsInitPromise) {
+        return window.hillaMapsInitPromise;
+      }
+      window.hillaMapsInitPromise = new Promise(function(resolve, reject) {
+        var attempts = 0;
+        var timer = setInterval(function() {
+          attempts += 1;
+          if (window.hillaMapsReady && window.google && google.maps) {
+            clearInterval(timer);
+            resolve(true);
+            return;
+          }
+          if (attempts > 120) {
+            clearInterval(timer);
+            reject('maps_timeout');
+          }
+        }, 100);
+      });
+      return window.hillaMapsInitPromise;
+    };
+
+    window.hillaPlacesApiReady = function() {
+      return !!(
+        window.hillaMapsReady &&
+        window.google &&
+        google.maps &&
+        google.maps.places &&
+        google.maps.places.PlacesService
+      );
+    };
+
+    window.hillaGetPlacesService = function() {
+      if (!window.hillaPlacesApiReady()) return null;
+      if (!window.hillaPlacesService) {
+        window.hillaPlacesHost = document.createElement('div');
+        window.hillaPlacesService = new google.maps.places.PlacesService(
+          new google.maps.Map(window.hillaPlacesHost),
+        );
+      }
+      return window.hillaPlacesService;
+    };
+
+    window.hillaMapPlacesResults = function(results) {
+      if (!results || !results.length) return [];
+      return results.map(function(place) {
+        return {
+          name: place.name || '',
+          address: place.formatted_address || '',
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+        };
+      });
+    };
+
+    window.hillaAutocompleteSearch = function(
+      query, lat, lng, radiusMeters, languageCode,
+    ) {
+      return new Promise(function(resolve, reject) {
+        var autocomplete = new google.maps.places.AutocompleteService();
+        var request = {
+          input: query,
+          language: languageCode || 'ar',
+          componentRestrictions: { country: 'iq' },
+        };
+        if (google.maps.places.AutocompleteSessionToken) {
+          request.sessionToken = new google.maps.places.AutocompleteSessionToken();
+        }
+        if (google.maps.Circle) {
+          request.locationBias = new google.maps.Circle({
+            center: { lat: lat, lng: lng },
+            radius: radiusMeters,
+          });
+        } else {
+          request.location = new google.maps.LatLng(lat, lng);
+          request.radius = radiusMeters;
+        }
+        autocomplete.getPlacePredictions(
+          request,
+          function(predictions, predStatus) {
+            if (
+              predStatus !== google.maps.places.PlacesServiceStatus.OK ||
+              !predictions ||
+              !predictions.length
+            ) {
+              reject(predStatus || 'autocomplete_empty');
+              return;
+            }
+            var service = window.hillaGetPlacesService();
+            if (!service) {
+              reject('places_not_ready');
+              return;
+            }
+            var mapped = [];
+            var pending = predictions.slice(0, 8);
+            var done = 0;
+            pending.forEach(function(prediction) {
+              service.getDetails(
+                {
+                  placeId: prediction.place_id,
+                  fields: ['name', 'formatted_address', 'geometry'],
+                },
+                function(place, detailStatus) {
+                  done += 1;
+                  if (
+                    detailStatus === google.maps.places.PlacesServiceStatus.OK &&
+                    place &&
+                    place.geometry &&
+                    place.geometry.location
+                  ) {
+                    mapped.push({
+                      name:
+                        place.name ||
+                        (prediction.structured_formatting &&
+                          prediction.structured_formatting.main_text) ||
+                        '',
+                      address:
+                        place.formatted_address || prediction.description || '',
+                      lat: place.geometry.location.lat(),
+                      lng: place.geometry.location.lng(),
+                    });
+                  }
+                  if (done >= pending.length) {
+                    resolve(mapped);
+                  }
+                },
+              );
+            });
+          },
+        );
+      });
+    };
+
+    window.hillaRunPlacesSearch = function(request, callback) {
+      var finished = false;
+      var timer = setTimeout(function() {
+        if (finished) return;
+        finished = true;
+        callback(null, 'places_timeout');
+      }, 10000);
+      var service = window.hillaGetPlacesService();
+      if (!service) {
+        clearTimeout(timer);
+        callback(null, 'places_not_ready');
+        return;
+      }
+      service.textSearch(request, function(results, status) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+          callback([], 'OK');
+          return;
+        }
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !results) {
+          callback(null, status || 'no_results');
+          return;
+        }
+        callback(window.hillaMapPlacesResults(results), 'OK');
+      });
+    };
+
+    window.hillaGeocodeSearch = function(
+      query, lat, lng, radiusMeters, languageCode,
+    ) {
+      return window.hillaEnsureMapsReady().then(function() {
+        return new Promise(function(resolve, reject) {
+          var geocoder = new google.maps.Geocoder();
+          var delta = radiusMeters / 111000;
+          geocoder.geocode(
+            {
+              address: query,
+              language: languageCode || 'ar',
+              region: 'iq',
+              bounds: new google.maps.LatLngBounds(
+                { lat: lat - delta, lng: lng - delta },
+                { lat: lat + delta, lng: lng + delta },
+              ),
+            },
+            function(results, status) {
+              if (status !== 'OK' || !results || !results.length) {
+                reject(status || 'geocode_empty');
+                return;
+              }
+              resolve(
+                results.slice(0, 10).map(function(result) {
+                  var loc = result.geometry.location;
+                  return {
+                    name:
+                      result.address_components &&
+                      result.address_components[0]
+                        ? result.address_components[0].long_name
+                        : '',
+                    address: result.formatted_address || '',
+                    lat: loc.lat(),
+                    lng: loc.lng(),
+                  };
+                }),
+              );
+            },
+          );
+        });
+      });
+    };
+
+    window.hillaSearchPlaces = function(
+      query, lat, lng, radiusMeters, languageCode,
+    ) {
+      return window.hillaEnsureMapsReady().then(function() {
+        return new Promise(function(resolve) {
+          window.hillaRunPlacesSearch(
+            {
+              query: query,
+              location: new google.maps.LatLng(lat, lng),
+              radius: radiusMeters,
+              language: languageCode || 'ar',
+              region: 'iq',
+            },
+            function(results, status) {
+              if (status === 'OK' && results != null && results.length) {
+                resolve(results);
+                return;
+              }
+              window.hillaAutocompleteSearch(
+                query, lat, lng, radiusMeters, languageCode,
+              )
+                .then(function(autoResults) {
+                  if (autoResults && autoResults.length) {
+                    return autoResults;
+                  }
+                  return window.hillaGeocodeSearch(
+                    query, lat, lng, radiusMeters, languageCode,
+                  );
+                })
+                .then(resolve)
+                .catch(function() {
+                  window.hillaGeocodeSearch(
+                    query, lat, lng, radiusMeters, languageCode,
+                  )
+                    .then(resolve)
+                    .catch(function() {
+                      resolve([]);
+                    });
+                });
+            },
+          );
+        });
+      });
+    };
+
+    window.hillaNearbyPlaces = function(lat, lng, radiusMeters, languageCode) {
+      return window.hillaEnsureMapsReady().then(function() {
+        return new Promise(function(resolve) {
+          var service = window.hillaGetPlacesService();
+          if (!service) {
+            resolve([]);
+            return;
+          }
+          service.nearbySearch(
+            {
+              location: new google.maps.LatLng(lat, lng),
+              radius: radiusMeters,
+              language: languageCode || 'ar',
+              region: 'iq',
+            },
+            function(results, status) {
+              if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+                resolve([]);
+                return;
+              }
+              if (
+                status !== google.maps.places.PlacesServiceStatus.OK ||
+                !results
+              ) {
+                resolve([]);
+                return;
+              }
+              resolve(window.hillaMapPlacesResults(results));
+            },
+          );
+        });
+      });
+    };
+
+    window.hillaLooksLikeStreetName = function(value) {
+      if (!value) return false;
+      var trimmed = String(value).trim();
+      if (!trimmed) return false;
+      if (/شارع|ش\.|طريق|street|st\.|road|rd\./i.test(trimmed)) return true;
+      var parts = trimmed.indexOf('،') >= 0
+        ? trimmed.split('،')
+        : trimmed.split(',');
+      parts = parts.map(function(part) { return part.trim(); }).filter(Boolean);
+      if (parts.length >= 2) return window.hillaLooksLikeStreetName(parts[0]);
+      return trimmed.length > 8;
+    };
+
+    window.hillaFirstStreetSegment = function(formatted, languageCode) {
+      if (!formatted) return '';
+      var parts = formatted.indexOf('،') >= 0
+        ? formatted.split('،')
+        : formatted.split(',');
+      parts = parts.map(function(part) { return part.trim(); }).filter(Boolean);
+      if (!parts.length) return '';
+      for (var i = 0; i < parts.length; i++) {
+        if (window.hillaLooksLikeStreetName(parts[i])) {
+          var area = parts[i + 1] || '';
+          if (area && parts[i].indexOf(area) < 0) {
+            var isArabic = (languageCode || 'ar').indexOf('ar') === 0;
+            return isArabic ? parts[i] + '، ' + area : parts[i] + ', ' + area;
+          }
+          return parts[i];
+        }
+      }
+      if (parts.length >= 2) {
+        var isArabic = (languageCode || 'ar').indexOf('ar') === 0;
+        return isArabic ? parts[0] + '، ' + parts[1] : parts[0] + ', ' + parts[1];
+      }
+      return parts[0];
+    };
+
+    window.hillaStreetLabelFromGeocodeResult = function(result, languageCode) {
+      if (!result) return '';
+      var components = result.address_components || [];
+      var types = result.types || [];
+      var route = '';
+      var streetNumber = '';
+      var area = '';
+      var isArabic = (languageCode || 'ar').indexOf('ar') === 0;
+      for (var i = 0; i < components.length; i++) {
+        var comp = components[i];
+        var compTypes = comp.types || [];
+        if (compTypes.indexOf('route') >= 0) route = comp.long_name;
+        if (compTypes.indexOf('street_number') >= 0) streetNumber = comp.long_name;
+        if (compTypes.indexOf('neighborhood') >= 0) area = comp.long_name;
+        else if (!area && compTypes.indexOf('sublocality') >= 0) area = comp.long_name;
+        else if (!area && compTypes.indexOf('locality') >= 0) area = comp.long_name;
+      }
+      var street = route;
+      if (route && streetNumber) {
+        street = isArabic ? route + '، ' + streetNumber : streetNumber + ' ' + route;
+      }
+      if (street && area && street.indexOf(area) < 0) {
+        return isArabic ? street + '، ' + area : street + ', ' + area;
+      }
+      if (street) return street;
+      if (types.indexOf('route') >= 0 || types.indexOf('street_address') >= 0) {
+        var routeFormatted = window.hillaFirstStreetSegment(
+          result.formatted_address || result.formattedAddress || '',
+          languageCode,
+        );
+        if (routeFormatted) return routeFormatted;
+      }
+      return '';
+    };
+
+    window.hillaPickBestStreetLabel = function(results, languageCode) {
+      if (!results || !results.length) return '';
+      var i;
+      var label;
+      for (i = 0; i < results.length; i++) {
+        var resultTypes = results[i].types || [];
+        if (
+          resultTypes.indexOf('route') >= 0 ||
+          resultTypes.indexOf('street_address') >= 0
+        ) {
+          label = window.hillaStreetLabelFromGeocodeResult(results[i], languageCode);
+          if (label && window.hillaLooksLikeStreetName(label)) return label;
+        }
+      }
+      for (i = 0; i < results.length; i++) {
+        label = window.hillaStreetLabelFromGeocodeResult(results[i], languageCode);
+        if (label && window.hillaLooksLikeStreetName(label)) return label;
+      }
+      for (i = 0; i < results.length; i++) {
+        label = window.hillaFirstStreetSegment(
+          results[i].formatted_address || results[i].formattedAddress || '',
+          languageCode,
+        );
+        if (label && window.hillaLooksLikeStreetName(label)) return label;
+      }
+      return '';
+    };
+
+    window.hillaReverseGeocode = function(lat, lng, languageCode) {
+      return window.hillaEnsureMapsReady().then(function() {
+        return new Promise(function(resolve, reject) {
+          var geocoder = new google.maps.Geocoder();
+          geocoder.geocode(
+            {
+              location: { lat: lat, lng: lng },
+              language: languageCode || 'ar',
+              region: 'iq',
+            },
+            function(results, status) {
+              if (status === 'OK' && results && results.length) {
+                resolve(window.hillaPickBestStreetLabel(results, languageCode));
+                return;
+              }
+              reject(status || 'geocode_failed');
+            },
+          );
+        });
+      });
+    };
+
+    window.hillaRunDirectionsRoute = function(
+      originLat, originLng, destLat, destLng, callback,
+    ) {
+      var finished = false;
+      var timer = setTimeout(function() {
+        if (finished) return;
+        finished = true;
+        callback(null, 'directions_timeout');
+      }, 8000);
+      var svc = new google.maps.DirectionsService();
+      svc.route(
+        {
+          origin: { lat: originLat, lng: originLng },
+          destination: { lat: destLat, lng: destLng },
+          travelMode: google.maps.TravelMode.DRIVING,
+          region: 'iq',
+        },
+        function(result, status) {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timer);
+          if (!result || !result.routes || !result.routes.length || status !== 'OK') {
+            callback(null, status || 'no_route');
+            return;
+          }
+          var leg = result.routes[0].legs[0];
+          var encoded = result.routes[0].overview_polyline
+            ? result.routes[0].overview_polyline.points
+            : '';
+          callback(
+            {
+              distanceMeters: leg.distance.value,
+              durationSeconds: leg.duration.value,
+              encodedPolyline: encoded,
+            },
+            'OK',
+          );
+        },
+      );
+    };
+
+    window.hillaGetDrivingRoute = function(originLat, originLng, destLat, destLng) {
+      return window.hillaEnsureMapsReady().then(function() {
+        return new Promise(function(resolve, reject) {
+          window.hillaRunDirectionsRoute(
+            originLat, originLng, destLat, destLng,
+            function(payload, status) {
+              if (status !== 'OK' || !payload) {
+                reject(status);
+                return;
+              }
+              resolve({
+                distanceMeters: payload.distanceMeters,
+                durationSeconds: payload.durationSeconds,
+              });
+            },
+          );
+        });
+      });
+    };
+
+    window.hillaGetDrivingPolyline = function(originLat, originLng, destLat, destLng) {
+      return window.hillaEnsureMapsReady().then(function() {
+        return new Promise(function(resolve, reject) {
+          window.hillaRunDirectionsRoute(
+            originLat, originLng, destLat, destLng,
+            function(payload, status) {
+              if (status !== 'OK' || !payload || !payload.encodedPolyline) {
+                reject(status);
+                return;
+              }
+              resolve({ encodedPolyline: payload.encodedPolyline });
+            },
+          );
+        });
+      });
+    };
+  </script>
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCygbeGlDUlA7l0GkJjB8TUHvHNUlHwsBg&libraries=places&callback=initHillaMaps"></script>
+  <div id="recaptcha-container"></div>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

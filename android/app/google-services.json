@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "862680507196",
+    "project_id": "hello-tiktok-57dc5",
+    "storage_bucket": "hello-tiktok-57dc5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:862680507196:android:60e6335cb57b9e76987439",
+        "android_client_info": {
+          "package_name": "com.hillaride.hilla_ride"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyATkDQ-s_PdP3rbRnrvkLs4XXrIAdzE7Q0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

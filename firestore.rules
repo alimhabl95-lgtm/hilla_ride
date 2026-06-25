@@ -1,0 +1,402 @@
+rules_version = '2';
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+    function signedIn() {
+
+      return request.auth != null;
+
+    }
+
+
+
+    function isSelf(userId) {
+
+      return signedIn() && request.auth.uid == userId;
+
+    }
+
+
+
+    function userDoc() {
+
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+
+    }
+
+
+
+    function isManager() {
+
+      return signedIn()
+
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+
+        && userDoc().role == 'manager';
+
+    }
+
+
+
+    function isAssistant() {
+
+      return signedIn()
+
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+
+        && userDoc().role == 'assistant';
+
+    }
+
+
+
+    function isAdminUser() {
+
+      return isManager() || isAssistant();
+
+    }
+
+
+
+    function hasPermission(permission) {
+
+      return isManager()
+
+        || (
+
+          isAssistant()
+
+          && userDoc().permissions is list
+
+          && permission in userDoc().permissions
+
+        );
+
+    }
+
+
+
+    match /users/{userId} {
+
+      allow read: if signedIn();
+
+      allow create: if isSelf(userId)
+
+        && request.resource.data.role in ['customer', 'driver', 'manager'];
+
+      allow update: if isManager()
+
+        || (
+
+          isSelf(userId)
+
+          && !request.resource.data.diff(resource.data).affectedKeys()
+
+            .hasAny(['isBlocked', 'cancelledRidesCount', 'blockedAt', 'role', 'permissions', 'createdBy'])
+
+        )
+
+        || (
+
+          isSelf(userId)
+
+          && request.resource.data.diff(resource.data).affectedKeys()
+
+            .hasOnly(['cancelledRidesCount'])
+
+        )
+
+        || (
+
+          isManager()
+
+          && resource.data.role == 'assistant'
+
+          && request.resource.data.diff(resource.data).affectedKeys()
+
+            .hasOnly(['permissions', 'updatedAt', 'isBlocked', 'blockedAt'])
+
+        )
+
+        || (
+
+          isSelf(userId)
+
+          && request.resource.data.diff(resource.data).affectedKeys()
+
+            .hasOnly(['activeSessionId', 'activeSessionUpdatedAt'])
+
+        )
+
+        || (
+
+          signedIn()
+
+          && request.resource.data.diff(resource.data).affectedKeys()
+
+            .hasOnly(['promoRidesUsed'])
+
+        );
+
+      allow delete: if (isManager() || (isAssistant() && hasPermission('customers')))
+        && resource.data.role == 'customer'
+        || (isManager() || (isAssistant() && hasPermission('allDrivers')))
+        && resource.data.role == 'driver';
+
+    }
+
+
+
+    match /users/{userId}/saved_places/{placeId} {
+
+      allow read: if isSelf(userId) || isManager()
+        || (isAssistant() && hasPermission('customers'));
+
+      allow create, update: if isSelf(userId);
+
+      allow delete: if isManager()
+        || (isAssistant() && hasPermission('customers'));
+
+    }
+
+
+
+    match /released_phones/{phoneKey} {
+
+      allow read: if true;
+
+      allow create, update, delete: if isManager()
+        || (isAssistant() && hasPermission('customers'));
+
+    }
+
+    match /otp_sessions/{phoneKey} {
+      allow read, write: if false;
+    }
+
+
+
+    match /drivers/{driverId} {
+
+      allow read: if signedIn();
+
+      allow create: if isSelf(driverId) || isAdminUser();
+
+      allow update: if isAdminUser()
+
+        || (
+
+          isSelf(driverId)
+
+          && !request.resource.data.diff(resource.data).affectedKeys()
+
+            .hasAny(['isRemoved', 'removedAt', 'approvalStatus', 'reviewedAt', 'isBlocked', 'blockedAt'])
+
+        )
+
+        || (
+
+          isSelf(driverId)
+
+          && request.resource.data.diff(resource.data).affectedKeys()
+
+            .hasOnly(['cancelledRidesCount'])
+
+        )
+
+        || (
+
+          signedIn()
+
+          && request.resource.data.diff(resource.data).affectedKeys()
+
+            .hasOnly(['monthlyRideCount', 'monthlyMonthKey'])
+
+        );
+
+      allow delete: if isManager();
+
+    }
+
+    match /drivers/{driverId}/profit_settlements/{settlementId} {
+      allow read: if signedIn();
+      allow create: if isAdminUser();
+      allow delete: if isManager();
+    }
+
+    match /drivers/{driverId}/bonuses/{bonusId} {
+      allow read: if signedIn();
+      allow create, update: if isAdminUser();
+      allow delete: if isManager();
+    }
+
+
+
+    match /rides/{rideId} {
+
+      allow read: if signedIn();
+
+      allow create, update: if signedIn();
+
+    }
+
+
+
+    match /config/pricing {
+
+      allow read: if signedIn();
+
+      allow write: if hasPermission('pricing');
+
+    }
+
+
+
+    match /config/{configId} {
+
+      allow read: if signedIn()
+
+        && (
+
+          configId.matches('pricing_.+')
+
+          || configId.matches('promo_.+')
+
+        );
+
+      allow write: if (
+
+        hasPermission('pricing')
+
+        && configId.matches('pricing_.+')
+
+      ) || (
+
+        hasPermission('promoCodes')
+
+        && configId.matches('promo_.+')
+
+      );
+
+    }
+
+
+
+    match /config/monthly_prize {
+
+      allow read: if signedIn();
+
+      allow write: if hasPermission('monthlyLeaderboard');
+
+    }
+
+
+
+    match /config/pricing/cities/{districtId} {
+
+      allow read: if signedIn();
+
+      allow write: if hasPermission('pricing');
+
+    }
+
+
+
+    match /config/support {
+
+      allow read: if signedIn();
+
+      allow write: if isManager() || hasPermission('supportInbox');
+
+    }
+
+
+
+    match /config/commission {
+
+      allow read: if signedIn();
+
+      allow write: if hasPermission('earnings');
+
+    }
+
+
+
+    match /rides/{rideId}/messages/{messageId} {
+
+      allow read: if signedIn();
+
+      allow create: if signedIn();
+
+    }
+
+
+
+    match /support_messages/{messageId} {
+
+      allow read: if signedIn()
+
+        && (resource.data.userId == request.auth.uid || isAdminUser());
+
+      allow create: if signedIn()
+
+        && (
+
+          (request.resource.data.userId == request.auth.uid && !request.resource.data.isFromManager)
+
+          || hasPermission('supportInbox')
+
+        );
+
+      allow update: if hasPermission('supportInbox');
+
+    }
+
+    match /announcements/{announcementId} {
+
+      allow read: if signedIn() && (
+
+        isAdminUser()
+
+        || (
+
+          resource.data.audience == 'customers'
+
+          && userDoc().role == 'customer'
+
+        )
+
+        || (
+
+          resource.data.audience == 'drivers'
+
+          && exists(/databases/$(database)/documents/drivers/$(request.auth.uid))
+
+        )
+
+      );
+
+      allow create: if isManager()
+
+        && request.resource.data.audience in ['drivers', 'customers']
+
+        && request.resource.data.title is string
+
+        && request.resource.data.title.size() > 0
+
+        && request.resource.data.body is string
+
+        && request.resource.data.body.size() > 0
+
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update, delete: if false;
+
+    }
+
+  }
+
+}
+

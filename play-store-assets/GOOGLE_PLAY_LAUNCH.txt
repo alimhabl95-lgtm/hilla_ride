@@ -1,0 +1,86 @@
+Hello Tuk-Tuk — Google Play launch package
+==========================================
+Generated: June 2026
+
+FILES IN THIS FOLDER (upload to Play Console)
+---------------------------------------------
+app-release.aab          → Release → Create release → Upload
+app-icon-512.png         → Main store listing → App icon (512×512)
+app-icon-original.png    → Keep as backup (do not upload)
+store-listing-en.txt       → Copy text into English listing
+store-listing-ar.txt       → Copy text into Arabic listing
+screenshots/               → Add 2–8 phone screenshots (1080×1920 PNG)
+
+APP IDENTITY
+------------
+App name:        Hello Tuk-Tuk
+Package name:    com.hillaride.hilla_ride
+Version name:    1.0.23
+Version code:    24
+Default language: Arabic (recommended) or English
+
+LEGAL URLS (required)
+---------------------
+Privacy policy:  https://hello-tiktok-57dc5.web.app/legal/privacy.html
+Terms:           https://hello-tiktok-57dc5.web.app/legal/terms.html
+
+CONTACT (use in Play Console → App content)
+-------------------------------------------
+Developer name:  Ali Mohammed Habl Al-Isawi
+Email:           hellotuktuk3@gmail.com
+Address:         Showmali, Hilla, Babil, Iraq
+
+FIREBASE (after first upload)
+-----------------------------
+Add Play App Signing SHA-1 in Firebase Console → Project settings → Android app.
+Play Console → Setup → App signing → App signing key certificate → copy SHA-1.
+
+PLAY CONSOLE STEPS (in order)
+---------------------------
+1. Create app (if not done) → App name: Hello Tuk-Tuk
+2. Store presence → Main store listing
+   - Upload app-icon-512.png
+   - Short + full description (EN and AR from store-listing-*.txt)
+   - Privacy policy URL (above)
+   - Category: Maps & Navigation or Travel & Local
+3. Store presence → Store settings → Add Arabic listing (same icon + AR text)
+4. Release → Testing → Internal testing (recommended first)
+   - Create release → Upload app-release.aab
+   - Add testers (your Gmail)
+5. Policy → App content — complete ALL sections:
+   - Privacy policy URL
+   - Ads: No (unless you add ads later)
+   - App access: All functionality available without special login, OR explain driver approval
+   - Content rating: Start questionnaire → likely Everyone / Teen
+   - Target audience: 18+ (drivers must be 18)
+   - Data safety: Location, phone, photos (driver ID) — collected for app function
+   - Government apps / Financial / Health: No
+6. Release → Production → Create release (when testing OK)
+7. Submit for review
+
+SCREENSHOTS NEEDED (you must add)
+---------------------------------
+Minimum 2 phone screenshots (max 8). Recommended 4:
+  01 — Welcome screen (customer / driver choice)
+  02 — Customer map + book ride
+  03 — Fare confirmation
+  04 — Live trip tracking
+
+Size: 1080 × 1920 PNG or JPEG (9:16 portrait).
+Save in: play-store-assets/screenshots/
+
+INTERNAL TEST FIRST
+-------------------
+Before Production, upload the same AAB to Internal testing and install on your phone
+from the Play Console tester link. Verify login, booking, driver alerts, and maps.
+
+IMPORTANT
+---------
+- Keep upload-keystore.jks and key.properties safe — you need them for every update.
+- Never lose the upload keystore password.
+- Each new release: bump version in pubspec.yaml, rebuild AAB, upload again.
+
+Rebuild AAB command:
+  cd hilla_ride
+  flutter build appbundle --release
+  copy build\app\outputs\bundle\release\app-release.aab play-store-assets\

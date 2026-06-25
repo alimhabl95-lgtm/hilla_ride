@@ -1,0 +1,684 @@
+{
+  "@@locale": "en",
+  "appTitle": "Hello Tuk-Tuk",
+  "welcomeMessage": "Welcome!",
+  "continueLabel": "Continue",
+  "cancel": "Cancel",
+  "save": "Save",
+  "logout": "Log out",
+  "language": "Language",
+  "english": "English",
+  "arabic": "Arabic",
+  "selectRole": "How will you use Hello Tuk-Tuk?",
+  "roleCustomer": "Customer",
+  "roleCustomerDesc": "Request rides around Hilla",
+  "roleDriver": "Driver",
+  "roleDriverDesc": "Accept rides and earn money",
+  "roleManager": "Manager",
+  "roleManagerDesc": "Approve drivers and manage the fleet",
+  "phoneLogin": "Phone login",
+  "phoneHint": "Phone number",
+  "sendCode": "Send verification code",
+  "verifyCode": "Verify code",
+  "otpHint": "6-digit code",
+  "customerProfileTitle": "Your profile",
+  "fullName": "Full name",
+  "age": "Age",
+  "gender": "Gender (optional)",
+  "male": "Male",
+  "female": "Female",
+  "pickup": "Pickup",
+  "destination": "Destination",
+  "searchPlaces": "Search places in Hilla",
+  "noPlacesFound": "No places found. Try a shorter name or use Pin on map.",
+  "searchAction": "Search",
+  "searchPlacesHint": "Type in Arabic or English, then tap Search",
+  "searchFieldHint": "Search or type English (hospital, market)",
+  "searchTapPlaceHint": "Tap a place in the list, or pick a category below",
+  "placesInHillaCount": "{count} places in Hilla",
+  "@placesInHillaCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pinOnMap": "Pin on map",
+  "requestRide": "Request ride",
+  "searchingDriver": "Searching for a driver...",
+  "driverFound": "Driver on the way",
+  "noDriversAvailable": "No drivers available right now. Try again later.",
+  "liveDriverLocation": "Live driver location",
+  "driverRegistration": "Driver registration",
+  "vehicleType": "Vehicle type",
+  "vehiclePlate": "Plate number",
+  "licenseNumber": "License number",
+  "submitForApproval": "Submit for approval",
+  "pendingApprovalTitle": "Waiting for manager approval",
+  "pendingApprovalBody": "Your account will be activated after a manager reviews your information.",
+  "rejectedTitle": "Registration rejected",
+  "goOnline": "Go online",
+  "goOffline": "Go offline",
+  "newRideRequest": "New ride request",
+  "acceptRide": "Accept ride",
+  "rejectRide": "Reject ride",
+  "activeRideExists": "You already have an active ride. Finish or cancel it before booking another.",
+  "managerTitle": "Driver approvals",
+  "approve": "Approve",
+  "reject": "Reject",
+  "noPendingDrivers": "No pending driver applications",
+  "noDriversYet": "No drivers registered yet.",
+  "pendingDriversLoadError": "Could not load drivers. Publish Firestore rules from firestore.rules in Firebase Console → Firestore → Rules, then click Publish. Also confirm you are logged in as manager.",
+  "checkAllDriversTab": "Tip: open the All Drivers tab to see every registered driver.",
+  "unnamedDriver": "Driver (name not saved)",
+  "routeToPickup": "To customer pickup",
+  "routeToDestination": "Pickup to destination",
+  "firebaseSetupRequired": "Firebase is not configured yet. Run: flutterfire configure",
+  "currentLocation": "Current location",
+  "confirmLocation": "Confirm location",
+  "tapMapToPin": "Tap the map to choose a location",
+  "rideFrom": "From",
+  "rideTo": "To",
+  "profile": "Profile",
+  "wrongRoleTitle": "Wrong app for this account",
+  "wrongRoleBody": "This app is for {expectedRole} accounts. You signed in as {actualRole}.",
+  "@wrongRoleBody": {
+    "placeholders": {
+      "expectedRole": {"type": "String"},
+      "actualRole": {"type": "String"}
+    }
+  },
+  "adminPanelTitle": "Hello Tuk-Tuk Admin",
+  "pendingDriversTab": "Pending",
+  "activeRidesTab": "Active rides",
+  "allDriversTab": "All drivers",
+  "rideHistoryTab": "History",
+  "noActiveRides": "No active rides",
+  "cashFare": "Cash fare",
+  "paymentMethodCash": "Payment: cash only",
+  "startRide": "Start ride",
+  "endRide": "End ride",
+  "cashCollected": "Cash collected",
+  "waitingCustomerCashConfirm": "Waiting for customer cash confirmation",
+  "payCash": "I paid cash",
+  "cashPaymentConfirmed": "Cash payment confirmed",
+  "waitingForRides": "Waiting for ride requests",
+  "rideCompleted": "Ride completed",
+  "modeChooserSubtitle": "Choose how you want to use Hello Tuk-Tuk today",
+  "takeRide": "Take a ride",
+  "takeRideDesc": "Book a trip around Hilla city",
+  "driveAndEarn": "Enter or register as driver",
+  "driveAndEarnDesc": "Create your driver account and start accepting rides",
+  "accountAlreadyOpenElsewhere": "This account is already open on another phone. Log out there first, then try again.",
+  "accountLoggedInElsewhere": "You were signed out because this account opened on another phone.",
+  "switchMode": "Switch mode",
+  "phoneLoginModeHint": "Sign in with your phone to continue registration",
+  "managerAccessDenied": "This admin panel is only for manager accounts.",
+  "phoneNumberInvalid": "Enter a valid Iraqi phone number (9 digits after +964).",
+  "phoneHintExample": "7901234567",
+  "phoneVerificationFailed": "Phone verification failed. Check Firebase setup and try again.",
+  "webPhoneLoginHint": "On web, phone login needs Firebase configured and reCAPTCHA. For testing, use an Android phone or emulator.",
+  "loginTitle": "Log in",
+  "passwordLabel": "Password",
+  "rememberMe": "Remember me",
+  "forgotPassword": "Forgot password?",
+  "loginButton": "Log in",
+  "createAccountButton": "Create account",
+  "loginFailed": "Login failed. Check your phone and password.",
+  "signupTitle": "Create account",
+  "emailOptional": "Email (optional)",
+  "passwordMinLength": "Password must be at least 6 characters.",
+  "nameRequired": "Please enter your full name.",
+  "signupFailed": "Sign up failed. Try a different phone number.",
+  "resetEmailSent": "Password reset link sent.",
+  "resetFailed": "Could not send reset link.",
+  "forgotPasswordHint": "Enter your phone or email to reset your password.",
+  "sendResetLink": "Send reset link",
+  "bookRideTitle": "Book ride",
+  "minutes": "min",
+  "bookNowButton": "Book now",
+  "bookRideFailed": "Could not complete booking. Check your connection and try again.",
+  "currentRideTitle": "Current ride",
+  "pickupDestinationRequired": "Choose pickup and destination first.",
+  "pickupDestinationMustDiffer": "Pickup and destination must be different places (at least 100 m apart).",
+  "districtLabel": "District",
+  "subDistrictLabel": "Sub-district",
+  "selectSubDistrictHint": "Select sub-district",
+  "selectSubDistrictRequired": "Please select your sub-district first.",
+  "fixedCustomerDistrictLabel": "Al-Hashimiya District",
+  "whereTo": "Where to?",
+  "bookRideButton": "Book ride",
+  "findingDriverTitle": "Finding driver",
+  "findingDriverSubtitle": "Notifying online drivers in your city. First to accept gets the ride.",
+  "driverAssignedTitle": "Driver assigned",
+  "waitingDriverAccept": "Waiting for driver to accept…",
+  "trackDriverTitle": "Track driver",
+  "tripInProgress": "Trip in progress",
+  "tripCompletedTitle": "Trip completed",
+  "doneButton": "Done",
+  "searchRegionHint": "Search is limited to {region}",
+  "@searchRegionHint": {
+    "placeholders": {
+      "region": {"type": "String"}
+    }
+  },
+  "placesInRegionCount": "{count} places in {region}",
+  "@placesInRegionCount": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "region": {"type": "String"}
+    }
+  },
+  "searchOutsideRegion": "This location is outside the selected area.",
+  "googleMapsKeyRequired": "Add your Google Maps API key to enable online search.",
+  "placesApiDenied": "Online place search is limited. Results below use OpenStreetMap for this area.",
+  "locatingCurrentPosition": "Getting your location…",
+  "searchUsingOpenStreetMap": "Showing places from OpenStreetMap in this area.",
+  "locationServiceDisabled": "Turn on location (GPS) in your phone settings.",
+  "locationPermissionDenied": "Location permission is required. Allow it in app settings.",
+  "locationFetchFailed": "Could not get GPS location. Tap the location icon to try again.",
+  "authEmailPasswordDisabled": "Enable Email/Password in Firebase Console: Authentication → Sign-in method → Email/Password → Enable.",
+  "authEmailAlreadyInUse": "This phone number is already registered. Try logging in instead.",
+  "restoreProfileTitle": "Restore your account",
+  "restoreProfileMessage": "Your login is still active but your profile data was removed from the server. Enter your name below to restore access.",
+  "restoreProfileRoleHint": "Account type: {role}",
+  "@restoreProfileRoleHint": {
+    "placeholders": {
+      "role": {"type": "String"}
+    }
+  },
+  "restoreProfileAction": "Restore account",
+  "useDifferentAccount": "Use a different account",
+  "assistantProfileMissingHint": "Assistant accounts must be recreated by the manager from the admin panel.",
+  "authTooManyRequests": "Too many attempts. Wait a few minutes and try again.",
+  "authNetworkError": "Network error. Check your internet connection and try again.",
+  "dragMapToSelectPin": "Drag the map to move the pin to your location.",
+  "pinStreetNameRequired": "Could not read the street name. Move the pin slightly and try again.",
+  "outOfServiceZone": "Out of Service Zone",
+  "calculatingFare": "Calculating fare…",
+  "fareCalculationFailed": "Could not calculate the fare. Check your connection and try again.",
+  "retry": "Retry",
+  "drivingDistance": "Driving distance",
+  "maxDistanceLimit": "Maximum ride distance is {km} km.",
+  "@maxDistanceLimit": {
+    "placeholders": {
+      "km": {"type": "String"}
+    }
+  },
+  "pricingTab": "Pricing",
+  "pricingRulesTitle": "Pricing rules",
+  "pricingRulesHint": "Fares use Google Maps driving distance. Rides above the maximum distance are blocked.",
+  "maxDistanceKmLabel": "Maximum distance",
+  "priceBracketsTitle": "Distance brackets",
+  "fromKm": "From (km)",
+  "toKm": "To (km)",
+  "priceIqd": "Price (IQD)",
+  "savePricingRules": "Save pricing rules",
+  "pricingSaved": "Pricing rules saved.",
+  "pricingSaveFailed": "Could not save pricing rules. Check the values and try again.",
+  "pricingSavePermissionDenied": "Save blocked by Firebase. Deploy the latest firestore.rules and Cloud Functions (savePricingConfig), then confirm your account role in the users collection is manager or assistant with pricing permission.",
+  "pricingInvalidValues": "Check all distance and price fields use valid numbers.",
+  "estimatedDistanceNote": "Approximate distance — exact route could not be loaded.",
+  "noRideHistory": "No ride history yet.",
+  "chatWithDriver": "Chat with driver",
+  "chatWithCustomer": "Chat with customer",
+  "noChatMessages": "No messages yet. Say hello!",
+  "typeMessage": "Type a message…",
+  "holdToRecordVoice": "Tap mic to record voice",
+  "tapToRecordVoice": "Tap to record",
+  "stopRecording": "Stop & send",
+  "voiceMessageTooShort": "Hold the mic a little longer, then tap stop.",
+  "recordingVoice": "Recording…",
+  "voiceMessageLabel": "Voice message",
+  "microphonePermissionRequired": "Microphone permission is required for voice messages.",
+  "voiceMessageSendFailed": "Could not send voice message. Try again.",
+  "voiceMessagePlaybackFailed": "Could not play voice message.",
+  "messageSendFailed": "Could not send message. Check your connection and try again.",
+  "chatLoadFailed": "Could not load chat messages.",
+  "microphonePermissionWebHint": "Allow microphone access in your browser settings, then try again.",
+  "driverWorkDistrictLabel": "Work city",
+  "driverWorkDistrictHint": "Assign this driver to a city. They receive ride requests only in that city. First driver to accept gets the ride.",
+  "driverWorkDistrictRequired": "Manager must assign a work city before this driver can receive rides.",
+  "driverWorkDistrictSaved": "Driver work city updated.",
+  "saveDriverWorkDistrict": "Save work city",
+  "noDriversInDistrict": "No drivers are online in this city right now. Ask the manager to assign drivers to this area.",
+  "openChat": "Chat",
+  "supportTitle": "Support",
+  "contactManagement": "Contact management",
+  "supportMessageHint": "Describe your issue or question…",
+  "supportSent": "Message sent to management.",
+  "callSupport": "Call",
+  "whatsappSupport": "WhatsApp support",
+  "emailSupport": "Email support",
+  "legalDocuments": "Legal",
+  "privacyPolicy": "Privacy Policy",
+  "termsOfService": "Terms of Service",
+  "managementReply": "Management",
+  "supportInboxTab": "Support inbox",
+  "noSupportMessages": "No support messages yet.",
+  "replyToUser": "Reply to user…",
+  "closeThread": "Close",
+  "driverHistoryTitle": "Driver history",
+  "viewDriverHistory": "View ride history",
+  "earningsTab": "Earnings",
+  "commissionSettingsTitle": "Platform commission",
+  "commissionSettingsHint": "Set the percentage the platform keeps from each completed ride fare. This applies to all drivers.",
+  "platformPercentLabel": "Commission percentage",
+  "saveCommissionSettings": "Save commission",
+  "commissionSaved": "Commission settings saved.",
+  "commissionSaveFailed": "Could not save commission. Enter a value between 0 and 100.",
+  "totalPlatformProfit": "Total platform profit",
+  "managerProfitByDriver": "Profit by driver",
+  "managerProfitFromDriver": "Your profit",
+  "driverNetEarnings": "Driver earnings",
+  "platformCommission": "Platform commission",
+  "outstandingProfitLabel": "Outstanding profit",
+  "outstandingProfitTotal": "Total outstanding profit",
+  "lifetimeProfitLabel": "Lifetime profit",
+  "lifetimeProfitTotal": "Total lifetime profit",
+  "owedToPlatformLabel": "Owed to platform",
+  "lastProfitReceivedLabel": "Last profit received",
+  "receivedProfitsTitle": "Confirm profit received",
+  "receivedProfitsAction": "Profits received",
+  "receivedProfitsConfirm": "Confirm you received {amount} from this driver. Their outstanding balance will reset to zero for the next rides.",
+  "@receivedProfitsConfirm": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "receivedProfitsSuccess": "Profit received. Outstanding balance reset.",
+  "driverBonusesTab": "Bonuses",
+  "driverBonusesHint": "Grant bonuses to drivers and mark them as paid when you pay out.",
+  "grantBonusQuickTitle": "Grant bonus to driver",
+  "grantBonusTitle": "Grant bonus",
+  "grantBonusHint": "Add a bonus for {driverName}.",
+  "@grantBonusHint": {
+    "placeholders": {
+      "driverName": {"type": "String"}
+    }
+  },
+  "grantBonusAction": "Grant bonus",
+  "bonusAmountLabel": "Bonus amount",
+  "bonusReasonLabel": "Reason (optional)",
+  "bonusAmountInvalid": "Enter a valid bonus amount.",
+  "bonusGranted": "Bonus granted.",
+  "pendingBonusLabel": "Pending bonus",
+  "pendingBonusesTitle": "Pending bonuses",
+  "noPendingBonuses": "No pending bonuses.",
+  "markBonusPaid": "Mark paid",
+  "bonusMarkedPaid": "Bonus marked as paid.",
+  "completedRidesCount": "Completed rides",
+  "yourEarningsTitle": "Your earnings",
+  "rideEarningsManager": "Fare {fare} • Your profit {profit} ({percent}%)",
+  "@rideEarningsManager": {
+    "placeholders": {
+      "fare": {"type": "String"},
+      "profit": {"type": "String"},
+      "percent": {"type": "String"}
+    }
+  },
+  "rideEarningsDriver": "You keep {net} • Platform fee {fee} ({percent}%)",
+  "@rideEarningsDriver": {
+    "placeholders": {
+      "net": {"type": "String"},
+      "fee": {"type": "String"},
+      "percent": {"type": "String"}
+    }
+  },
+  "idPhotoLabel": "ID photo",
+  "profilePhotoLabel": "Your photo",
+  "pickFromGallery": "Gallery",
+  "takePhoto": "Camera",
+  "driverTermsTitle": "Terms to work with Hello Tuk-Tuk",
+  "driverTermsBody": "You agree to follow app rules, provide safe rides, collect cash fares honestly, and accept that the manager may review your documents and block your account for repeated cancellations or violations.",
+  "acceptDriverTerms": "I accept the terms to work with this app",
+  "registrationFieldsRequired": "Please fill in all required fields.",
+  "vehiclePlateOptional": "Plate number (optional)",
+  "licenseNumberOptional": "License number (optional)",
+  "registrationPhotosRequired": "Please upload your ID photo and your personal photo.",
+  "registrationTermsRequired": "You must accept the terms before submitting.",
+  "registrationSubmitFailed": "Could not submit registration. Check your connection and try again.",
+  "photoPickFailed": "Could not load the photo. Allow camera or gallery permission and try again.",
+  "registrationStorageRulesHint": "Photo upload blocked by Firebase. Open Firebase Console → Storage → Rules, paste storage.rules from the project, then Publish.",
+  "customersTab": "Customers",
+  "noCustomers": "No customers yet.",
+  "blockUser": "Block",
+  "unblockUser": "Unblock",
+  "removeDriver": "Delete account",
+  "removeDriverConfirmTitle": "Delete this driver account?",
+  "removeDriverConfirmMessage": "This removes their profile from the app. They can use Forgot Password, then log in with the same phone to set up again.",
+  "driverRemoved": "Driver account deleted.",
+  "removeDriverFailed": "Could not delete driver account. Try again.",
+  "deleteCustomer": "Delete account",
+  "removeCustomerConfirmTitle": "Delete this customer account?",
+  "removeCustomerConfirmMessage": "This removes their profile from the app. They can use Forgot Password, then log in with the same phone to set up again.",
+  "customerRemoved": "Customer account deleted.",
+  "removeCustomerFailed": "Could not delete customer account. Try again.",
+  "accountReleasedSignupHint": "This phone was reset by the manager. Use Forgot Password to set a new password, then log in to create your profile again.",
+  "blockedLabel": "Blocked",
+  "accountBlockedTitle": "Account blocked",
+  "driverBlockedBody": "Your driver account has been blocked by management. Contact support if you think this is a mistake.",
+  "customerBlockedBody": "Your account has been blocked by management because of repeated ride cancellations or other violations. Contact support for help.",
+  "cancelledRidesCount": "Cancelled rides",
+  "noDriverPhotos": "No photos uploaded.",
+  "addBracket": "Add bracket",
+  "removeBracket": "Remove bracket",
+  "liveMapTab": "Live map",
+  "tripDetailsTitle": "Trip details",
+  "customerDetails": "Customer",
+  "driverDetails": "Driver",
+  "noDriverAssigned": "No driver assigned yet.",
+  "managerProfileTitle": "Manager profile",
+  "noLocationYet": "Location not available",
+  "noOnlineDrivers": "No drivers online right now.",
+  "tripMapTitle": "Trip map",
+  "tripStatusLabel": "Trip status",
+  "statusLabel": "Status",
+  "myProfileTitle": "My profile",
+  "myTripsTitle": "My trips",
+  "accountInformation": "Account information",
+  "accountTypeLabel": "Account type",
+  "registeredAt": "Registered",
+  "tripDateTime": "Date & time",
+  "tripHistoryHint": "Your completed and cancelled trips with date and time.",
+  "totalTripsCount": "{count} completed trips",
+  "@totalTripsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "rateDriverTitle": "Rate your driver",
+  "rateDriverHint": "How was your trip?",
+  "driverFeedbackLabel": "Feedback (optional)",
+  "driverFeedbackHint": "Share your experience with the driver",
+  "submitRating": "Submit rating",
+  "ratingSubmitted": "Thank you for your feedback!",
+  "driverReviewsTab": "Driver reviews",
+  "noDriverReviews": "No driver reviews yet",
+  "driverLabel": "Driver",
+  "customerLabel": "Customer",
+  "unknownUser": "Unknown",
+  "feedbackLabel": "Feedback",
+  "awaitingPayment": "Awaiting payment confirmation",
+  "cityPricingLabel": "City / district",
+  "roleAssistant": "Assistant",
+  "assistantsTab": "Assistants",
+  "assistantsTabHint": "Create dashboard accounts for your team with limited permissions.",
+  "createAssistantTitle": "New assistant account",
+  "createAssistantButton": "Create assistant",
+  "assistantPermissionsTitle": "Allowed activities",
+  "assistantFormInvalid": "Enter name, valid email, and password (6+ characters).",
+  "assistantCreated": "Assistant account created.",
+  "assistantCreateFailed": "Could not create assistant.",
+  "existingAssistantsTitle": "Team members",
+  "noAssistantsYet": "No assistants yet.",
+  "editAssistantPermissions": "Edit permissions",
+  "assistantLoginHint": "Use the email and password your manager gave you.",
+  "assistantNoPermissions": "Your account has no dashboard permissions. Contact the manager.",
+  "emailLabel": "Email",
+  "permPendingDrivers": "Approve pending drivers",
+  "permActiveRides": "View active rides",
+  "permLiveMap": "View live map",
+  "permAllDrivers": "View all drivers",
+  "permCustomers": "Manage customers",
+  "permRideHistory": "View ride history",
+  "permPricing": "Edit city pricing",
+  "permEarnings": "View earnings & commission",
+  "permDriverReviews": "View driver reviews",
+  "permSupportInbox": "Support inbox",
+  "permManageAssistants": "Manage assistants",
+  "filterByCity": "Filter by city",
+  "allCities": "All cities",
+  "filterBySubDistrict": "Filter by sub-district",
+  "allSubDistricts": "All sub-districts",
+  "filterByMonth": "Filter by month",
+  "allMonths": "All months",
+  "tripsInMonth": "{count} trips",
+  "@tripsInMonth": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "supportContactSettings": "Support contact",
+  "supportPhoneLabel": "Support phone number",
+  "supportWhatsappLabel": "WhatsApp number",
+  "supportEmailLabel": "Support email",
+  "saveSupportContact": "Save contact",
+  "supportContactSaved": "Support contact saved.",
+  "pricingUsingDefaultsHint": "Showing default prices for this city. Edit the values below and click Save to store them in Firebase.",
+  "pricingForCity": "Prices for {city}",
+  "@pricingForCity": {
+    "placeholders": {
+      "city": {
+        "type": "String"
+      }
+    }
+  },
+  "pricingDistrictDefault": "District default (all sub-districts)",
+  "pricingForArea": "Prices for {district} — {subDistrict}",
+  "@pricingForArea": {
+    "placeholders": {
+      "district": {
+        "type": "String"
+      },
+      "subDistrict": {
+        "type": "String"
+      }
+    }
+  },
+  "pricingSubDistrictFallbackHint": "If no sub-district prices are saved, the district default prices are used for rides.",
+  "promoCodesTab": "Promo codes",
+  "promoCodesHint": "New customers automatically receive the FREE3 code when auto-assign is enabled.",
+  "promoCodeLabel": "Promo code",
+  "promoCodeActive": "Active",
+  "promoEnabledLabel": "Promo enabled",
+  "promoEnabledHint": "Turn off to stop discounts without deleting the code.",
+  "promoAutoAssignLabel": "Auto-assign on signup",
+  "promoAutoAssignHint": "Give this code to every new customer account.",
+  "promoDiscountPercentLabel": "Discount percent",
+  "promoMaxDiscountLabel": "Max discount per ride",
+  "promoMaxRidesLabel": "Discounted rides per customer",
+  "promoDescriptionLabel": "Description",
+  "savePromoCode": "Save promo code",
+  "promoCodeSaved": "Promo code saved.",
+  "promoDiscountApplied": "{code}: you save {amount}",
+  "@promoDiscountApplied": {
+    "placeholders": {
+      "code": { "type": "String" },
+      "amount": { "type": "String" }
+    }
+  },
+  "monthlyLeaderboardTab": "Monthly prize leaderboard",
+  "monthlyLeaderboardMonth": "Month: {monthKey}",
+  "@monthlyLeaderboardMonth": {
+    "placeholders": {
+      "monthKey": { "type": "String" }
+    }
+  },
+  "monthlyPrizeAmount": "Prize: {amount}",
+  "@monthlyPrizeAmount": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "leaderboardRideCount": "{count} rides this month",
+  "@leaderboardRideCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "leaderboardEmpty": "No completed rides this month yet.",
+  "markAsWinner": "Mark as winner",
+  "markAsPaid": "Mark as paid",
+  "resetMonthlyCounter": "Reset monthly counter",
+  "resetMonthlyConfirm": "Reset all driver ride counts for the new month? This clears the current winner.",
+  "leaderboardWinnerMarked": "Winner marked.",
+  "leaderboardPaidMarked": "Prize marked as paid.",
+  "leaderboardResetDone": "Monthly counters reset.",
+  "leaderboardWinnerBadge": "Winner",
+  "leaderboardPaidBadge": "Paid",
+  "leaderboardCurrentWinner": "Current winner: {name}",
+  "@leaderboardCurrentWinner": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "permPromoCodes": "Manage promo codes",
+  "permMonthlyLeaderboard": "Monthly prize leaderboard",
+  "driverMonthlyPrizeTitle": "Monthly prize challenge",
+  "driverMonthlyRideCount": "{count} rides this month",
+  "@driverMonthlyRideCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "driverMonthlyRank": "You are #{rank} this month — {count} rides",
+  "@driverMonthlyRank": {
+    "placeholders": {
+      "rank": { "type": "int" },
+      "count": { "type": "int" }
+    }
+  },
+  "driverMonthlyPrizeAmount": "Top driver this month wins {amount}!",
+  "@driverMonthlyPrizeAmount": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "ridePromoSectionTitle": "Promo code used",
+  "ridePromoCodeUsed": "Code: {code}",
+  "@ridePromoCodeUsed": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "ridePromoOriginalFare": "Full fare: {amount}",
+  "@ridePromoOriginalFare": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "ridePromoCustomerPaid": "Customer paid: {amount}",
+  "@ridePromoCustomerPaid": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "ridePromoDiscountAmount": "Promo discount: {amount}",
+  "@ridePromoDiscountAmount": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "rideDriverCompensationOwed": "Pay driver: {amount}",
+  "@rideDriverCompensationOwed": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "rideDriverCompensationHint": "The customer paid less because of the promo. Pay the driver this amount so they are not shortchanged.",
+  "ridePromoUsedCompact": "{code} −{amount}",
+  "@ridePromoUsedCompact": {
+    "placeholders": {
+      "code": { "type": "String" },
+      "amount": { "type": "String" }
+    }
+  },
+  "rideDriverCompensationCompact": "Pay driver {amount}",
+  "@rideDriverCompensationCompact": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "fakeDriversTitle": "Test drivers",
+  "fakeDriversHint": "Create a fake driver for testing. When you activate them, they go online in Hilla and automatically accept matched rides.",
+  "createFakeDriver": "Create test driver",
+  "fakeDriverCreated": "Test driver created. Tap Activate to go online.",
+  "fakeDriverBadge": "Test",
+  "activateFakeDriver": "Activate",
+  "deactivateFakeDriver": "Deactivate",
+  "fakeDriverActivated": "Test driver is online and will auto-accept rides.",
+  "fakeDriverDeactivated": "Test driver is offline.",
+  "driverNameLabel": "Driver name",
+  "savedPlacesTitle": "Saved places",
+  "placeSaveAction": "Save place",
+  "placeRemoveFromSaved": "Remove from saved",
+  "placeSaved": "Place saved.",
+  "placeRemovedFromSaved": "Removed from saved places.",
+  "savedPlacesEmptyHint": "Search for a place and tap Save to keep it here.",
+  "savePlaceShort": "Save",
+  "savedPlaceShort": "Saved",
+  "savePlaceHint": "Tap Save on any result to add it to your saved places.",
+  "broadcastToDrivers": "Message all drivers",
+  "broadcastToCustomers": "Message all customers",
+  "broadcastDriversHint": "Send a push notification to every approved online-capable driver.",
+  "broadcastCustomersHint": "Send a push notification to every customer.",
+  "announcementTitleLabel": "Title",
+  "announcementMessageLabel": "Message",
+  "announcementDefaultTitle": "Announcement",
+  "announcementFieldsRequired": "Enter a title and message.",
+  "sendAnnouncement": "Send",
+  "broadcastSentSummary": "Sent to {sent} of {total} devices.",
+  "@broadcastSentSummary": {
+    "placeholders": {
+      "sent": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "broadcastPublishedSummary": "Announcement published to {total} users. They will receive it in the app.",
+  "@broadcastPublishedSummary": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "broadcastSendFailed": "Could not send announcement. Check your connection and try again.",
+  "editProfileTitle": "Edit profile",
+  "editProfileButton": "Edit profile",
+  "profilePhotoLabel": "Profile photo",
+  "saveProfile": "Save profile",
+  "profileUpdated": "Profile updated.",
+  "changePasswordTitle": "Change password",
+  "currentPassword": "Current password",
+  "newPassword": "New password",
+  "confirmNewPassword": "Confirm new password",
+  "changePasswordButton": "Update password",
+  "passwordChanged": "Password updated.",
+  "passwordFieldsRequired": "Enter your current and new password.",
+  "passwordsDoNotMatch": "New passwords do not match.",
+  "fullNameRequired": "Name is required.",
+  "phoneChangeHint": "To change your phone, enter the new number and your current password below.",
+  "currentPasswordForPhoneChange": "Current password (required to change phone)",
+  "phoneChangePasswordRequired": "Enter your current password to change phone number.",
+  "recoveryEmailLabel": "Recovery email (optional)",
+  "recoveryEmailHint": "Optional email for account recovery.",
+  "forgotPasswordStepsHint": "Enter your phone number and new password.",
+  "whatsappOtpTitle": "SMS verification",
+  "whatsappOtpInstructions": "Enter the 6-digit code we sent to your phone by SMS.",
+  "whatsappOtpSent": "Verification code sent to {phone}.",
+  "@whatsappOtpSent": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "whatsappOtpResend": "Resend code",
+  "whatsappOtpResendWait": "Resend in {seconds}s",
+  "@whatsappOtpResendWait": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "whatsappOtpSendFailed": "Could not send SMS verification code. Try again.",
+  "whatsappOtpIncorrect": "Incorrect verification code.",
+  "whatsappOtpExpired": "Verification code expired. Tap Resend code and try again.",
+  "whatsappOtpTooManyAttempts": "Too many attempts. Request a new code.",
+  "whatsappOtpSignupHint": "We will send an SMS verification code before creating your account.",
+  "openPasswordResetPage": "Open reset page",
+  "resetLinkOpened": "Password reset page opened. Set your new password there.",
+  "resetWhileLoggedInHint": "If you are signed in, open Profile → Edit profile → Change password.",
+  "announcementsTitle": "Announcements",
+  "announcementsEmpty": "No announcements from the manager yet."
+}

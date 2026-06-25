@@ -1,0 +1,684 @@
+{
+  "@@locale": "ar",
+  "appTitle": "Hello Tuk-Tuk",
+  "welcomeMessage": "أهلاً بكم!",
+  "continueLabel": "متابعة",
+  "cancel": "إلغاء",
+  "save": "حفظ",
+  "logout": "تسجيل الخروج",
+  "language": "اللغة",
+  "english": "English",
+  "arabic": "العربية",
+  "selectRole": "كيف ستستخدم Hello Tuk-Tuk؟",
+  "roleCustomer": "زبون",
+  "roleCustomerDesc": "اطلب رحلات داخل الحلة",
+  "roleDriver": "سائق",
+  "roleDriverDesc": "اقبل الرحلات واكسب المال",
+  "roleManager": "مدير",
+  "roleManagerDesc": "وافق على السائقين وأدر الأسطول",
+  "phoneLogin": "تسجيل الدخول بالهاتف",
+  "phoneHint": "رقم الهاتف",
+  "sendCode": "إرسال رمز التحقق",
+  "verifyCode": "تحقق من الرمز",
+  "otpHint": "رمز من 6 أرقام",
+  "customerProfileTitle": "ملفك الشخصي",
+  "fullName": "الاسم الكامل",
+  "age": "العمر",
+  "gender": "الجنس (اختياري)",
+  "male": "ذكر",
+  "female": "أنثى",
+  "pickup": "نقطة الانطلاق",
+  "destination": "الوجهة",
+  "searchPlaces": "ابحث عن أماكن في الحلة",
+  "noPlacesFound": "لم يتم العثور على أماكن. جرّب اسمًا أقصر أو استخدم تحديد على الخريطة.",
+  "searchAction": "بحث",
+  "searchPlacesHint": "اكتب بالعربية ثم اضغط بحث. على المحاكي: Win+Space لاختيار لوحة العربية",
+  "searchFieldHint": "ابحث أو اكتب بالإنجليزية (hospital, market)",
+  "searchTapPlaceHint": "اضغط على مكان من القائمة، أو اختر تصنيفاً أدناه",
+  "placesInHillaCount": "{count} مكان في الحلة",
+  "@placesInHillaCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pinOnMap": "حدد على الخريطة",
+  "requestRide": "اطلب رحلة",
+  "searchingDriver": "جاري البحث عن سائق...",
+  "driverFound": "السائق في الطريق",
+  "noDriversAvailable": "لا يوجد سائقون متاحون حالياً. حاول لاحقاً.",
+  "liveDriverLocation": "موقع السائق المباشر",
+  "driverRegistration": "تسجيل السائق",
+  "vehicleType": "نوع المركبة",
+  "vehiclePlate": "رقم اللوحة",
+  "licenseNumber": "رقم الرخصة",
+  "submitForApproval": "إرسال للموافقة",
+  "pendingApprovalTitle": "بانتظار موافقة المدير",
+  "pendingApprovalBody": "سيتم تفعيل حسابك بعد مراجعة المدير لمعلوماتك.",
+  "rejectedTitle": "تم رفض التسجيل",
+  "goOnline": "اتصل بالعمل",
+  "goOffline": "قطع الاتصال",
+  "newRideRequest": "طلب رحلة جديد",
+  "acceptRide": "قبول الرحلة",
+  "rejectRide": "رفض الرحلة",
+  "activeRideExists": "لديك رحلة نشطة بالفعل. أنهِها أو ألغِها قبل حجز رحلة أخرى.",
+  "managerTitle": "موافقات السائقين",
+  "approve": "موافقة",
+  "reject": "رفض",
+  "noPendingDrivers": "لا توجد طلبات سائقين معلقة",
+  "noDriversYet": "لا يوجد سائقون مسجلون بعد.",
+  "pendingDriversLoadError": "تعذّر تحميل السائقين. انشر قواعد Firestore من firestore.rules في Firebase Console → Firestore → Rules ثم Publish. تأكد أيضاً أنك مسجل دخول كمدير.",
+  "checkAllDriversTab": "نصيحة: افتح تبويب كل السائقين لرؤية جميع السائقين المسجلين.",
+  "unnamedDriver": "سائق (الاسم غير محفوظ)",
+  "routeToPickup": "إلى نقطة العميل",
+  "routeToDestination": "من الانطلاق إلى الوجهة",
+  "firebaseSetupRequired": "Firebase غير مهيأ. نفّذ: flutterfire configure",
+  "currentLocation": "موقعي الحالي",
+  "confirmLocation": "تأكيد الموقع",
+  "tapMapToPin": "اضغط على الخريطة لاختيار موقع",
+  "rideFrom": "من",
+  "rideTo": "إلى",
+  "profile": "الملف الشخصي",
+  "wrongRoleTitle": "تطبيق خاطئ لهذا الحساب",
+  "wrongRoleBody": "هذا التطبيق مخصص لحسابات {expectedRole}. أنت مسجل كـ {actualRole}.",
+  "@wrongRoleBody": {
+    "placeholders": {
+      "expectedRole": {"type": "String"},
+      "actualRole": {"type": "String"}
+    }
+  },
+  "adminPanelTitle": "Hello Tuk-Tuk Admin",
+  "pendingDriversTab": "المعلقة",
+  "activeRidesTab": "الرحلات النشطة",
+  "allDriversTab": "كل السائقين",
+  "rideHistoryTab": "السجل",
+  "noActiveRides": "لا توجد رحلات نشطة",
+  "cashFare": "أجرة نقداً",
+  "paymentMethodCash": "الدفع: نقداً فقط",
+  "startRide": "بدء الرحلة",
+  "endRide": "إنهاء الرحلة",
+  "cashCollected": "تم استلام النقد",
+  "waitingCustomerCashConfirm": "بانتظار تأكيد الزبون للدفع النقدي",
+  "payCash": "دفعت نقداً",
+  "cashPaymentConfirmed": "تم تأكيد الدفع النقدي",
+  "waitingForRides": "بانتظار طلبات الرحلات",
+  "rideCompleted": "اكتملت الرحلة",
+  "modeChooserSubtitle": "اختر كيف تريد استخدام Hello Tuk-Tuk اليوم",
+  "takeRide": "خذ رحلة",
+  "takeRideDesc": "احجز رحلة داخل مدينة الحلة",
+  "driveAndEarn": "ادخل أو سجّل كسائق",
+  "driveAndEarnDesc": "أنشئ حساب السائق وابدأ بقبول الرحلات",
+  "accountAlreadyOpenElsewhere": "هذا الحساب مفتوح على هاتف آخر. سجّل الخروج منه أولاً ثم حاول مرة أخرى.",
+  "accountLoggedInElsewhere": "تم تسجيل خروجك لأن الحساب فُتح على هاتف آخر.",
+  "switchMode": "تغيير الوضع",
+  "phoneLoginModeHint": "سجّل الدخول برقم هاتفك لإكمال التسجيل",
+  "managerAccessDenied": "لوحة الإدارة مخصصة لحسابات المدير فقط.",
+  "phoneNumberInvalid": "أدخل رقم هاتف عراقي صحيح (9 أرقام بعد +964).",
+  "phoneHintExample": "7901234567",
+  "phoneVerificationFailed": "فشل التحقق من الهاتف. تحقق من إعداد Firebase وحاول مرة أخرى.",
+  "webPhoneLoginHint": "على الويب، يحتاج تسجيل الدخول إلى Firebase وreCAPTCHA. للاختبار استخدم هاتف Android أو محاكي.",
+  "loginTitle": "تسجيل الدخول",
+  "passwordLabel": "كلمة المرور",
+  "rememberMe": "تذكرني",
+  "forgotPassword": "نسيت كلمة المرور؟",
+  "loginButton": "تسجيل الدخول",
+  "createAccountButton": "إنشاء حساب",
+  "loginFailed": "فشل تسجيل الدخول. تحقق من الهاتف وكلمة المرور.",
+  "signupTitle": "إنشاء حساب",
+  "emailOptional": "البريد الإلكتروني (اختياري)",
+  "passwordMinLength": "كلمة المرور 6 أحرف على الأقل.",
+  "nameRequired": "يرجى إدخال الاسم الكامل.",
+  "signupFailed": "فشل إنشاء الحساب. جرّب رقم هاتف آخر.",
+  "resetEmailSent": "تم إرسال رابط إعادة تعيين كلمة المرور.",
+  "resetFailed": "تعذّر إرسال رابط إعادة التعيين.",
+  "forgotPasswordHint": "أدخل رقم هاتفك أو بريدك لإعادة تعيين كلمة المرور.",
+  "sendResetLink": "إرسال رابط إعادة التعيين",
+  "bookRideTitle": "حجز رحلة",
+  "minutes": "د",
+  "bookNowButton": "احجز الآن",
+  "bookRideFailed": "تعذّر إكمال الحجز. تحقق من الاتصال وحاول مرة أخرى.",
+  "currentRideTitle": "الرحلة الحالية",
+  "pickupDestinationRequired": "اختر نقطة الانطلاق والوجهة أولاً.",
+  "pickupDestinationMustDiffer": "يجب أن تكون نقطة الانطلاق مختلفة عن الوجهة (100 متر على الأقل).",
+  "districtLabel": "القضاء",
+  "subDistrictLabel": "الناحية",
+  "selectSubDistrictHint": "اختر الناحية",
+  "selectSubDistrictRequired": "يرجى اختيار الناحية أولاً.",
+  "fixedCustomerDistrictLabel": "قضاء الهاشمية",
+  "whereTo": "إلى أين؟",
+  "bookRideButton": "احجز رحلة",
+  "findingDriverTitle": "البحث عن سائق",
+  "findingDriverSubtitle": "إشعار السائقين المتصلين في مدينتك. أول من يقبل يحصل على الرحلة.",
+  "driverAssignedTitle": "تم تعيين السائق",
+  "waitingDriverAccept": "بانتظار قبول السائق للرحلة…",
+  "trackDriverTitle": "تتبع السائق",
+  "tripInProgress": "الرحلة جارية",
+  "tripCompletedTitle": "اكتملت الرحلة",
+  "doneButton": "تم",
+  "searchRegionHint": "البحث محصور في {region}",
+  "@searchRegionHint": {
+    "placeholders": {
+      "region": {"type": "String"}
+    }
+  },
+  "placesInRegionCount": "{count} مكان في {region}",
+  "@placesInRegionCount": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "region": {"type": "String"}
+    }
+  },
+  "searchOutsideRegion": "هذا الموقع خارج المنطقة المحددة.",
+  "googleMapsKeyRequired": "أضف مفتاح Google Maps لتفعيل البحث عبر الإنترنت.",
+  "placesApiDenied": "البحث عبر الإنترنت محدود. النتائج أدناه من OpenStreetMap في هذه المنطقة.",
+  "locatingCurrentPosition": "جاري تحديد موقعك…",
+  "searchUsingOpenStreetMap": "عرض الأماكن من OpenStreetMap في هذه المنطقة.",
+  "locationServiceDisabled": "فعّل خدمة الموقع (GPS) من إعدادات الهاتف.",
+  "locationPermissionDenied": "التطبيق يحتاج إذن الموقع. اسمح به من إعدادات التطبيق.",
+  "locationFetchFailed": "تعذّر تحديد موقع GPS. اضغط أيقونة الموقع للمحاولة مرة أخرى.",
+  "authEmailPasswordDisabled": "Enable Email/Password in Firebase Console: Authentication → Sign-in method → Email/Password → Enable.",
+  "authEmailAlreadyInUse": "رقم الهاتف مسجل مسبقاً. جرّب تسجيل الدخول.",
+  "restoreProfileTitle": "استعادة الحساب",
+  "restoreProfileMessage": "تسجيل الدخول لا يزال نشطاً لكن بيانات ملفك حُذفت من الخادم. أدخل اسمك أدناه لاستعادة الوصول.",
+  "restoreProfileRoleHint": "نوع الحساب: {role}",
+  "@restoreProfileRoleHint": {
+    "placeholders": {
+      "role": {"type": "String"}
+    }
+  },
+  "restoreProfileAction": "استعادة الحساب",
+  "useDifferentAccount": "استخدام حساب آخر",
+  "assistantProfileMissingHint": "يجب على المدير إعادة إنشاء حسابات المساعدين من لوحة الإدارة.",
+  "authTooManyRequests": "محاولات كثيرة. انتظر دقائق ثم حاول مرة أخرى.",
+  "authNetworkError": "خطأ في الشبكة. تحقق من الإنترنت وحاول مرة أخرى.",
+  "dragMapToSelectPin": "حرّك الخريطة لوضع الدبوس على الموقع المطلوب.",
+  "pinStreetNameRequired": "تعذر قراءة اسم الشارع. حرّك الدبوس قليلاً ثم حاول مرة أخرى.",
+  "outOfServiceZone": "خارج نطاق الخدمة",
+  "calculatingFare": "جاري حساب الأجرة…",
+  "fareCalculationFailed": "تعذّر حساب الأجرة. تحقق من الاتصال وحاول مرة أخرى.",
+  "retry": "إعادة المحاولة",
+  "drivingDistance": "مسافة القيادة",
+  "maxDistanceLimit": "أقصى مسافة للرحلة {km} كم.",
+  "@maxDistanceLimit": {
+    "placeholders": {
+      "km": {"type": "String"}
+    }
+  },
+  "pricingTab": "التسعير",
+  "pricingRulesTitle": "قواعد التسعير",
+  "pricingRulesHint": "يتم حساب الأجرة حسب مسافة القيادة من Google Maps. الرحلات التي تتجاوز الحد الأقصى للمسافة مرفوضة.",
+  "maxDistanceKmLabel": "أقصى مسافة",
+  "priceBracketsTitle": "شرائح المسافة",
+  "fromKm": "من (كم)",
+  "toKm": "إلى (كم)",
+  "priceIqd": "السعر (د.ع)",
+  "savePricingRules": "حفظ قواعد التسعير",
+  "pricingSaved": "تم حفظ قواعد التسعير.",
+  "pricingSaveFailed": "تعذّر حفظ قواعد التسعير. تحقق من القيم وحاول مرة أخرى.",
+  "pricingSavePermissionDenied": "Firebase منع الحفظ. انشر firestore.rules وCloud Functions (savePricingConfig)، وتأكد أن role حسابك في مجموعة users هو manager أو assistant مع صلاحية pricing.",
+  "pricingInvalidValues": "تحقق من أن جميع حقول المسافة والسعر تحتوي أرقاماً صحيحة.",
+  "estimatedDistanceNote": "مسافة تقريبية — تعذّر تحميل مسار القيادة الدقيق.",
+  "noRideHistory": "لا يوجد سجل رحلات بعد.",
+  "chatWithDriver": "محادثة مع السائق",
+  "chatWithCustomer": "محادثة مع الزبون",
+  "noChatMessages": "لا توجد رسائل بعد. ابدأ المحادثة!",
+  "typeMessage": "اكتب رسالة…",
+  "holdToRecordVoice": "اضغط الميكروفون للتسجيل",
+  "tapToRecordVoice": "اضغط للتسجيل",
+  "stopRecording": "إيقاف وإرسال",
+  "voiceMessageTooShort": "استمر بالتسجيل قليلاً ثم اضغط إيقاف.",
+  "recordingVoice": "جاري التسجيل…",
+  "voiceMessageLabel": "رسالة صوتية",
+  "microphonePermissionRequired": "يلزم إذن الميكروفون لإرسال الرسائل الصوتية.",
+  "voiceMessageSendFailed": "تعذر إرسال الرسالة الصوتية. حاول مرة أخرى.",
+  "voiceMessagePlaybackFailed": "تعذر تشغيل الرسالة الصوتية.",
+  "messageSendFailed": "تعذر إرسال الرسالة. تحقق من الاتصال وحاول مرة أخرى.",
+  "chatLoadFailed": "تعذر تحميل رسائل المحادثة.",
+  "microphonePermissionWebHint": "اسمح للمتصفح باستخدام الميكروفون ثم حاول مرة أخرى.",
+  "driverWorkDistrictLabel": "مدينة العمل",
+  "driverWorkDistrictHint": "عيّن مدينة عمل للسائق. يستلم طلبات الرحلات في هذه المدينة فقط. أول سائق يقبل يأخذ الرحلة.",
+  "driverWorkDistrictRequired": "يجب على المدير تعيين مدينة عمل قبل أن يستلم السائق الطلبات.",
+  "driverWorkDistrictSaved": "تم تحديث مدينة عمل السائق.",
+  "saveDriverWorkDistrict": "حفظ مدينة العمل",
+  "noDriversInDistrict": "لا يوجد سائقون متصلون في هذه المدينة حالياً. اطلب من المدير تعيين سائقين لهذه المنطقة.",
+  "openChat": "محادثة",
+  "supportTitle": "الدعم",
+  "contactManagement": "التواصل مع الإدارة",
+  "supportMessageHint": "صف مشكلتك أو سؤالك…",
+  "supportSent": "تم إرسال الرسالة إلى الإدارة.",
+  "callSupport": "اتصال",
+  "whatsappSupport": "دعم واتساب",
+  "emailSupport": "دعم البريد الإلكتروني",
+  "legalDocuments": "الشروط والخصوصية",
+  "privacyPolicy": "سياسة الخصوصية",
+  "termsOfService": "شروط الخدمة",
+  "managementReply": "الإدارة",
+  "supportInboxTab": "صندوق الدعم",
+  "noSupportMessages": "لا توجد رسائل دعم بعد.",
+  "replyToUser": "رد على المستخدم…",
+  "closeThread": "إغلاق",
+  "driverHistoryTitle": "سجل السائق",
+  "viewDriverHistory": "عرض سجل الرحلات",
+  "earningsTab": "الأرباح",
+  "commissionSettingsTitle": "عمولة المنصة",
+  "commissionSettingsHint": "حدد النسبة التي تحتفظ بها المنصة من أجرة كل رحلة مكتملة. تنطبق على جميع السائقين.",
+  "platformPercentLabel": "نسبة العمولة",
+  "saveCommissionSettings": "حفظ العمولة",
+  "commissionSaved": "تم حفظ إعدادات العمولة.",
+  "commissionSaveFailed": "تعذّر حفظ العمولة. أدخل قيمة بين 0 و 100.",
+  "totalPlatformProfit": "إجمالي أرباح المنصة",
+  "managerProfitByDriver": "الربح حسب السائق",
+  "managerProfitFromDriver": "ربحك",
+  "driverNetEarnings": "أرباح السائق",
+  "platformCommission": "عمولة المنصة",
+  "outstandingProfitLabel": "الربح المستحق",
+  "outstandingProfitTotal": "إجمالي الربح المستحق",
+  "lifetimeProfitLabel": "الربح التراكمي",
+  "lifetimeProfitTotal": "إجمالي الربح التراكمي",
+  "owedToPlatformLabel": "المبلغ المستحق للمنصة",
+  "lastProfitReceivedLabel": "آخر استلام للأرباح",
+  "receivedProfitsTitle": "تأكيد استلام الأرباح",
+  "receivedProfitsAction": "تم استلام الأرباح",
+  "receivedProfitsConfirm": "تأكيد استلام {amount} من هذا السائق. سيتم تصفير الرصيد المستحق للرحلات القادمة.",
+  "@receivedProfitsConfirm": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "receivedProfitsSuccess": "تم استلام الأرباح وتصفير الرصيد المستحق.",
+  "driverBonusesTab": "المكافآت",
+  "driverBonusesHint": "منح مكافآت للسائقين وتعليمها كمدفوعة عند الصرف.",
+  "grantBonusQuickTitle": "منح مكافأة لسائق",
+  "grantBonusTitle": "منح مكافأة",
+  "grantBonusHint": "إضافة مكافأة لـ {driverName}.",
+  "@grantBonusHint": {
+    "placeholders": {
+      "driverName": {"type": "String"}
+    }
+  },
+  "grantBonusAction": "منح مكافأة",
+  "bonusAmountLabel": "مبلغ المكافأة",
+  "bonusReasonLabel": "السبب (اختياري)",
+  "bonusAmountInvalid": "أدخل مبلغ مكافأة صحيح.",
+  "bonusGranted": "تم منح المكافأة.",
+  "pendingBonusLabel": "مكافأة معلقة",
+  "pendingBonusesTitle": "المكافآت المعلقة",
+  "noPendingBonuses": "لا توجد مكافآت معلقة.",
+  "markBonusPaid": "تم الدفع",
+  "bonusMarkedPaid": "تم تعليم المكافأة كمدفوعة.",
+  "completedRidesCount": "الرحلات المكتملة",
+  "yourEarningsTitle": "أرباحك",
+  "rideEarningsManager": "الأجرة {fare} • ربحك {profit} ({percent}%)",
+  "@rideEarningsManager": {
+    "placeholders": {
+      "fare": {"type": "String"},
+      "profit": {"type": "String"},
+      "percent": {"type": "String"}
+    }
+  },
+  "rideEarningsDriver": "تستلم {net} • عمولة المنصة {fee} ({percent}%)",
+  "@rideEarningsDriver": {
+    "placeholders": {
+      "net": {"type": "String"},
+      "fee": {"type": "String"},
+      "percent": {"type": "String"}
+    }
+  },
+  "idPhotoLabel": "صورة الهوية",
+  "profilePhotoLabel": "صورتك الشخصية",
+  "pickFromGallery": "المعرض",
+  "takePhoto": "الكاميرا",
+  "driverTermsTitle": "شروط العمل مع Hello Tuk-Tuk",
+  "driverTermsBody": "توافق على الالتزام بقواعد التطبيق، وتقديم رحلات آمنة، وتحصيل الأجرة نقداً بأمانة، وقبول مراجعة الإدارة لوثائقك وحظر حسابك عند الإلغاءات المتكررة أو المخالفات.",
+  "acceptDriverTerms": "أوافق على الشروط للعمل مع هذا التطبيق",
+  "registrationFieldsRequired": "يرجى تعبئة الحقول المطلوبة.",
+  "vehiclePlateOptional": "رقم اللوحة (اختياري)",
+  "licenseNumberOptional": "رقم الرخصة (اختياري)",
+  "registrationPhotosRequired": "يرجى رفع صورة الهوية وصورتك الشخصية.",
+  "registrationTermsRequired": "يجب الموافقة على الشروط قبل الإرسال.",
+  "registrationSubmitFailed": "تعذّر إرسال التسجيل. تحقق من الاتصال وحاول مرة أخرى.",
+  "photoPickFailed": "تعذّر تحميل الصورة. اسمح بالكاميرا أو المعرض وحاول مرة أخرى.",
+  "registrationStorageRulesHint": "Firebase منع رفع الصور. افتح Firebase Console → Storage → Rules، الصق storage.rules من المشروع، ثم Publish.",
+  "customersTab": "الزبائن",
+  "noCustomers": "لا يوجد زبائن بعد.",
+  "blockUser": "حظر",
+  "unblockUser": "إلغاء الحظر",
+  "removeDriver": "حذف الحساب",
+  "removeDriverConfirmTitle": "حذف حساب هذا السائق؟",
+  "removeDriverConfirmMessage": "سيتم حذف ملفهم من التطبيق. يمكنهم استخدام نسيت كلمة المرور ثم تسجيل الدخول بنفس الهاتف للبدء من جديد.",
+  "driverRemoved": "تم حذف حساب السائق.",
+  "removeDriverFailed": "تعذر حذف حساب السائق. حاول مرة أخرى.",
+  "deleteCustomer": "حذف الحساب",
+  "removeCustomerConfirmTitle": "حذف حساب هذا الزبون؟",
+  "removeCustomerConfirmMessage": "سيتم حذف ملفهم من التطبيق. يمكنهم استخدام نسيت كلمة المرور ثم تسجيل الدخول بنفس الهاتف للبدء من جديد.",
+  "customerRemoved": "تم حذف حساب الزبون.",
+  "removeCustomerFailed": "تعذر حذف حساب الزبون. حاول مرة أخرى.",
+  "accountReleasedSignupHint": "تمت إعادة تعيين هذا الرقم من قبل المدير. استخدم نسيت كلمة المرور لتعيين كلمة جديدة، ثم سجّل الدخول لإنشاء ملفك من جديد.",
+  "blockedLabel": "محظور",
+  "accountBlockedTitle": "الحساب محظور",
+  "driverBlockedBody": "تم حظر حسابك كسائق من قبل الإدارة. تواصل مع الدعم إذا كان ذلك خطأ.",
+  "customerBlockedBody": "تم حظر حسابك بسبب إلغاء رحلات متكررة أو مخالفات أخرى. تواصل مع الدعم للمساعدة.",
+  "cancelledRidesCount": "الرحلات الملغاة",
+  "noDriverPhotos": "لم يتم رفع صور.",
+  "addBracket": "إضافة شريحة",
+  "removeBracket": "حذف الشريحة",
+  "liveMapTab": "الخريطة الحية",
+  "tripDetailsTitle": "تفاصيل الرحلة",
+  "customerDetails": "الزبون",
+  "driverDetails": "السائق",
+  "noDriverAssigned": "لم يُعيَّن سائق بعد.",
+  "managerProfileTitle": "ملف المدير",
+  "noLocationYet": "الموقع غير متوفر",
+  "noOnlineDrivers": "لا يوجد سائقون متصلون الآن.",
+  "tripMapTitle": "خريطة الرحلة",
+  "tripStatusLabel": "حالة الرحلة",
+  "statusLabel": "الحالة",
+  "myProfileTitle": "ملفي",
+  "myTripsTitle": "رحلاتي",
+  "accountInformation": "معلومات الحساب",
+  "accountTypeLabel": "نوع الحساب",
+  "registeredAt": "تاريخ التسجيل",
+  "tripDateTime": "التاريخ والوقت",
+  "tripHistoryHint": "رحلاتك المكتملة والملغاة مع التاريخ والوقت.",
+  "totalTripsCount": "{count} رحلة مكتملة",
+  "@totalTripsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "rateDriverTitle": "قيّم السائق",
+  "rateDriverHint": "كيف كانت رحلتك؟",
+  "driverFeedbackLabel": "ملاحظات (اختياري)",
+  "driverFeedbackHint": "شاركنا تجربتك مع السائق",
+  "submitRating": "إرسال التقييم",
+  "ratingSubmitted": "شكراً لملاحظاتك!",
+  "driverReviewsTab": "تقييمات السائقين",
+  "noDriverReviews": "لا توجد تقييمات بعد",
+  "driverLabel": "السائق",
+  "customerLabel": "الزبون",
+  "unknownUser": "غير معروف",
+  "feedbackLabel": "الملاحظات",
+  "awaitingPayment": "بانتظار تأكيد الدفع",
+  "cityPricingLabel": "المدينة / القضاء",
+  "roleAssistant": "مساعد",
+  "assistantsTab": "المساعدون",
+  "assistantsTabHint": "أنشئ حسابات للفريق مع صلاحيات محدودة.",
+  "createAssistantTitle": "حساب مساعد جديد",
+  "createAssistantButton": "إنشاء مساعد",
+  "assistantPermissionsTitle": "الصلاحيات المسموحة",
+  "assistantFormInvalid": "أدخل الاسم وبريداً صحيحاً وكلمة مرور (6 أحرف على الأقل).",
+  "assistantCreated": "تم إنشاء حساب المساعد.",
+  "assistantCreateFailed": "تعذر إنشاء المساعد.",
+  "existingAssistantsTitle": "أعضاء الفريق",
+  "noAssistantsYet": "لا يوجد مساعدون بعد.",
+  "editAssistantPermissions": "تعديل الصلاحيات",
+  "assistantLoginHint": "استخدم البريد وكلمة المرور التي أعطاك إياها الإدارة.",
+  "assistantNoPermissions": "حسابك لا يملك صلاحيات. تواصل مع المدير.",
+  "emailLabel": "البريد الإلكتروني",
+  "permPendingDrivers": "الموافقة على السائقين المعلقين",
+  "permActiveRides": "عرض الرحلات النشطة",
+  "permLiveMap": "عرض الخريطة الحية",
+  "permAllDrivers": "عرض كل السائقين",
+  "permCustomers": "إدارة الزبائن",
+  "permRideHistory": "عرض سجل الرحلات",
+  "permPricing": "تعديل أسعار المدينة",
+  "permEarnings": "عرض الأرباح والعمولة",
+  "permDriverReviews": "عرض تقييمات السائقين",
+  "permSupportInbox": "صندوق الدعم",
+  "permManageAssistants": "إدارة المساعدين",
+  "filterByCity": "تصفية حسب المدينة",
+  "allCities": "كل المدن",
+  "filterBySubDistrict": "تصفية حسب الناحية",
+  "allSubDistricts": "كل النواحي",
+  "filterByMonth": "تصفية حسب الشهر",
+  "allMonths": "كل الأشهر",
+  "tripsInMonth": "{count} رحلة",
+  "@tripsInMonth": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "supportContactSettings": "رقم الدعم",
+  "supportPhoneLabel": "رقم هاتف الدعم",
+  "supportWhatsappLabel": "رقم واتساب",
+  "supportEmailLabel": "البريد الإلكتروني للدعم",
+  "saveSupportContact": "حفظ رقم الدعم",
+  "supportContactSaved": "تم حفظ رقم الدعم.",
+  "pricingUsingDefaultsHint": "يتم عرض الأسعار الافتراضية لهذه المدينة. عدّل القيم أدناه ثم اضغط حفظ لتخزينها في Firebase.",
+  "pricingForCity": "أسعار {city}",
+  "@pricingForCity": {
+    "placeholders": {
+      "city": {
+        "type": "String"
+      }
+    }
+  },
+  "pricingDistrictDefault": "افتراضي القضاء (كل النواحي)",
+  "pricingForArea": "أسعار {district} — {subDistrict}",
+  "@pricingForArea": {
+    "placeholders": {
+      "district": {
+        "type": "String"
+      },
+      "subDistrict": {
+        "type": "String"
+      }
+    }
+  },
+  "pricingSubDistrictFallbackHint": "إذا لم تُحفظ أسعار الناحية، تُستخدم أسعار القضاء الافتراضية للرحلات.",
+  "promoCodesTab": "أكواد الخصم",
+  "promoCodesHint": "يحصل الزبائن الجدد تلقائياً على كود FREE3 عند تفعيل الإسناد التلقائي.",
+  "promoCodeLabel": "كود الخصم",
+  "promoCodeActive": "مفعّل",
+  "promoEnabledLabel": "تفعيل الكود",
+  "promoEnabledHint": "أوقف الخصم دون حذف الكود.",
+  "promoAutoAssignLabel": "إسناد تلقائي عند التسجيل",
+  "promoAutoAssignHint": "منح هذا الكود لكل زبون جديد.",
+  "promoDiscountPercentLabel": "نسبة الخصم",
+  "promoMaxDiscountLabel": "أقصى خصم لكل رحلة",
+  "promoMaxRidesLabel": "عدد الرحلات المخفّضة لكل زبون",
+  "promoDescriptionLabel": "الوصف",
+  "savePromoCode": "حفظ كود الخصم",
+  "promoCodeSaved": "تم حفظ كود الخصم.",
+  "promoDiscountApplied": "{code}: توفر {amount}",
+  "@promoDiscountApplied": {
+    "placeholders": {
+      "code": { "type": "String" },
+      "amount": { "type": "String" }
+    }
+  },
+  "monthlyLeaderboardTab": "لوحة الجائزة الشهرية",
+  "monthlyLeaderboardMonth": "الشهر: {monthKey}",
+  "@monthlyLeaderboardMonth": {
+    "placeholders": {
+      "monthKey": { "type": "String" }
+    }
+  },
+  "monthlyPrizeAmount": "الجائزة: {amount}",
+  "@monthlyPrizeAmount": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "leaderboardRideCount": "{count} رحلة هذا الشهر",
+  "@leaderboardRideCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "leaderboardEmpty": "لا توجد رحلات مكتملة هذا الشهر بعد.",
+  "markAsWinner": "تحديد الفائز",
+  "markAsPaid": "تم الدفع",
+  "resetMonthlyCounter": "إعادة ضبط العداد الشهري",
+  "resetMonthlyConfirm": "إعادة ضبط عدد رحلات كل السائقين للشهر الجديد؟ سيتم مسح الفائز الحالي.",
+  "leaderboardWinnerMarked": "تم تحديد الفائز.",
+  "leaderboardPaidMarked": "تم تسجيل دفع الجائزة.",
+  "leaderboardResetDone": "تم إعادة ضبط العدادات الشهرية.",
+  "leaderboardWinnerBadge": "فائز",
+  "leaderboardPaidBadge": "مدفوع",
+  "leaderboardCurrentWinner": "الفائز الحالي: {name}",
+  "@leaderboardCurrentWinner": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "permPromoCodes": "إدارة أكواد الخصم",
+  "permMonthlyLeaderboard": "لوحة الجائزة الشهرية",
+  "driverMonthlyPrizeTitle": "تحدي الجائزة الشهرية",
+  "driverMonthlyRideCount": "{count} رحلة هذا الشهر",
+  "@driverMonthlyRideCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "driverMonthlyRank": "أنت #{rank} هذا الشهر — {count} رحلة",
+  "@driverMonthlyRank": {
+    "placeholders": {
+      "rank": { "type": "int" },
+      "count": { "type": "int" }
+    }
+  },
+  "driverMonthlyPrizeAmount": "أفضل سائق هذا الشهر يفوز بـ {amount}!",
+  "@driverMonthlyPrizeAmount": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "ridePromoSectionTitle": "تم استخدام كود خصم",
+  "ridePromoCodeUsed": "الكود: {code}",
+  "@ridePromoCodeUsed": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "ridePromoOriginalFare": "الأجرة الكاملة: {amount}",
+  "@ridePromoOriginalFare": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "ridePromoCustomerPaid": "دفع الزبون: {amount}",
+  "@ridePromoCustomerPaid": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "ridePromoDiscountAmount": "قيمة الخصم: {amount}",
+  "@ridePromoDiscountAmount": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "rideDriverCompensationOwed": "ادفع للسائق: {amount}",
+  "@rideDriverCompensationOwed": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "rideDriverCompensationHint": "الزبون دفع أقل بسبب الخصم. ادفع للسائق هذا المبلغ حتى لا يتضرر.",
+  "ridePromoUsedCompact": "{code} −{amount}",
+  "@ridePromoUsedCompact": {
+    "placeholders": {
+      "code": { "type": "String" },
+      "amount": { "type": "String" }
+    }
+  },
+  "rideDriverCompensationCompact": "ادفع للسائق {amount}",
+  "@rideDriverCompensationCompact": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "fakeDriversTitle": "سائقون تجريبيون",
+  "fakeDriversHint": "أنشئ سائقاً وهمياً للاختبار. عند تفعيله يظهر متصلاً في الحلة ويقبل الرحلات تلقائياً.",
+  "createFakeDriver": "إنشاء سائق تجريبي",
+  "fakeDriverCreated": "تم إنشاء السائق التجريبي. اضغط تفعيل للاتصال.",
+  "fakeDriverBadge": "تجريبي",
+  "activateFakeDriver": "تفعيل",
+  "deactivateFakeDriver": "إيقاف",
+  "fakeDriverActivated": "السائق التجريبي متصل وسيقبل الرحلات تلقائياً.",
+  "fakeDriverDeactivated": "السائق التجريبي غير متصل.",
+  "driverNameLabel": "اسم السائق",
+  "savedPlacesTitle": "الأماكن المحفوظة",
+  "placeSaveAction": "حفظ المكان",
+  "placeRemoveFromSaved": "إزالة من المحفوظات",
+  "placeSaved": "تم حفظ المكان.",
+  "placeRemovedFromSaved": "تمت الإزالة من الأماكن المحفوظة.",
+  "savedPlacesEmptyHint": "ابحث عن مكان واضغط حفظ ليظهر هنا.",
+  "savePlaceShort": "حفظ",
+  "savedPlaceShort": "محفوظ",
+  "savePlaceHint": "اضغط حفظ بجانب أي نتيجة لإضافتها إلى أماكنك المحفوظة.",
+  "broadcastToDrivers": "رسالة لجميع السائقين",
+  "broadcastToCustomers": "رسالة لجميع الزبائن",
+  "broadcastDriversHint": "إرسال إشعار push لكل سائق معتمد.",
+  "broadcastCustomersHint": "إرسال إشعار push لكل زبون.",
+  "announcementTitleLabel": "العنوان",
+  "announcementMessageLabel": "الرسالة",
+  "announcementDefaultTitle": "إعلان",
+  "announcementFieldsRequired": "أدخل العنوان والرسالة.",
+  "sendAnnouncement": "إرسال",
+  "broadcastSentSummary": "تم الإرسال إلى {sent} من {total} جهاز.",
+  "@broadcastSentSummary": {
+    "placeholders": {
+      "sent": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "broadcastPublishedSummary": "تم نشر الإعلان لـ {total} مستخدم. سيصلهم داخل التطبيق.",
+  "@broadcastPublishedSummary": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "broadcastSendFailed": "تعذر إرسال الإعلان. تحقق من الاتصال وحاول مرة أخرى.",
+  "editProfileTitle": "تعديل الملف الشخصي",
+  "editProfileButton": "تعديل الملف",
+  "profilePhotoLabel": "صورة الملف الشخصي",
+  "saveProfile": "حفظ الملف",
+  "profileUpdated": "تم تحديث الملف الشخصي.",
+  "changePasswordTitle": "تغيير كلمة المرور",
+  "currentPassword": "كلمة المرور الحالية",
+  "newPassword": "كلمة المرور الجديدة",
+  "confirmNewPassword": "تأكيد كلمة المرور الجديدة",
+  "changePasswordButton": "تحديث كلمة المرور",
+  "passwordChanged": "تم تحديث كلمة المرور.",
+  "passwordFieldsRequired": "أدخل كلمة المرور الحالية والجديدة.",
+  "passwordsDoNotMatch": "كلمتا المرور الجديدتان غير متطابقتين.",
+  "fullNameRequired": "الاسم مطلوب.",
+  "phoneChangeHint": "لتغيير رقم الهاتف، أدخل الرقم الجديد وكلمة المرور الحالية أدناه.",
+  "currentPasswordForPhoneChange": "كلمة المرور الحالية (مطلوبة لتغيير الهاتف)",
+  "phoneChangePasswordRequired": "أدخل كلمة المرور الحالية لتغيير رقم الهاتف.",
+  "recoveryEmailLabel": "البريد الاختياري للاستعادة",
+  "recoveryEmailHint": "بريد اختياري لاستعادة الحساب.",
+  "forgotPasswordStepsHint": "أدخل رقم هاتفك وكلمة المرور الجديدة.",
+  "whatsappOtpTitle": "التحقق عبر الرسائل النصية",
+  "whatsappOtpInstructions": "أدخل رمز التحقق المكوّن من 6 أرقام الذي أرسلناه برسالة نصية.",
+  "whatsappOtpSent": "تم إرسال رمز التحقق إلى {phone}.",
+  "@whatsappOtpSent": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "whatsappOtpResend": "إعادة إرسال الرمز",
+  "whatsappOtpResendWait": "إعادة الإرسال خلال {seconds} ث",
+  "@whatsappOtpResendWait": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "whatsappOtpSendFailed": "تعذّر إرسال رمز التحقق عبر الرسائل النصية. حاول مرة أخرى.",
+  "whatsappOtpIncorrect": "رمز التحقق غير صحيح.",
+  "whatsappOtpExpired": "انتهت صلاحية رمز التحقق. اضغط إعادة إرسال الرمز وحاول مرة أخرى.",
+  "whatsappOtpTooManyAttempts": "محاولات كثيرة. اطلب رمزاً جديداً.",
+  "whatsappOtpSignupHint": "سنرسل رمز تحقق عبر رسالة نصية قبل إنشاء حسابك.",
+  "openPasswordResetPage": "فتح صفحة إعادة التعيين",
+  "resetLinkOpened": "تم فتح صفحة إعادة تعيين كلمة المرور. عيّن كلمة مرورك الجديدة هناك.",
+  "resetWhileLoggedInHint": "إذا كنت مسجلاً الدخول، افتح الملف الشخصي → تعديل الملف → تغيير كلمة المرور.",
+  "announcementsTitle": "الإعلانات",
+  "announcementsEmpty": "لا توجد إعلانات من المدير بعد."
+}
