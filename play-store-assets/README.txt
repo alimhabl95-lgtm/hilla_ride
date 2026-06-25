@@ -6,7 +6,7 @@ Ready when your Play Console account is approved.
 ANDROID APP BUNDLE (.aab)
 -------------------------
 File: app-release.aab (in this folder)
-Version: 1.0.23 (24)
+Version: 1.0.24 (25)
 Package: com.hillaride.hilla_ride
 
 Upload in Play Console → Production (or Internal testing) → Create release.

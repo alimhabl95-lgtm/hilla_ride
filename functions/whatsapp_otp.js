@@ -576,6 +576,7 @@ async function runSignUpWithVerifiedPhone(normalizePhone, data, auth) {
   }
 
   await consumeVerification(phoneKey);
+  await admin.firestore().collection("released_phones").doc(phoneKey).delete().catch(() => {});
   return { ok: true, uid: auth.uid };
 }
 
@@ -633,4 +634,6 @@ module.exports = {
   runSignUpWithVerifiedPhone,
   createResetPasswordByPhoneVerified,
   createSendWhatsAppOtpDebug,
+  getSignupPromoFields,
+  authEmailFromPhoneKey,
 };

@@ -284,17 +284,8 @@ class AdminService {
   }
 
   Future<void> deleteUserAccount(String userId) async {
-    try {
-      final callable = _functions.httpsCallable('deleteUserAccount');
-      await callable.call({'userId': userId});
-      return;
-    } on FirebaseFunctionsException catch (error) {
-      if (error.code == 'permission-denied' || error.code == 'unauthenticated') {
-        rethrow;
-      }
-    }
-
-    await _deleteUserAccountLocally(userId);
+    final callable = _functions.httpsCallable('deleteUserAccount');
+    await callable.call({'userId': userId});
   }
 
   Future<void> _deleteCollection(CollectionReference<Map<String, dynamic>> ref) async {

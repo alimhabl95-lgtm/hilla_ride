@@ -66,34 +66,49 @@ class AuthService {
     }
 
     final phone = PhoneAuthCredentials.normalizePhone(phoneRaw);
-    final authEmail = PhoneAuthCredentials.toAuthEmail(phone);
 
-    final credential = await _auth.createUserWithEmailAndPassword(
-      email: authEmail,
-      password: password,
-    );
+    try {
+      final callable = _functions.httpsCallable('registerWithPhonePassword');
+      final result = await callable.call({
+        'phone': phone,
+        'password': password,
+        'fullName': fullName.trim(),
+        'role': role.value,
+        if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+        'age': age,
+      });
+      final data = result.data;
+      final customToken = data is Map ? data['customToken'] as String? : null;
+      if (customToken == null || customToken.isEmpty) {
+        throw FirebaseAuthException(
+          code: 'internal',
+          message: 'Could not create account.',
+        );
+      }
 
-    final user = credential.user;
-    if (user == null) {
-      throw FirebaseAuthException(
-        code: 'user-not-found',
-        message: 'Could not create account.',
-      );
+      final credential = await _auth.signInWithCustomToken(customToken);
+      final uid = credential.user?.uid;
+      if (uid != null) {
+        await _sessionService.claimSession(uid);
+      }
+      return credential;
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code == 'already-exists') {
+        throw FirebaseAuthException(
+          code: 'email-already-in-use',
+          message: error.message,
+        );
+      }
+      if (error.code == 'invalid-argument') {
+        throw FirebaseAuthException(
+          code: error.message?.contains('Password') == true
+              ? 'weak-password'
+              : 'invalid-phone',
+          message: error.message,
+        );
+      }
+      rethrow;
     }
-
-    await _firestore.collection('users').doc(user.uid).set({
-      'phone': phone,
-      'role': role.value,
-      'name': fullName.trim(),
-      'age': age,
-      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-      if (role == UserRole.customer) ...await _customerPromoFields(),
-    });
-
-    await _sessionService.claimSession(user.uid);
-
-    return credential;
   }
 
   Future<Map<String, dynamic>> _customerPromoFields() async {

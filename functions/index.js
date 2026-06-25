@@ -32,6 +32,8 @@ const {
   runSignUpWithVerifiedPhone,
   createResetPasswordByPhoneVerified,
   createSendWhatsAppOtpDebug,
+  getSignupPromoFields,
+  authEmailFromPhoneKey,
 } = require("./whatsapp_otp");
 
 const sendWhatsAppOtpV1 = createSendWhatsAppOtp(normalizePhone);
@@ -726,6 +728,144 @@ async function deleteDriverFirestoreData(driverId) {
   await driverRef.delete();
 }
 
+function phoneKeyFromPhone(phone) {
+  return String(phone || "").replace(/\D/g, "");
+}
+
+async function deleteAuthUserForPhone(phone) {
+  const phoneKey = phoneKeyFromPhone(phone);
+  if (!phoneKey) {
+    return false;
+  }
+
+  try {
+    const userRecord = await admin.auth().getUserByEmail(authEmailFromPhoneKey(phoneKey));
+    await admin.auth().deleteUser(userRecord.uid);
+    return true;
+  } catch (error) {
+    if (error.code === "auth/user-not-found") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function clearReleasedPhone(phone) {
+  const phoneKey = phoneKeyFromPhone(phone);
+  if (!phoneKey) {
+    return;
+  }
+  await admin.firestore().collection("released_phones").doc(phoneKey).delete().catch(() => {});
+}
+
+async function cleanupDeletedAccountArtifacts(phone, knownUid) {
+  const db = admin.firestore();
+  const phoneKey = phoneKeyFromPhone(phone);
+  if (!phoneKey) {
+    return;
+  }
+
+  try {
+    const userRecord = await admin.auth().getUserByEmail(authEmailFromPhoneKey(phoneKey));
+    if (!knownUid || userRecord.uid !== knownUid) {
+      const staleUserRef = db.collection("users").doc(userRecord.uid);
+      if ((await staleUserRef.get()).exists) {
+        await staleUserRef.delete();
+      }
+      const staleDriverRef = db.collection("drivers").doc(userRecord.uid);
+      if ((await staleDriverRef.get()).exists) {
+        await deleteDriverFirestoreData(userRecord.uid);
+      }
+      await admin.auth().deleteUser(userRecord.uid);
+    }
+  } catch (error) {
+    if (error.code !== "auth/user-not-found") {
+      throw error;
+    }
+  }
+
+  await clearReleasedPhone(phone);
+}
+
+exports.registerWithPhonePassword = onCall(
+  { region: "us-central1", invoker: "public" },
+  async (request) => {
+    const payload = request.data?.data ?? request.data ?? {};
+    const phone = normalizePhone(String(payload.phone || "").trim());
+    const password = String(payload.password || "");
+    const fullName = String(payload.fullName || "").trim();
+    const role = String(payload.role || "customer").trim();
+    const email = String(payload.email || "").trim();
+    const age = Number(payload.age || 18);
+
+    if (!phone || phone === "+964") {
+      throw new functions.https.HttpsError("invalid-argument", "Phone number required.");
+    }
+    if (password.length < 6) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Password must be at least 6 characters.",
+      );
+    }
+    if (!fullName) {
+      throw new functions.https.HttpsError("invalid-argument", "Full name required.");
+    }
+    if (!["customer", "driver"].includes(role)) {
+      throw new functions.https.HttpsError("invalid-argument", "Invalid account role.");
+    }
+
+    const db = admin.firestore();
+    const activeUsers = await db.collection("users").where("phone", "==", phone).limit(1).get();
+    if (!activeUsers.empty) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "An account with this phone number already exists.",
+      );
+    }
+
+    await cleanupDeletedAccountArtifacts(phone, null);
+
+    const phoneKey = phoneKeyFromPhone(phone);
+    const userRecord = await admin.auth().createUser({
+      email: authEmailFromPhoneKey(phoneKey),
+      password,
+      displayName: fullName,
+    });
+
+    const profile = {
+      phone,
+      role,
+      name: fullName,
+      age: Number.isFinite(age) && age > 0 ? age : 18,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (email) {
+      profile.email = email;
+    }
+    if (role === "customer") {
+      Object.assign(profile, await getSignupPromoFields());
+    }
+
+    try {
+      await db.collection("users").doc(userRecord.uid).set(profile);
+    } catch (error) {
+      await admin.auth().deleteUser(userRecord.uid).catch(() => {});
+      functions.logger.error("registerWithPhonePassword profile create failed", {
+        uid: userRecord.uid,
+        phoneKey,
+        message: error.message,
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Could not save account profile. Try again.",
+      );
+    }
+
+    const customToken = await admin.auth().createCustomToken(userRecord.uid);
+    return { ok: true, customToken, uid: userRecord.uid };
+  },
+);
+
 exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
   const targetUserId = String(data.userId || "").trim();
   if (!targetUserId) {
@@ -793,6 +933,17 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
         "internal",
         "Could not delete login account. Try again.",
       );
+    }
+  }
+
+  if (phone) {
+    try {
+      await deleteAuthUserForPhone(phone);
+    } catch (error) {
+      functions.logger.warn("Auth delete by phone failed", {
+        phone,
+        message: error.message,
+      });
     }
   }
 
