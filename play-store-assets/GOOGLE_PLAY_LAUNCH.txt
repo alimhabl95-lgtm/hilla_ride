@@ -15,8 +15,8 @@ APP IDENTITY
 ------------
 App name:        Hello Tuk-Tuk
 Package name:    com.hillaride.hilla_ride
-Version name:    1.0.24
-Version code:    25
+Version name:    1.0.25
+Version code:    26
 Default language: Arabic (recommended) or English
 
 LEGAL URLS (required)

@@ -587,44 +587,63 @@ function createSignUpWithVerifiedPhone(normalizePhone) {
 }
 
 function createResetPasswordByPhoneVerified(normalizePhone) {
-  return functions.https.onCall(async (data) => {
-    const payload = parseCallablePayload(data);
-    const phone = normalizePhone(String(payload.phone || "").trim());
-    const newPassword = String(payload.newPassword || "");
-    const verificationToken = String(payload.verificationToken || "").trim();
+  return functions.https.onCall(async (data) => runResetPasswordByPhone(normalizePhone, data));
+}
 
-    if (!phone || !newPassword) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Phone and new password are required.",
-      );
-    }
-    if (newPassword.length < 6) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Password must be at least 6 characters.",
-      );
-    }
+async function runResetPasswordByPhone(normalizePhone, data) {
+  const payload = parseCallablePayload(data);
+  const phone = normalizePhone(String(payload.phone || "").trim());
+  const newPassword = String(payload.newPassword || "");
+  const verificationToken = String(payload.verificationToken || "").trim();
 
-    const phoneKey = phoneKeyFromE164(phone);
-    if (verificationToken) {
-      assertValidVerification(phoneKey, "reset_password", verificationToken);
-    }
+  if (!phone || !newPassword) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Phone and new password are required.",
+    );
+  }
+  if (newPassword.length < 6) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Password must be at least 6 characters.",
+    );
+  }
 
-    const uid = await resolveAuthUidForPhone(phone);
-    if (!uid) {
-      throw new functions.https.HttpsError("not-found", "No account found for this phone number.");
-    }
+  const phoneKey = phoneKeyFromE164(phone);
+  if (verificationToken) {
+    assertValidVerification(phoneKey, "reset_password", verificationToken);
+  }
 
-    try {
-      await admin.auth().updateUser(uid, { password: newPassword });
-    } catch (_) {
-      throw new functions.https.HttpsError("internal", "Could not reset password.");
+  let uid = await resolveAuthUidForPhone(phone);
+  if (!uid) {
+    const snapshot = await admin
+      .firestore()
+      .collection("users")
+      .where("phone", "==", phone)
+      .limit(1)
+      .get();
+    if (!snapshot.empty) {
+      uid = snapshot.docs[0].id;
     }
+  }
+  if (!uid) {
+    throw new functions.https.HttpsError("not-found", "No account found for this phone number.");
+  }
 
-    await consumeVerification(phoneKey);
-    return { ok: true };
-  });
+  try {
+    await admin.auth().updateUser(uid, { password: newPassword });
+  } catch (error) {
+    functions.logger.error("resetPasswordByPhone failed", {
+      uid,
+      phoneKey,
+      code: error.code,
+      message: error.message,
+    });
+    throw new functions.https.HttpsError("internal", "Could not reset password.");
+  }
+
+  await consumeVerification(phoneKey);
+  return { ok: true };
 }
 
 module.exports = {
@@ -636,4 +655,5 @@ module.exports = {
   createSendWhatsAppOtpDebug,
   getSignupPromoFields,
   authEmailFromPhoneKey,
+  runResetPasswordByPhone,
 };

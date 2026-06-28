@@ -34,6 +34,7 @@ const {
   createSendWhatsAppOtpDebug,
   getSignupPromoFields,
   authEmailFromPhoneKey,
+  runResetPasswordByPhone,
 } = require("./whatsapp_otp");
 
 const sendWhatsAppOtpV1 = createSendWhatsAppOtp(normalizePhone);
@@ -612,7 +613,12 @@ exports.signUpWithVerifiedPhone = onCall(
 );
 exports.resetPasswordByPhoneVerified = onCall(
   { region: "us-central1", invoker: "public" },
-  async (request) => resetPasswordByPhoneVerifiedV1.run(request.data),
+  async (request) => runResetPasswordByPhone(normalizePhone, request.data),
+);
+
+exports.resetPasswordByPhone = onCall(
+  { region: "us-central1", invoker: "public" },
+  async (request) => runResetPasswordByPhone(normalizePhone, request.data),
 );
 
 exports.testPing = functions.https.onCall(async () => {
@@ -664,11 +670,6 @@ exports.requestPasswordReset = functions.https.onCall(async (data) => {
   });
   return { resetLink };
 });
-
-exports.resetPasswordByPhone = onCall(
-  { region: "us-central1", invoker: "public" },
-  async (request) => resetPasswordByPhoneVerifiedV1.run(request.data),
-);
 
 exports.updateAccountPhone = functions.https.onCall(async (data, context) => {
   if (!context.auth) {

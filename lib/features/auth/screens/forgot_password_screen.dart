@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
@@ -82,11 +83,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       showAuthErrorSnackBar(context, error);
-    } catch (error) {
+    } on FirebaseFunctionsException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$error')),
-      );
+      showFunctionsErrorSnackBar(context, error);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

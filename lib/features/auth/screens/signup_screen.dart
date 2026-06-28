@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
@@ -68,6 +69,9 @@ class _SignupScreenState extends State<SignupScreen> {
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       showAuthErrorSnackBar(context, error);
+    } on FirebaseFunctionsException catch (error) {
+      if (!mounted) return;
+      showFunctionsErrorSnackBar(context, error);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

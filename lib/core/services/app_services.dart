@@ -5,6 +5,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
@@ -93,21 +94,7 @@ class AuthService {
       }
       return credential;
     } on FirebaseFunctionsException catch (error) {
-      if (error.code == 'already-exists') {
-        throw FirebaseAuthException(
-          code: 'email-already-in-use',
-          message: error.message,
-        );
-      }
-      if (error.code == 'invalid-argument') {
-        throw FirebaseAuthException(
-          code: error.message?.contains('Password') == true
-              ? 'weak-password'
-              : 'invalid-phone',
-          message: error.message,
-        );
-      }
-      rethrow;
+      throw authExceptionFromFunctions(error);
     }
   }
 
@@ -207,19 +194,7 @@ class AuthService {
         'newPassword': newPassword,
       });
     } on FirebaseFunctionsException catch (error) {
-      if (error.code == 'not-found') {
-        throw FirebaseAuthException(
-          code: 'user-not-found',
-          message: error.message,
-        );
-      }
-      if (error.code == 'invalid-argument') {
-        throw FirebaseAuthException(
-          code: 'weak-password',
-          message: error.message,
-        );
-      }
-      rethrow;
+      throw authExceptionFromFunctions(error);
     }
   }
 
