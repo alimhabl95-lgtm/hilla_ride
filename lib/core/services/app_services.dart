@@ -70,7 +70,7 @@ class AuthService {
 
     try {
       final callable = _functions.httpsCallable('registerWithPhonePassword');
-      final result = await callable.call({
+      await callable.call({
         'phone': phone,
         'password': password,
         'fullName': fullName.trim(),
@@ -78,21 +78,10 @@ class AuthService {
         if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
         'age': age,
       });
-      final data = result.data;
-      final customToken = data is Map ? data['customToken'] as String? : null;
-      if (customToken == null || customToken.isEmpty) {
-        throw FirebaseAuthException(
-          code: 'internal',
-          message: 'Could not create account.',
-        );
-      }
-
-      final credential = await _auth.signInWithCustomToken(customToken);
-      final uid = credential.user?.uid;
-      if (uid != null) {
-        await _sessionService.claimSession(uid);
-      }
-      return credential;
+      return signInWithPhonePassword(
+        phoneRaw: phoneRaw,
+        password: password,
+      );
     } on FirebaseFunctionsException catch (error) {
       throw authExceptionFromFunctions(error);
     }

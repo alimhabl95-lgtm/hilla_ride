@@ -65,7 +65,9 @@ FirebaseAuthException authExceptionFromFunctions(FirebaseFunctionsException erro
     default:
       return FirebaseAuthException(
         code: 'internal',
-        message: error.message,
+        message: error.message?.trim().isNotEmpty == true
+            ? error.message
+            : 'Request failed. Check your internet and try again.',
       );
   }
 }

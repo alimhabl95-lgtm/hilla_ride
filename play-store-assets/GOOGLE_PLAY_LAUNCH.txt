@@ -4,7 +4,8 @@ Generated: June 2026
 
 FILES IN THIS FOLDER (upload to Play Console)
 ---------------------------------------------
-app-release.aab          → Release → Create release → Upload
+app-release.aab          → Release → Create release → Upload (required for Play Store)
+app-release.apk          → Direct install / testers sideload (not for Play Store upload)
 app-icon-512.png         → Main store listing → App icon (512×512)
 app-icon-original.png    → Keep as backup (do not upload)
 store-listing-en.txt       → Copy text into English listing
@@ -15,8 +16,8 @@ APP IDENTITY
 ------------
 App name:        Hello Tuk-Tuk
 Package name:    com.hillaride.hilla_ride
-Version name:    1.0.25
-Version code:    26
+Version name:    1.0.26
+Version code:    27
 Default language: Arabic (recommended) or English
 
 LEGAL URLS (required)
@@ -84,3 +85,7 @@ Rebuild AAB command:
   cd hilla_ride
   flutter build appbundle --release
   copy build\app\outputs\bundle\release\app-release.aab play-store-assets\
+
+Rebuild APK command (direct install / testing):
+  flutter build apk --release
+  copy build\app\outputs\flutter-apk\app-release.apk play-store-assets\

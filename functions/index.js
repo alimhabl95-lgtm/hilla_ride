@@ -611,14 +611,16 @@ exports.signUpWithVerifiedPhone = onCall(
   { region: "us-central1", invoker: "public" },
   async (request) => runSignUpWithVerifiedPhone(normalizePhone, request.data, request.auth),
 );
-exports.resetPasswordByPhoneVerified = onCall(
-  { region: "us-central1", invoker: "public" },
-  async (request) => runResetPasswordByPhone(normalizePhone, request.data),
+exports.resetPasswordByPhoneVerified = functions.https.onCall(async (data) =>
+  runResetPasswordByPhone(normalizePhone, data),
 );
 
-exports.resetPasswordByPhone = onCall(
-  { region: "us-central1", invoker: "public" },
-  async (request) => runResetPasswordByPhone(normalizePhone, request.data),
+exports.registerWithPhonePassword = functions.https.onCall(async (data) =>
+  runRegisterWithPhonePassword(data),
+);
+
+exports.resetPasswordByPhone = functions.https.onCall(async (data) =>
+  runResetPasswordByPhone(normalizePhone, data),
 );
 
 exports.testPing = functions.https.onCall(async () => {
@@ -747,7 +749,12 @@ async function deleteAuthUserForPhone(phone) {
     if (error.code === "auth/user-not-found") {
       return false;
     }
-    throw error;
+    functions.logger.warn("deleteAuthUserForPhone skipped", {
+      phoneKey,
+      code: error.code,
+      message: error.message,
+    });
+    return false;
   }
 }
 
@@ -781,91 +788,117 @@ async function cleanupDeletedAccountArtifacts(phone, knownUid) {
     }
   } catch (error) {
     if (error.code !== "auth/user-not-found") {
-      throw error;
+      functions.logger.warn("Auth cleanup skipped", {
+        phoneKey,
+        code: error.code,
+        message: error.message,
+      });
     }
   }
 
   await clearReleasedPhone(phone);
 }
 
-exports.registerWithPhonePassword = onCall(
-  { region: "us-central1", invoker: "public" },
-  async (request) => {
-    const payload = request.data?.data ?? request.data ?? {};
-    const phone = normalizePhone(String(payload.phone || "").trim());
-    const password = String(payload.password || "");
-    const fullName = String(payload.fullName || "").trim();
-    const role = String(payload.role || "customer").trim();
-    const email = String(payload.email || "").trim();
-    const age = Number(payload.age || 18);
+function parseCallableData(data) {
+  if (data && typeof data === "object" && data.data && typeof data.data === "object") {
+    return data.data;
+  }
+  return data && typeof data === "object" ? data : {};
+}
 
-    if (!phone || phone === "+964") {
-      throw new functions.https.HttpsError("invalid-argument", "Phone number required.");
-    }
-    if (password.length < 6) {
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "Password must be at least 6 characters.",
-      );
-    }
-    if (!fullName) {
-      throw new functions.https.HttpsError("invalid-argument", "Full name required.");
-    }
-    if (!["customer", "driver"].includes(role)) {
-      throw new functions.https.HttpsError("invalid-argument", "Invalid account role.");
-    }
+async function runRegisterWithPhonePassword(data) {
+  const payload = parseCallableData(data);
+  const phone = normalizePhone(String(payload.phone || "").trim());
+  const password = String(payload.password || "");
+  const fullName = String(payload.fullName || "").trim();
+  const role = String(payload.role || "customer").trim();
+  const email = String(payload.email || "").trim();
+  const age = Number(payload.age || 18);
 
-    const db = admin.firestore();
-    const activeUsers = await db.collection("users").where("phone", "==", phone).limit(1).get();
-    if (!activeUsers.empty) {
+  if (!phone || phone === "+964") {
+    throw new functions.https.HttpsError("invalid-argument", "Phone number required.");
+  }
+  if (password.length < 6) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Password must be at least 6 characters.",
+    );
+  }
+  if (!fullName) {
+    throw new functions.https.HttpsError("invalid-argument", "Full name required.");
+  }
+  if (!["customer", "driver"].includes(role)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid account type.");
+  }
+
+  const db = admin.firestore();
+  const activeUsers = await db.collection("users").where("phone", "==", phone).limit(1).get();
+  if (!activeUsers.empty) {
+    throw new functions.https.HttpsError(
+      "already-exists",
+      "An account with this phone number already exists.",
+    );
+  }
+
+  await cleanupDeletedAccountArtifacts(phone, null);
+
+  const phoneKey = phoneKeyFromPhone(phone);
+  let userRecord;
+  try {
+    userRecord = await admin.auth().createUser({
+      email: authEmailFromPhoneKey(phoneKey),
+      password,
+      displayName: fullName,
+    });
+  } catch (error) {
+    if (error.code === "auth/email-already-exists") {
       throw new functions.https.HttpsError(
         "already-exists",
         "An account with this phone number already exists.",
       );
     }
-
-    await cleanupDeletedAccountArtifacts(phone, null);
-
-    const phoneKey = phoneKeyFromPhone(phone);
-    const userRecord = await admin.auth().createUser({
-      email: authEmailFromPhoneKey(phoneKey),
-      password,
-      displayName: fullName,
+    functions.logger.error("registerWithPhonePassword createUser failed", {
+      phoneKey,
+      code: error.code,
+      message: error.message,
     });
+    throw new functions.https.HttpsError(
+      "internal",
+      "Could not create login account. Try again.",
+    );
+  }
 
-    const profile = {
-      phone,
-      role,
-      name: fullName,
-      age: Number.isFinite(age) && age > 0 ? age : 18,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-    if (email) {
-      profile.email = email;
-    }
-    if (role === "customer") {
-      Object.assign(profile, await getSignupPromoFields());
-    }
+  const profile = {
+    phone,
+    role,
+    name: fullName,
+    age: Number.isFinite(age) && age > 0 ? age : 18,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (email) {
+    profile.email = email;
+  }
+  if (role === "customer") {
+    Object.assign(profile, await getSignupPromoFields());
+  }
 
-    try {
-      await db.collection("users").doc(userRecord.uid).set(profile);
-    } catch (error) {
-      await admin.auth().deleteUser(userRecord.uid).catch(() => {});
-      functions.logger.error("registerWithPhonePassword profile create failed", {
-        uid: userRecord.uid,
-        phoneKey,
-        message: error.message,
-      });
-      throw new functions.https.HttpsError(
-        "internal",
-        "Could not save account profile. Try again.",
-      );
-    }
+  try {
+    await db.collection("users").doc(userRecord.uid).set(profile);
+  } catch (error) {
+    await admin.auth().deleteUser(userRecord.uid).catch(() => {});
+    functions.logger.error("registerWithPhonePassword profile create failed", {
+      uid: userRecord.uid,
+      phoneKey,
+      message: error.message,
+    });
+    throw new functions.https.HttpsError(
+      "internal",
+      "Could not save account profile. Try again.",
+    );
+  }
 
-    const customToken = await admin.auth().createCustomToken(userRecord.uid);
-    return { ok: true, customToken, uid: userRecord.uid };
-  },
-);
+  return { ok: true, uid: userRecord.uid };
+}
 
 exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
   const targetUserId = String(data.userId || "").trim();
