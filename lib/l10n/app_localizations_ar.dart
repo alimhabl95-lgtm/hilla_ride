@@ -193,6 +193,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String get reject => 'رفض';
 
   @override
+  String get driverApprovedSuccess => 'تمت الموافقة على السائق بنجاح';
+
+  @override
+  String get driverRejectedSuccess => 'تم رفض السائق';
+
+  @override
+  String get driverApprovalFailed => 'تعذّر تحديث حالة السائق. حاول مرة أخرى.';
+
+  @override
+  String get rejectDriverConfirmTitle => 'رفض هذا السائق؟';
+
+  @override
+  String get rejectDriverConfirmBody => 'سيظهر للسائق رسالة رفض في التطبيق.';
+
+  @override
+  String get rejectedDriverHint =>
+      'إذا كان هذا خطأ، اطلب من المدير الموافقة على حسابك مرة أخرى من لوحة الإدارة.';
+
+  @override
   String get noPendingDrivers => 'لا توجد طلبات سائقين معلقة';
 
   @override
@@ -363,6 +382,42 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get signupTitle => 'إنشاء حساب';
+
+  @override
+  String get signupSuccessTitle => 'تم إنشاء الحساب بنجاح';
+
+  @override
+  String get signupSuccessMessage =>
+      'حسابك جاهز. سجّل الدخول برقم هاتفك وكلمة المرور.';
+
+  @override
+  String get driverSignupSuccessTitle => 'شكراً لك!';
+
+  @override
+  String get driverSignupSuccessMessage =>
+      'تم إكمال التسجيل بنجاح. يرجى انتظار موافقة المدير قبل البدء بالعمل.';
+
+  @override
+  String get passwordResetFailed =>
+      'تعذر إعادة تعيين كلمة المرور. حاول مرة أخرى.';
+
+  @override
+  String get vehicleColor => 'لون التكتك';
+
+  @override
+  String get vehiclePlateRequired => 'رقم اللوحة مطلوب.';
+
+  @override
+  String get vehicleColorRequired => 'لون التكتك مطلوب.';
+
+  @override
+  String get ageRequired => 'أدخل عمرك.';
+
+  @override
+  String get driverMinAge => 'يجب أن يكون عمر السائق 18 سنة على الأقل.';
+
+  @override
+  String get goToLogin => 'الذهاب لتسجيل الدخول';
 
   @override
   String get emailOptional => 'البريد الإلكتروني (اختياري)';
@@ -903,7 +958,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get registrationFieldsRequired => 'يرجى تعبئة الحقول المطلوبة.';
 
   @override
-  String get vehiclePlateOptional => 'رقم اللوحة (اختياري)';
+  String get vehiclePlateOptional => 'رقم اللوحة';
 
   @override
   String get licenseNumberOptional => 'رقم الرخصة (اختياري)';
@@ -948,10 +1003,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get removeDriverConfirmMessage =>
-      'سيتم حذف ملفهم من التطبيق. يمكنهم استخدام نسيت كلمة المرور ثم تسجيل الدخول بنفس الهاتف للبدء من جديد.';
+      'سيتم حذف بيانات تسجيل الدخول والملف نهائياً. يمكنهم التسجيل مجدداً بنفس رقم الهاتف كحساب جديد.';
 
   @override
-  String get driverRemoved => 'تم حذف حساب السائق.';
+  String get driverRemoved => 'تم حذف حساب السائق بنجاح.';
 
   @override
   String get removeDriverFailed => 'تعذر حذف حساب السائق. حاول مرة أخرى.';
@@ -964,7 +1019,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get removeCustomerConfirmMessage =>
-      'سيتم حذف ملفهم من التطبيق. يمكنهم استخدام نسيت كلمة المرور ثم تسجيل الدخول بنفس الهاتف للبدء من جديد.';
+      'سيتم حذف بيانات تسجيل الدخول والملف نهائياً. يمكنهم التسجيل مجدداً بنفس رقم الهاتف كحساب جديد.';
 
   @override
   String get customerRemoved => 'تم حذف حساب الزبون.';
@@ -1123,7 +1178,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get assistantFormInvalid =>
-      'أدخل الاسم وبريداً صحيحاً وكلمة مرور (6 أحرف على الأقل).';
+      'أدخل الاسم ورقم الهاتف العراقي وكلمة مرور (6 أحرف على الأقل).';
 
   @override
   String get assistantCreated => 'تم إنشاء حساب المساعد.';
@@ -1142,7 +1197,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get assistantLoginHint =>
-      'استخدم البريد وكلمة المرور التي أعطاك إياها الإدارة.';
+      'استخدم رقم الهاتف وكلمة المرور التي أعطاك إياها الإدارة.';
 
   @override
   String get assistantNoPermissions =>

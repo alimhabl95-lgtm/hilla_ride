@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
@@ -10,11 +12,15 @@ class StorageService {
   StorageService({
     FirebaseStorage? storage,
     FirebaseAuth? auth,
+    FirebaseFunctions? functions,
   })  : _storage = storage ?? FirebaseStorage.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+        _auth = auth ?? FirebaseAuth.instance,
+        _functions = functions ??
+            FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseStorage _storage;
   final FirebaseAuth _auth;
+  final FirebaseFunctions _functions;
   final _picker = ImagePicker();
   static const _maxPhotoBytes = 15 * 1024 * 1024;
   static const _maxVoiceBytes = 5 * 1024 * 1024;
@@ -134,12 +140,73 @@ class StorageService {
     required Uint8List bytes,
     required String fileName,
   }) async {
-    final ref = _driverPhotoRef(driverId: uid, fileName: fileName);
-    await ref.putData(
-      bytes,
-      SettableMetadata(contentType: 'image/jpeg'),
-    );
-    return ref.getDownloadURL();
+    final currentUid = _auth.currentUser?.uid;
+    if (currentUid == null || currentUid != uid) {
+      throw FirebaseException(
+        plugin: 'firebase_storage',
+        code: 'unauthorized',
+        message: 'Sign in again to upload your documents.',
+      );
+    }
+
+    if (bytes.isEmpty) {
+      throw FirebaseException(
+        plugin: 'firebase_storage',
+        code: 'invalid-argument',
+        message: 'Photo file is empty.',
+      );
+    }
+
+    if (bytes.length > _maxPhotoBytes) {
+      throw FirebaseException(
+        plugin: 'firebase_storage',
+        code: 'invalid-argument',
+        message: 'Photo is too large. Choose a smaller image.',
+      );
+    }
+
+    await _auth.currentUser?.getIdToken(true);
+
+    try {
+      final ref = _driverPhotoRef(driverId: uid, fileName: fileName);
+      await ref.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      return ref.getDownloadURL();
+    } on FirebaseException catch (error) {
+      if (error.code == 'unauthorized' ||
+          error.code == 'permission-denied' ||
+          error.code == 'unauthenticated') {
+        return _uploadDriverDocumentViaFunction(
+          fileName: fileName,
+          bytes: bytes,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<String> _uploadDriverDocumentViaFunction({
+    required String fileName,
+    required Uint8List bytes,
+  }) async {
+    final result = await _functions
+        .httpsCallable('uploadDriverApplicationPhoto')
+        .call({
+      'fileName': fileName,
+      'base64': base64Encode(bytes),
+    });
+    final data = Map<String, dynamic>.from(result.data as Map);
+    final url = data['url'] as String? ?? '';
+    if (url.isEmpty) {
+      throw FirebaseException(
+        plugin: 'firebase_storage',
+        code: 'unavailable',
+        message: 'Could not upload photo. Try again.',
+      );
+    }
+    return url;
   }
 
   Future<String?> resolveDriverPhotoUrl({
@@ -185,10 +252,47 @@ class StorageService {
     required String driverId,
     required String fileName,
     String imageUrl = '',
+    bool forAdmin = false,
   }) async {
+    if (forAdmin || kIsWeb) {
+      try {
+        final result =
+            await _functions.httpsCallable('getDriverPhotoForAdmin').call({
+          'driverId': driverId,
+          'fileName': fileName,
+        });
+        final data = Map<String, dynamic>.from(result.data as Map);
+        final base64 = data['base64'] as String? ?? '';
+        if (base64.isNotEmpty) {
+          return base64Decode(base64);
+        }
+      } on FirebaseFunctionsException catch (error) {
+        if (error.code != 'not-found' && kDebugMode) {
+          debugPrint('Admin photo cloud load failed: ${error.message}');
+        }
+      } catch (error) {
+        if (kDebugMode) {
+          debugPrint('Admin photo cloud load failed: $error');
+        }
+      }
+    }
+
+    if (imageUrl.isNotEmpty && kIsWeb) {
+      try {
+        final response = await http.get(Uri.parse(imageUrl));
+        if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+          return response.bodyBytes;
+        }
+      } catch (error) {
+        if (kDebugMode) {
+          debugPrint('Driver photo HTTP load failed for stored URL: $error');
+        }
+      }
+    }
+
     if (_auth.currentUser == null) {
       if (kDebugMode) {
-        debugPrint('Driver photo bytes blocked: user is not signed in.');
+        debugPrint('Driver photo load blocked: user is not signed in.');
       }
       return null;
     }
@@ -208,35 +312,30 @@ class StorageService {
       }
     }
 
-    if (imageUrl.isNotEmpty) {
+    if (imageUrl.isNotEmpty && !kIsWeb) {
       try {
-        final urlRef = _storage.refFromURL(imageUrl);
-        final data = await urlRef.getData(_maxPhotoBytes);
-        if (data != null && data.isNotEmpty) {
-          return data;
+        final response = await http.get(Uri.parse(imageUrl));
+        if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+          return response.bodyBytes;
         }
       } catch (error) {
         if (kDebugMode) {
-          debugPrint('Driver photo getData from stored URL failed: $error');
+          debugPrint('Driver photo HTTP load failed for stored URL: $error');
         }
       }
     }
 
-    final url = await resolveDriverPhotoUrl(
-      driverId: driverId,
-      fileName: fileName,
-      imageUrl: imageUrl,
-    );
-    if (url == null || url.isEmpty) return null;
-
     try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
-        return response.bodyBytes;
+      final freshUrl = await ref.getDownloadURL();
+      if (freshUrl.isNotEmpty && !kIsWeb) {
+        final response = await http.get(Uri.parse(freshUrl));
+        if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+          return response.bodyBytes;
+        }
       }
     } catch (error) {
       if (kDebugMode) {
-        debugPrint('Driver photo HTTP load failed: $error');
+        debugPrint('Driver photo fresh URL load failed: $error');
       }
     }
 

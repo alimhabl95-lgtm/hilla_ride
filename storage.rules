@@ -5,22 +5,18 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    match /driver_applications/{userId}/{fileName} {
-      allow read: if signedIn();
-      allow write: if signedIn() && request.auth.uid == userId;
-    }
-
     match /driver_applications/{userId}/{allPaths=**} {
       allow read: if signedIn();
-      allow write: if signedIn() && request.auth.uid == userId;
+      allow write: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.size < 15 * 1024 * 1024;
     }
 
     match /user_profiles/{userId}/{allPaths=**} {
       allow read: if signedIn();
       allow write: if signedIn()
         && request.auth.uid == userId
-        && request.resource.size < 15 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.size < 15 * 1024 * 1024;
     }
 
     match /ride_chat/{rideId}/{fileName} {

@@ -4,6 +4,9 @@ import 'package:hilla_ride/core/constants/brand_assets.dart';
 class AppTheme {
   AppTheme._();
 
+  static const _iconTheme = IconThemeData(color: Colors.white);
+  static const _bodyIconTheme = IconThemeData(color: AppBrandAssets.brandNavy);
+
   static ThemeData get light {
     const colorScheme = ColorScheme(
       brightness: Brightness.light,
@@ -20,19 +23,20 @@ class AppTheme {
       surfaceContainerHighest: Color(0xFFE8F7F5),
     );
 
-    return ThemeData(
+    final base = ThemeData(
       useMaterial3: true,
-      fontFamily: 'Roboto',
-      fontFamilyFallback: const ['Noto Naskh Arabic', 'sans-serif'],
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppBrandAssets.brandSurface,
+      iconTheme: _bodyIconTheme,
+      primaryIconTheme: _iconTheme,
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: AppBrandAssets.brandTeal,
         foregroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: _iconTheme,
+        actionsIconTheme: _iconTheme,
         titleTextStyle: TextStyle(
           color: Colors.white,
           fontSize: 20,
@@ -99,6 +103,22 @@ class AppTheme {
       chipTheme: ChipThemeData(
         selectedColor: AppBrandAssets.brandTeal.withValues(alpha: 0.15),
         labelStyle: const TextStyle(color: AppBrandAssets.brandNavy),
+      ),
+    );
+
+    final textTheme = base.textTheme.apply(
+      fontFamily: 'Roboto',
+      fontFamilyFallback: const ['Noto Naskh Arabic', 'sans-serif'],
+    );
+
+    return base.copyWith(
+      textTheme: textTheme,
+      primaryTextTheme: textTheme,
+      appBarTheme: base.appBarTheme.copyWith(
+        titleTextStyle: textTheme.titleLarge?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

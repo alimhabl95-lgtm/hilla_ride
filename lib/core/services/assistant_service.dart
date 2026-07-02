@@ -8,7 +8,8 @@ class AssistantService {
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ?? FirebaseFunctions.instance;
+        _functions = functions ??
+            FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
@@ -31,14 +32,14 @@ class AssistantService {
 
   Future<String> createAssistant({
     required String name,
-    required String email,
+    required String phone,
     required String password,
     required List<String> permissions,
   }) async {
     final callable = _functions.httpsCallable('createAssistant');
     final result = await callable.call<Map<String, dynamic>>({
       'name': name.trim(),
-      'email': email.trim(),
+      'phone': phone.trim(),
       'password': password,
       'permissions': permissions,
     });

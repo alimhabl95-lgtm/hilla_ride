@@ -16,7 +16,6 @@ class AdminLoginScreen extends StatefulWidget {
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
   final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   var _loginAsAssistant = false;
   var _isLoading = false;
@@ -24,7 +23,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   @override
   void dispose() {
     _phoneController.dispose();
-    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -35,30 +33,16 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      if (_loginAsAssistant) {
-        final email = _emailController.text.trim();
-        if (email.isEmpty || !email.contains('@')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.assistantFormInvalid)),
-          );
-          return;
-        }
-        await auth.signInWithEmailPassword(
-          email: email,
-          password: _passwordController.text,
+      if (!PhoneAuthCredentials.isValidIraqiPhone(_phoneController.text)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.phoneNumberInvalid)),
         );
-      } else {
-        if (!PhoneAuthCredentials.isValidIraqiPhone(_phoneController.text)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.phoneNumberInvalid)),
-          );
-          return;
-        }
-        await auth.signInWithPhonePassword(
-          phoneRaw: _phoneController.text,
-          password: _passwordController.text,
-        );
+        return;
       }
+      await auth.signInWithPhonePassword(
+        phoneRaw: _phoneController.text,
+        password: _passwordController.text,
+      );
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       showAuthErrorSnackBar(context, error);
@@ -96,25 +80,15 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 },
               ),
               const SizedBox(height: 24),
-              if (_loginAsAssistant)
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: l10n.emailLabel,
-                    prefixIcon: const Icon(Icons.email_outlined),
-                  ),
-                )
-              else
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: l10n.phoneHint,
-                    prefixIcon: const Icon(Icons.phone),
-                    hintText: '7701234567',
-                  ),
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: l10n.phoneHint,
+                  prefixIcon: const Icon(Icons.phone),
+                  hintText: '7701234567',
                 ),
+              ),
               const SizedBox(height: 12),
               PasswordTextField(
                 controller: _passwordController,

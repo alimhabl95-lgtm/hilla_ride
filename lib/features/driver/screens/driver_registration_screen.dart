@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/config/legal_config.dart';
@@ -24,9 +25,9 @@ class DriverRegistrationScreen extends StatefulWidget {
 
 class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   final _nameController = TextEditingController();
-  final _vehicleTypeController = TextEditingController();
   final _plateController = TextEditingController();
-  final _licenseController = TextEditingController();
+  final _colorController = TextEditingController();
+  final _ageController = TextEditingController();
   PickedImage? _idPhoto;
   PickedImage? _profilePhoto;
   var _acceptedTerms = false;
@@ -36,9 +37,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _vehicleTypeController.dispose();
     _plateController.dispose();
-    _licenseController.dispose();
+    _colorController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
@@ -70,8 +71,21 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     if (user == null) return;
 
     final name = _nameController.text.trim();
-    if (name.isEmpty || _vehicleTypeController.text.trim().isEmpty) {
+    final age = int.tryParse(_ageController.text.trim()) ?? 0;
+    if (name.isEmpty || age <= 0) {
       setState(() => _errorMessage = l10n.registrationFieldsRequired);
+      return;
+    }
+    if (age < 18) {
+      setState(() => _errorMessage = l10n.driverMinAge);
+      return;
+    }
+    if (_plateController.text.trim().isEmpty) {
+      setState(() => _errorMessage = l10n.vehiclePlateRequired);
+      return;
+    }
+    if (_colorController.text.trim().isEmpty) {
+      setState(() => _errorMessage = l10n.vehicleColorRequired);
       return;
     }
     if (_idPhoto == null || _profilePhoto == null) {
@@ -89,6 +103,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     });
 
     try {
+      await user.reload();
+      await user.getIdToken(true);
+
       final storage = context.read<AppState>().storageService;
       final idPhotoUrl = await storage.uploadDriverDocument(
         uid: user.uid,
@@ -104,7 +121,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       await auth.saveUserProfile(
         role: UserRole.driver,
         name: name,
-        age: 18,
+        age: age,
         phone: widget.phone,
       );
       if (!mounted) return;
@@ -113,18 +130,45 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
             uid: user.uid,
             phone: widget.phone,
             name: name,
-            vehicleType: _vehicleTypeController.text.trim(),
+            vehicleType: 'Tuk-Tuk',
             vehiclePlate: _plateController.text.trim(),
-            licenseNumber: _licenseController.text.trim(),
+            vehicleColor: _colorController.text.trim(),
             idPhotoUrl: idPhotoUrl,
             profilePhotoUrl: profilePhotoUrl,
           );
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.driverSignupSuccessTitle),
+          content: Text(l10n.driverSignupSuccessMessage),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(MaterialLocalizations.of(dialogContext).okButtonLabel),
+            ),
+          ],
+        ),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = error.message?.isNotEmpty == true
+              ? error.message!
+              : l10n.registrationSubmitFailed;
+        });
+      }
     } on FirebaseException catch (error) {
       if (mounted) {
         setState(() {
-          _errorMessage = error.code == 'unauthorized'
+          _errorMessage = error.code == 'unauthorized' ||
+                  error.code == 'permission-denied'
               ? l10n.registrationStorageRulesHint
-              : l10n.registrationSubmitFailed;
+              : (error.message?.isNotEmpty == true
+                  ? error.message!
+                  : l10n.registrationSubmitFailed);
         });
       }
     } catch (_) {
@@ -152,18 +196,20 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _vehicleTypeController,
-              decoration: InputDecoration(labelText: l10n.vehicleType),
+              controller: _ageController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(labelText: l10n.age),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _plateController,
+              textCapitalization: TextCapitalization.characters,
               decoration: InputDecoration(labelText: l10n.vehiclePlateOptional),
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _licenseController,
-              decoration: InputDecoration(labelText: l10n.licenseNumberOptional),
+              controller: _colorController,
+              decoration: InputDecoration(labelText: l10n.vehicleColor),
             ),
             const SizedBox(height: 20),
             PhotoUploadTile(
@@ -301,10 +347,20 @@ class DriverRejectedScreen extends StatelessWidget {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Text(
-            l10n.rejectedTitle,
-            style: Theme.of(context).textTheme.headlineSmall,
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                l10n.rejectedTitle,
+                style: Theme.of(context).textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                l10n.rejectedDriverHint,
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),

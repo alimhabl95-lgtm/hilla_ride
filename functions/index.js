@@ -8,6 +8,15 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+const AUTH_ADMIN_SERVICE_ACCOUNT =
+  "firebase-adminsdk-fbsvc@hello-tiktok-57dc5.iam.gserviceaccount.com";
+
+function authAdminCallable(handler) {
+  return functions
+    .runWith({ serviceAccount: AUTH_ADMIN_SERVICE_ACCOUNT })
+    .https.onCall(handler);
+}
+
 (function hydrateTwilioEnvironment() {
   try {
     const cfg = functions.config().twilio || {};
@@ -190,7 +199,14 @@ const allowedAssistantPermissions = new Set([
 ]);
 
 function normalizePhone(raw) {
-  let digits = String(raw || "").replace(/\D/g, "");
+  const arabicIndic = "٠١٢٣٤٥٦٧٨٩";
+  const easternArabic = "۰۱۲۳۴۵۶۷۸۹";
+  let text = String(raw || "");
+  for (let i = 0; i < 10; i += 1) {
+    text = text.split(arabicIndic[i]).join(String(i));
+    text = text.split(easternArabic[i]).join(String(i));
+  }
+  let digits = text.replace(/\D/g, "");
   if (digits.startsWith("964")) {
     digits = digits.substring(3);
   }
@@ -232,53 +248,183 @@ async function assertAdminPermission(context, permission) {
   return userDoc;
 }
 
-exports.createAssistant = functions.https.onCall(async (data, context) => {
+async function assertAdminPermissionAny(context, permissions) {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
   }
 
-  const managerDoc = await admin
+  const userDoc = await admin
     .firestore()
     .collection("users")
     .doc(context.auth.uid)
     .get();
-  if (!managerDoc.exists || managerDoc.data()?.role !== "manager") {
-    throw new functions.https.HttpsError("permission-denied", "Managers only.");
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError("permission-denied", "User profile not found.");
   }
 
-  const name = String(data.name || "").trim();
-  const email = String(data.email || "").trim().toLowerCase();
-  const password = String(data.password || "");
-  const permissions = Array.isArray(data.permissions) ? data.permissions : [];
+  const role = userDoc.data()?.role;
+  const granted = Array.isArray(userDoc.data()?.permissions)
+    ? userDoc.data().permissions
+    : [];
 
-  if (!name || !email || password.length < 6) {
-    throw new functions.https.HttpsError("invalid-argument", "Invalid assistant data.");
+  const allowed =
+    role === "manager" ||
+    (role === "assistant" &&
+      permissions.some((permission) => granted.includes(permission)));
+
+  if (!allowed) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      `${permissions.join(" or ")} permission required.`,
+    );
   }
 
-  const sanitizedPermissions = permissions.filter((permission) =>
-    allowedAssistantPermissions.has(permission),
-  );
+  return userDoc;
+}
 
-  const userRecord = await admin.auth().createUser({
-    email,
-    password,
-    displayName: name,
+exports.createAssistant = authAdminCallable(async (data, context) => {
+  functions.logger.info("createAssistant started", {
+    callerUid: context.auth?.uid || null,
   });
 
-  await admin.firestore().collection("users").doc(userRecord.uid).set({
-    name,
-    email,
-    phone: "",
-    role: "assistant",
-    age: 18,
-    permissions: sanitizedPermissions,
-    createdBy: context.auth.uid,
-    isBlocked: false,
-    cancelledRidesCount: 0,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  try {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+    }
 
-  return { uid: userRecord.uid };
+    const managerDoc = await admin
+      .firestore()
+      .collection("users")
+      .doc(context.auth.uid)
+      .get();
+    if (!managerDoc.exists || managerDoc.data()?.role !== "manager") {
+      throw new functions.https.HttpsError("permission-denied", "Managers only.");
+    }
+
+    const payload = parseCallableData(data);
+    const name = String(payload.name || "").trim();
+    const phone = normalizePhone(String(payload.phone || payload.email || "").trim());
+    const password = String(payload.password || "");
+    const permissions = Array.isArray(payload.permissions) ? payload.permissions : [];
+
+    if (!name || !phone || phone === "+964" || password.length < 6) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Enter a valid name, Iraqi phone number, and password (6+ characters).",
+      );
+    }
+
+    const sanitizedPermissions = permissions.filter((permission) =>
+      allowedAssistantPermissions.has(permission),
+    );
+    const phoneKey = phoneKeyFromPhone(phone);
+    const authEmail = authEmailFromPhoneKey(phoneKey);
+
+    try {
+      const existing = await admin.auth().getUserByEmail(authEmail);
+      functions.logger.warn("createAssistant blocked duplicate auth user", {
+        phoneKey,
+        uid: existing.uid,
+      });
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "This phone number is already registered.",
+      );
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      if (error.code !== "auth/user-not-found") {
+        functions.logger.error("createAssistant auth lookup failed", {
+          phoneKey,
+          code: error.code,
+          message: error.message,
+        });
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Could not verify phone number. Try again.",
+        );
+      }
+    }
+
+    let userRecord;
+    try {
+      userRecord = await admin.auth().createUser({
+        email: authEmail,
+        password,
+        displayName: name,
+      });
+    } catch (error) {
+      if (error.code === "auth/email-already-exists") {
+        throw new functions.https.HttpsError(
+          "already-exists",
+          "This phone number is already registered.",
+        );
+      }
+      functions.logger.error("createAssistant createUser failed", {
+        phoneKey,
+        code: error.code,
+        message: error.message,
+      });
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Could not create assistant login. Try again.",
+      );
+    }
+
+    try {
+      await admin.firestore().collection("users").doc(userRecord.uid).set({
+        name,
+        phone,
+        email: "",
+        role: "assistant",
+        age: 18,
+        permissions: sanitizedPermissions,
+        createdBy: context.auth.uid,
+        isBlocked: false,
+        cancelledRidesCount: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      try {
+        await admin.auth().deleteUser(userRecord.uid);
+      } catch (cleanupError) {
+        functions.logger.warn("createAssistant rollback auth delete failed", {
+          uid: userRecord.uid,
+          code: cleanupError.code,
+          message: cleanupError.message,
+        });
+      }
+      functions.logger.error("createAssistant firestore write failed", {
+        uid: userRecord.uid,
+        code: error.code,
+        message: error.message,
+      });
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Could not save assistant profile. Try again.",
+      );
+    }
+
+    functions.logger.info("createAssistant completed", {
+      assistantUid: userRecord.uid,
+      phoneKey,
+      createdBy: context.auth.uid,
+    });
+    return { uid: userRecord.uid, phone };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    functions.logger.error("createAssistant unhandled", {
+      message: error.message,
+      code: error.code,
+    });
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Could not create assistant. Try again.",
+    );
+  }
 });
 
 exports.savePricingConfig = functions.https.onCall(async (data, context) => {
@@ -611,15 +757,97 @@ exports.signUpWithVerifiedPhone = onCall(
   { region: "us-central1", invoker: "public" },
   async (request) => runSignUpWithVerifiedPhone(normalizePhone, request.data, request.auth),
 );
-exports.resetPasswordByPhoneVerified = functions.https.onCall(async (data) =>
+exports.resetPasswordByPhoneVerified = authAdminCallable(async (data) =>
   runResetPasswordByPhone(normalizePhone, data),
 );
 
-exports.registerWithPhonePassword = functions.https.onCall(async (data) =>
-  runRegisterWithPhonePassword(data),
-);
+exports.registerWithPhonePassword = functions.https.onCall(async (data) => {
+  try {
+    return await runRegisterWithPhonePassword(data);
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    functions.logger.error("registerWithPhonePassword unhandled", {
+      message: error.message,
+      code: error.code,
+    });
+    throw new functions.https.HttpsError(
+      "internal",
+      "Registration failed. Try again.",
+    );
+  }
+});
 
-exports.resetPasswordByPhone = functions.https.onCall(async (data) =>
+const DEFAULT_DRIVER_DISTRICT = {
+  id: "hashimiya",
+  subDistrictId: "hashimiya_center",
+  latitude: 32.374,
+  longitude: 44.665,
+};
+
+exports.setDriverApprovalStatus = functions.https.onCall(async (data, context) => {
+  await assertAdminPermission(context, "allDrivers");
+
+  const payload = parseCallableData(data);
+  const driverId = String(payload.driverId || "").trim();
+  const status = String(payload.status || "").trim();
+
+  if (!driverId) {
+    throw new functions.https.HttpsError("invalid-argument", "Driver id required.");
+  }
+  if (!["approved", "rejected", "pending"].includes(status)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid approval status.");
+  }
+
+  const db = admin.firestore();
+  const driverRef = db.collection("drivers").doc(driverId);
+  const existing = await driverRef.get();
+  if (!existing.exists) {
+    throw new functions.https.HttpsError("not-found", "Driver not found.");
+  }
+
+  const existingData = existing.data() || {};
+  const update = {
+    approvalStatus: status,
+    reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (status === "approved") {
+    update.isBlocked = false;
+
+    let districtId = String(existingData.assignedDistrictId || "").trim();
+    let subDistrictId = String(existingData.assignedSubDistrictId || "").trim();
+    if (!districtId || !subDistrictId) {
+      districtId = DEFAULT_DRIVER_DISTRICT.id;
+      subDistrictId = DEFAULT_DRIVER_DISTRICT.subDistrictId;
+      update.assignedDistrictId = districtId;
+      update.assignedSubDistrictId = subDistrictId;
+    }
+
+    if (existingData.latitude == null) {
+      update.latitude = DEFAULT_DRIVER_DISTRICT.latitude;
+    }
+    if (existingData.longitude == null) {
+      update.longitude = DEFAULT_DRIVER_DISTRICT.longitude;
+    }
+    if (!existingData.locationUpdatedAt) {
+      update.locationUpdatedAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+  }
+
+  await driverRef.set(update, { merge: true });
+
+  functions.logger.info("setDriverApprovalStatus", {
+    driverId,
+    status,
+    reviewedBy: context.auth.uid,
+  });
+
+  return { ok: true, approvalStatus: status };
+});
+
+exports.resetPasswordByPhone = authAdminCallable(async (data) =>
   runResetPasswordByPhone(normalizePhone, data),
 );
 
@@ -638,7 +866,7 @@ exports.sendWhatsAppOtpDryRun = functions.https.onCall(async (data) => {
 
 exports.sendWhatsAppOtpDebug = createSendWhatsAppOtpDebug(normalizePhone);
 
-exports.requestPasswordReset = functions.https.onCall(async (data) => {
+exports.requestPasswordReset = authAdminCallable(async (data) => {
   const phone = normalizePhone(String(data.phone || "").trim());
   if (!phone) {
     throw new functions.https.HttpsError("invalid-argument", "Phone number required.");
@@ -673,7 +901,7 @@ exports.requestPasswordReset = functions.https.onCall(async (data) => {
   return { resetLink };
 });
 
-exports.updateAccountPhone = functions.https.onCall(async (data, context) => {
+exports.updateAccountPhone = authAdminCallable(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
   }
@@ -731,6 +959,277 @@ async function deleteDriverFirestoreData(driverId) {
   await driverRef.delete();
 }
 
+async function deleteUserFirestoreData(userId, role) {
+  const db = admin.firestore();
+  const userRef = db.collection("users").doc(userId);
+
+  try {
+    await deleteCollection(userRef.collection("saved_places"));
+  } catch (error) {
+    functions.logger.warn("deleteUserFirestoreData saved_places skipped", {
+      userId,
+      message: error.message,
+    });
+  }
+
+  if (role === "driver") {
+    const driverDoc = await db.collection("drivers").doc(userId).get();
+    if (driverDoc.exists) {
+      await deleteDriverFirestoreData(userId);
+    }
+  }
+
+  try {
+    await userRef.delete();
+  } catch (error) {
+    if (error.code !== 5 && error.code !== "not-found") {
+      throw error;
+    }
+  }
+}
+
+async function markReleasedPhone(phone, userId) {
+  const phoneKey = phoneKeyFromPhone(phone);
+  if (!phoneKey) {
+    return;
+  }
+
+  await admin.firestore().collection("released_phones").doc(phoneKey).set({
+    phone,
+    previousUid: userId,
+    releasedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+function driverPhotoDownloadUrl(bucketName, objectPath, token) {
+  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+}
+
+exports.uploadDriverApplicationPhoto = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const payload = parseCallableData(data);
+  const uid = context.auth.uid;
+  const fileName = String(payload.fileName || "").trim();
+  const base64 = String(payload.base64 || "").trim();
+
+  if (!["id_photo.jpg", "profile_photo.jpg"].includes(fileName)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid photo file name.");
+  }
+  if (!base64) {
+    throw new functions.https.HttpsError("invalid-argument", "Photo data required.");
+  }
+
+  let buffer;
+  try {
+    buffer = Buffer.from(base64, "base64");
+  } catch (error) {
+    throw new functions.https.HttpsError("invalid-argument", "Photo data is invalid.");
+  }
+
+  if (!buffer.length) {
+    throw new functions.https.HttpsError("invalid-argument", "Photo file is empty.");
+  }
+  if (buffer.length > 15 * 1024 * 1024) {
+    throw new functions.https.HttpsError("invalid-argument", "Photo is too large.");
+  }
+
+  const bucket = admin.storage().bucket();
+  const objectPath = `driver_applications/${uid}/${fileName}`;
+  const file = bucket.file(objectPath);
+  const token = require("crypto").randomUUID();
+
+  try {
+    await file.save(buffer, {
+      metadata: {
+        contentType: "image/jpeg",
+        metadata: {
+          firebaseStorageDownloadTokens: token,
+        },
+      },
+    });
+  } catch (error) {
+    functions.logger.error("uploadDriverApplicationPhoto save failed", {
+      uid,
+      fileName,
+      message: error.message,
+    });
+    throw new functions.https.HttpsError(
+      "unavailable",
+      "Could not upload photo. Try again.",
+    );
+  }
+
+  return {
+    ok: true,
+    url: driverPhotoDownloadUrl(bucket.name, objectPath, token),
+  };
+});
+
+exports.submitDriverRegistration = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const payload = parseCallableData(data);
+  const uid = context.auth.uid;
+  const phone = normalizePhone(String(payload.phone || "").trim());
+  const name = String(payload.name || "").trim();
+  const vehicleType = String(payload.vehicleType || "Tuk-Tuk").trim() || "Tuk-Tuk";
+  const vehiclePlate = String(payload.vehiclePlate || "").trim();
+  const vehicleColor = String(payload.vehicleColor || "").trim();
+  const licenseNumber = String(payload.licenseNumber || "").trim();
+  const idPhotoUrl = String(payload.idPhotoUrl || "").trim();
+  const profilePhotoUrl = String(payload.profilePhotoUrl || "").trim();
+
+  if (!phone || phone === "+964") {
+    throw new functions.https.HttpsError("invalid-argument", "Phone number required.");
+  }
+  if (!name) {
+    throw new functions.https.HttpsError("invalid-argument", "Name is required.");
+  }
+  if (!vehiclePlate) {
+    throw new functions.https.HttpsError("invalid-argument", "Plate number is required.");
+  }
+  if (!vehicleColor) {
+    throw new functions.https.HttpsError("invalid-argument", "Vehicle color is required.");
+  }
+  if (!idPhotoUrl || !profilePhotoUrl) {
+    throw new functions.https.HttpsError("invalid-argument", "Both photos are required.");
+  }
+
+  const driverRef = admin.firestore().collection("drivers").doc(uid);
+  const existing = await driverRef.get();
+  const existingData = existing.exists ? existing.data() || {} : {};
+
+  await driverRef.set(
+    {
+      phone,
+      name,
+      vehicleType,
+      vehiclePlate,
+      vehicleColor,
+      licenseNumber,
+      idPhotoUrl,
+      profilePhotoUrl,
+      termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+      approvalStatus: "pending",
+      isOnline: false,
+      isBlocked: false,
+      hasActiveRide: false,
+      cancelledRidesCount: existingData.cancelledRidesCount || 0,
+      createdAt: existingData.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  await admin.firestore().collection("users").doc(uid).set(
+    {
+      phone,
+      name,
+      role: "driver",
+      profilePhotoUrl,
+    },
+    { merge: true },
+  );
+
+  return { ok: true };
+});
+
+async function resolveStoragePhotoUrl(bucket, objectPath) {
+  const file = bucket.file(objectPath);
+  const [exists] = await file.exists();
+  if (!exists) {
+    return "";
+  }
+
+  const [metadata] = await file.getMetadata();
+  let token = String(metadata.metadata?.firebaseStorageDownloadTokens || "").split(",")[0].trim();
+  if (!token) {
+    token = require("crypto").randomUUID();
+    await file.setMetadata({
+      metadata: {
+        firebaseStorageDownloadTokens: token,
+      },
+    });
+  }
+
+  return driverPhotoDownloadUrl(bucket.name, objectPath, token);
+}
+
+exports.syncDriverDocumentsFromStorage = authAdminCallable(async (data, context) => {
+  await assertAdminPermissionAny(context, ["allDrivers", "pendingDrivers"]);
+
+  const payload = parseCallableData(data);
+  const driverId = String(payload.driverId || "").trim();
+  if (!driverId) {
+    throw new functions.https.HttpsError("invalid-argument", "Driver id required.");
+  }
+
+  const bucket = admin.storage().bucket();
+  const idPhotoUrl = await resolveStoragePhotoUrl(
+    bucket,
+    `driver_applications/${driverId}/id_photo.jpg`,
+  );
+  const profilePhotoUrl = await resolveStoragePhotoUrl(
+    bucket,
+    `driver_applications/${driverId}/profile_photo.jpg`,
+  );
+
+  const updates = {};
+  if (idPhotoUrl) {
+    updates.idPhotoUrl = idPhotoUrl;
+  }
+  if (profilePhotoUrl) {
+    updates.profilePhotoUrl = profilePhotoUrl;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await admin.firestore().collection("drivers").doc(driverId).set(updates, { merge: true });
+    if (updates.profilePhotoUrl) {
+      await admin.firestore().collection("users").doc(driverId).set(
+        { profilePhotoUrl: updates.profilePhotoUrl },
+        { merge: true },
+      );
+    }
+  }
+
+  return { ok: true, idPhotoUrl, profilePhotoUrl };
+});
+
+exports.getDriverPhotoForAdmin = authAdminCallable(async (data, context) => {
+  await assertAdminPermissionAny(context, ["allDrivers", "pendingDrivers"]);
+
+  const payload = parseCallableData(data);
+  const driverId = String(payload.driverId || "").trim();
+  const fileName = String(payload.fileName || "").trim();
+
+  if (!driverId) {
+    throw new functions.https.HttpsError("invalid-argument", "Driver id required.");
+  }
+  if (!["id_photo.jpg", "profile_photo.jpg"].includes(fileName)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid photo file name.");
+  }
+
+  const bucket = admin.storage().bucket();
+  const objectPath = `driver_applications/${driverId}/${fileName}`;
+  const file = bucket.file(objectPath);
+  const [exists] = await file.exists();
+  if (!exists) {
+    throw new functions.https.HttpsError("not-found", "Photo not found.");
+  }
+
+  const [buffer] = await file.download();
+  const [metadata] = await file.getMetadata();
+  return {
+    ok: true,
+    base64: buffer.toString("base64"),
+    contentType: metadata.contentType || "image/jpeg",
+  };
+});
+
 function phoneKeyFromPhone(phone) {
   return String(phone || "").replace(/\D/g, "");
 }
@@ -756,6 +1255,77 @@ async function deleteAuthUserForPhone(phone) {
     });
     return false;
   }
+}
+
+async function deleteAccountStorageFiles(userId) {
+  if (!userId || userId.startsWith("fake_")) {
+    return;
+  }
+
+  try {
+    const bucket = admin.storage().bucket();
+    await bucket.deleteFiles({ prefix: `driver_applications/${userId}/` });
+  } catch (error) {
+    functions.logger.warn("deleteAccountStorageFiles driver docs skipped", {
+      userId,
+      message: error.message,
+    });
+  }
+
+  try {
+    const bucket = admin.storage().bucket();
+    await bucket.file(`user_profiles/${userId}/profile_photo.jpg`).delete();
+  } catch (error) {
+    if (error.code !== 404) {
+      functions.logger.warn("deleteAccountStorageFiles profile photo skipped", {
+        userId,
+        message: error.message,
+      });
+    }
+  }
+}
+
+async function deleteAuthCredentialsForAccount(userId, phone) {
+  let deletedPrimary = false;
+
+  if (userId) {
+    try {
+      await admin.auth().deleteUser(userId);
+      deletedPrimary = true;
+    } catch (error) {
+      if (error.code !== "auth/user-not-found") {
+        throw error;
+      }
+    }
+  }
+
+  const phoneKey = phoneKeyFromPhone(phone);
+  if (!phoneKey) {
+    return deletedPrimary;
+  }
+
+  try {
+    const userRecord = await admin.auth().getUserByEmail(authEmailFromPhoneKey(phoneKey));
+    if (!userId || userRecord.uid !== userId) {
+      await admin.auth().deleteUser(userRecord.uid);
+      deletedPrimary = true;
+    }
+  } catch (error) {
+    if (error.code === "auth/user-not-found") {
+      return deletedPrimary;
+    }
+    if (deletedPrimary) {
+      functions.logger.warn("deleteAuthCredentialsForAccount phone lookup skipped", {
+        phoneKey,
+        code: error.code,
+        message: error.message,
+      });
+      return deletedPrimary;
+    }
+    throw error;
+  }
+
+  return deletedPrimary;
 }
 
 async function clearReleasedPhone(phone) {
@@ -812,8 +1382,6 @@ async function runRegisterWithPhonePassword(data) {
   const password = String(payload.password || "");
   const fullName = String(payload.fullName || "").trim();
   const role = String(payload.role || "customer").trim();
-  const email = String(payload.email || "").trim();
-  const age = Number(payload.age || 18);
 
   if (!phone || phone === "+964") {
     throw new functions.https.HttpsError("invalid-argument", "Phone number required.");
@@ -831,22 +1399,40 @@ async function runRegisterWithPhonePassword(data) {
     throw new functions.https.HttpsError("invalid-argument", "Invalid account type.");
   }
 
-  const db = admin.firestore();
-  const activeUsers = await db.collection("users").where("phone", "==", phone).limit(1).get();
-  if (!activeUsers.empty) {
+  const phoneKey = phoneKeyFromPhone(phone);
+  const authEmail = authEmailFromPhoneKey(phoneKey);
+
+  try {
+    const existing = await admin.auth().getUserByEmail(authEmail);
+    functions.logger.warn("registerWithPhonePassword blocked duplicate auth user", {
+      phoneKey,
+      uid: existing.uid,
+    });
     throw new functions.https.HttpsError(
       "already-exists",
       "An account with this phone number already exists.",
     );
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    if (error.code !== "auth/user-not-found") {
+      functions.logger.error("registerWithPhonePassword auth lookup failed", {
+        phoneKey,
+        code: error.code,
+        message: error.message,
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Could not verify phone number. Try again.",
+      );
+    }
   }
 
-  await cleanupDeletedAccountArtifacts(phone, null);
-
-  const phoneKey = phoneKeyFromPhone(phone);
   let userRecord;
   try {
     userRecord = await admin.auth().createUser({
-      email: authEmailFromPhoneKey(phoneKey),
+      email: authEmail,
       password,
       displayName: fullName,
     });
@@ -868,40 +1454,12 @@ async function runRegisterWithPhonePassword(data) {
     );
   }
 
-  const profile = {
-    phone,
-    role,
-    name: fullName,
-    age: Number.isFinite(age) && age > 0 ? age : 18,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-  if (email) {
-    profile.email = email;
-  }
-  if (role === "customer") {
-    Object.assign(profile, await getSignupPromoFields());
-  }
-
-  try {
-    await db.collection("users").doc(userRecord.uid).set(profile);
-  } catch (error) {
-    await admin.auth().deleteUser(userRecord.uid).catch(() => {});
-    functions.logger.error("registerWithPhonePassword profile create failed", {
-      uid: userRecord.uid,
-      phoneKey,
-      message: error.message,
-    });
-    throw new functions.https.HttpsError(
-      "internal",
-      "Could not save account profile. Try again.",
-    );
-  }
-
-  return { ok: true, uid: userRecord.uid };
+  return { ok: true, uid: userRecord.uid, phone, role };
 }
 
-exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
-  const targetUserId = String(data.userId || "").trim();
+exports.deleteUserAccount = authAdminCallable(async (data, context) => {
+  const payload = parseCallableData(data);
+  const targetUserId = String(payload.userId || "").trim();
   if (!targetUserId) {
     throw new functions.https.HttpsError("invalid-argument", "User id required.");
   }
@@ -917,30 +1475,43 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const db = admin.firestore();
-
   if (targetUserId.startsWith("fake_")) {
     await assertAdminPermission(context, "allDrivers");
-    const fakeDriver = await db.collection("drivers").doc(targetUserId).get();
-    if (!fakeDriver.exists) {
-      throw new functions.https.HttpsError("not-found", "Driver not found.");
-    }
-    if ((fakeDriver.data()?.isFakeDriver || false) !== true) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Only test drivers can be deleted this way.",
-      );
-    }
-    await deleteDriverFirestoreData(targetUserId);
     return { ok: true, deletedAuth: false };
   }
 
-  const targetDoc = await db.collection("users").doc(targetUserId).get();
-  if (!targetDoc.exists || !targetDoc.data()) {
+  let role = String(payload.role || "").trim();
+  let phone = normalizePhone(String(payload.phone || "").trim());
+
+  const userDoc = await admin.firestore().collection("users").doc(targetUserId).get();
+  const driverDoc = await admin.firestore().collection("drivers").doc(targetUserId).get();
+
+  if (userDoc.exists && userDoc.data()) {
+    if (!role) {
+      role = String(userDoc.data().role || "");
+    }
+    if (!phone || phone === "+964") {
+      phone = normalizePhone(String(userDoc.data().phone || ""));
+    }
+  }
+
+  if (driverDoc.exists && driverDoc.data()) {
+    if (!role) {
+      role = "driver";
+    }
+    if (!phone || phone === "+964") {
+      phone = normalizePhone(String(driverDoc.data().phone || ""));
+    }
+  }
+
+  if (!userDoc.exists && !driverDoc.exists) {
     throw new functions.https.HttpsError("not-found", "Account not found.");
   }
 
-  const role = String(targetDoc.data().role || "");
+  if (!role) {
+    throw new functions.https.HttpsError("invalid-argument", "Account role required.");
+  }
+
   if (role === "manager" || role === "assistant") {
     throw new functions.https.HttpsError(
       "permission-denied",
@@ -949,55 +1520,126 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
   }
 
   if (role === "customer") {
-    await assertAdminPermission(context, "customers");
+    await assertAdminPermissionAny(context, ["customers"]);
   } else if (role === "driver") {
-    await assertAdminPermission(context, "allDrivers");
+    await assertAdminPermissionAny(context, ["allDrivers", "pendingDrivers"]);
   } else {
     throw new functions.https.HttpsError("failed-precondition", "Unsupported account type.");
   }
 
-  const phone = String(targetDoc.data().phone || "").trim();
+  let deletedAuth = false;
+  let deletedFirestore = false;
 
   try {
-    await admin.auth().deleteUser(targetUserId);
+    await deleteAccountStorageFiles(targetUserId);
   } catch (error) {
-    if (error.code !== "auth/user-not-found") {
-      functions.logger.error("Auth delete failed", { targetUserId, error: error.message });
-      throw new functions.https.HttpsError(
-        "internal",
-        "Could not delete login account. Try again.",
-      );
-    }
-  }
-
-  if (phone) {
-    try {
-      await deleteAuthUserForPhone(phone);
-    } catch (error) {
-      functions.logger.warn("Auth delete by phone failed", {
-        phone,
-        message: error.message,
-      });
-    }
-  }
-
-  await deleteCollection(db.collection("users").doc(targetUserId).collection("saved_places"));
-
-  const driverDoc = await db.collection("drivers").doc(targetUserId).get();
-  if (driverDoc.exists) {
-    await deleteDriverFirestoreData(targetUserId);
-  }
-
-  await db.collection("users").doc(targetUserId).delete();
-
-  if (phone) {
-    const phoneKey = phone.replace(/\D/g, "");
-    await db.collection("released_phones").doc(phoneKey).set({
-      phone,
-      previousUid: targetUserId,
-      releasedAt: admin.firestore.FieldValue.serverTimestamp(),
+    functions.logger.warn("deleteUserAccount storage cleanup skipped", {
+      targetUserId,
+      message: error.message,
     });
   }
 
-  return { ok: true, deletedAuth: true };
+  try {
+    await deleteUserFirestoreData(targetUserId, role);
+    deletedFirestore = true;
+  } catch (error) {
+    functions.logger.error("deleteUserAccount firestore delete failed", {
+      targetUserId,
+      code: error.code,
+      message: error.message,
+    });
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      `Could not delete profile data: ${error.message || error.code || "unknown error"}`,
+    );
+  }
+
+  try {
+    deletedAuth = await deleteAuthCredentialsForAccount(targetUserId, phone);
+    if (!deletedAuth) {
+      functions.logger.warn("deleteUserAccount auth user already absent", {
+        targetUserId,
+        phone,
+      });
+      deletedAuth = true;
+    }
+  } catch (error) {
+    functions.logger.error("deleteUserAccount auth delete failed", {
+      targetUserId,
+      code: error.code,
+      message: error.message,
+    });
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      `Could not delete login credentials: ${error.message || error.code || "unknown error"}`,
+    );
+  }
+
+  try {
+    await markReleasedPhone(phone, targetUserId);
+  } catch (error) {
+    functions.logger.warn("deleteUserAccount released phone mark skipped", {
+      targetUserId,
+      message: error.message,
+    });
+  }
+
+  functions.logger.info("deleteUserAccount completed", {
+    targetUserId,
+    role,
+    deletedAuth,
+    deletedFirestore,
+    deletedBy: context.auth.uid,
+  });
+
+  return { ok: true, deletedAuth, deletedFirestore };
+});
+
+exports.cleanupReleasedPhoneAuth = authAdminCallable(async (data) => {
+  const payload = parseCallableData(data);
+  const phone = normalizePhone(String(payload.phone || "").trim());
+  if (!phone || phone === "+964") {
+    throw new functions.https.HttpsError("invalid-argument", "Phone number required.");
+  }
+
+  const phoneKey = phoneKeyFromPhone(phone);
+  let released = false;
+  try {
+    const releasedDoc = await admin.firestore().collection("released_phones").doc(phoneKey).get();
+    released = releasedDoc.exists;
+  } catch (error) {
+    functions.logger.error("cleanupReleasedPhoneAuth released_phones lookup failed", {
+      phoneKey,
+      code: error.code,
+      message: error.message,
+    });
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Phone is not available for registration.",
+    );
+  }
+
+  if (!released) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Phone is not available for registration.",
+    );
+  }
+
+  try {
+    await deleteAuthCredentialsForAccount("", phone);
+  } catch (error) {
+    functions.logger.error("cleanupReleasedPhoneAuth auth delete failed", {
+      phoneKey,
+      code: error.code,
+      message: error.message,
+    });
+    throw new functions.https.HttpsError(
+      "internal",
+      "Could not prepare phone for registration. Try again.",
+    );
+  }
+
+  await clearReleasedPhone(phone);
+  return { ok: true };
 });

@@ -45,13 +45,6 @@ class HillaRideApp extends StatelessWidget {
         }
         return const Locale('ar');
       },
-      builder: (context, child) {
-        final isRtl = Localizations.localeOf(context).languageCode == 'ar';
-        return Directionality(
-          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
       home: firebaseReady
           ? _RootScaffold(variant: variant)
           : FirebaseSetupScreen(error: firebaseError),

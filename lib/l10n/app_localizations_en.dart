@@ -193,6 +193,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reject => 'Reject';
 
   @override
+  String get driverApprovedSuccess => 'Driver approved successfully';
+
+  @override
+  String get driverRejectedSuccess => 'Driver rejected';
+
+  @override
+  String get driverApprovalFailed =>
+      'Could not update driver status. Try again.';
+
+  @override
+  String get rejectDriverConfirmTitle => 'Reject this driver?';
+
+  @override
+  String get rejectDriverConfirmBody =>
+      'The driver will see a rejection message in the app.';
+
+  @override
+  String get rejectedDriverHint =>
+      'If this was a mistake, ask the manager to approve your account again from the admin panel.';
+
+  @override
   String get noPendingDrivers => 'No pending driver applications';
 
   @override
@@ -368,6 +389,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signupTitle => 'Create account';
+
+  @override
+  String get signupSuccessTitle => 'Account created successfully';
+
+  @override
+  String get signupSuccessMessage =>
+      'Your account is ready. Log in with your phone number and password.';
+
+  @override
+  String get driverSignupSuccessTitle => 'Thank you!';
+
+  @override
+  String get driverSignupSuccessMessage =>
+      'Your registration is complete. Please wait for the manager to approve your account before you can start working.';
+
+  @override
+  String get passwordResetFailed => 'Could not reset password. Try again.';
+
+  @override
+  String get vehicleColor => 'Tuk-Tuk color';
+
+  @override
+  String get vehiclePlateRequired => 'Plate number is required.';
+
+  @override
+  String get vehicleColorRequired => 'Tuk-Tuk color is required.';
+
+  @override
+  String get ageRequired => 'Enter your age.';
+
+  @override
+  String get driverMinAge => 'Drivers must be at least 18 years old.';
+
+  @override
+  String get goToLogin => 'Go to login';
 
   @override
   String get emailOptional => 'Email (optional)';
@@ -913,7 +969,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Please fill in all required fields.';
 
   @override
-  String get vehiclePlateOptional => 'Plate number (optional)';
+  String get vehiclePlateOptional => 'Plate number';
 
   @override
   String get licenseNumberOptional => 'License number (optional)';
@@ -958,10 +1014,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeDriverConfirmMessage =>
-      'This removes their profile from the app. They can use Forgot Password, then log in with the same phone to set up again.';
+      'This permanently deletes their login and profile. They can register again with the same phone number as a new account.';
 
   @override
-  String get driverRemoved => 'Driver account deleted.';
+  String get driverRemoved => 'Driver account deleted successfully.';
 
   @override
   String get removeDriverFailed =>
@@ -975,7 +1031,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeCustomerConfirmMessage =>
-      'This removes their profile from the app. They can use Forgot Password, then log in with the same phone to set up again.';
+      'This permanently deletes their login and profile. They can register again with the same phone number as a new account.';
 
   @override
   String get customerRemoved => 'Customer account deleted.';
@@ -1137,7 +1193,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantFormInvalid =>
-      'Enter name, valid email, and password (6+ characters).';
+      'Enter name, Iraqi phone number, and password (6+ characters).';
 
   @override
   String get assistantCreated => 'Assistant account created.';
@@ -1156,7 +1212,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantLoginHint =>
-      'Use the email and password your manager gave you.';
+      'Use the phone number and password your manager gave you.';
 
   @override
   String get assistantNoPermissions =>

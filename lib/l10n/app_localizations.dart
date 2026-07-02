@@ -452,6 +452,42 @@ abstract class AppLocalizations {
   /// **'Reject'**
   String get reject;
 
+  /// No description provided for @driverApprovedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver approved successfully'**
+  String get driverApprovedSuccess;
+
+  /// No description provided for @driverRejectedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver rejected'**
+  String get driverRejectedSuccess;
+
+  /// No description provided for @driverApprovalFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update driver status. Try again.'**
+  String get driverApprovalFailed;
+
+  /// No description provided for @rejectDriverConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject this driver?'**
+  String get rejectDriverConfirmTitle;
+
+  /// No description provided for @rejectDriverConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The driver will see a rejection message in the app.'**
+  String get rejectDriverConfirmBody;
+
+  /// No description provided for @rejectedDriverHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If this was a mistake, ask the manager to approve your account again from the admin panel.'**
+  String get rejectedDriverHint;
+
   /// No description provided for @noPendingDrivers.
   ///
   /// In en, this message translates to:
@@ -775,6 +811,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create account'**
   String get signupTitle;
+
+  /// No description provided for @signupSuccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account created successfully'**
+  String get signupSuccessTitle;
+
+  /// No description provided for @signupSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is ready. Log in with your phone number and password.'**
+  String get signupSuccessMessage;
+
+  /// No description provided for @driverSignupSuccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Thank you!'**
+  String get driverSignupSuccessTitle;
+
+  /// No description provided for @driverSignupSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your registration is complete. Please wait for the manager to approve your account before you can start working.'**
+  String get driverSignupSuccessMessage;
+
+  /// No description provided for @passwordResetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reset password. Try again.'**
+  String get passwordResetFailed;
+
+  /// No description provided for @vehicleColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Tuk-Tuk color'**
+  String get vehicleColor;
+
+  /// No description provided for @vehiclePlateRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Plate number is required.'**
+  String get vehiclePlateRequired;
+
+  /// No description provided for @vehicleColorRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Tuk-Tuk color is required.'**
+  String get vehicleColorRequired;
+
+  /// No description provided for @ageRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your age.'**
+  String get ageRequired;
+
+  /// No description provided for @driverMinAge.
+  ///
+  /// In en, this message translates to:
+  /// **'Drivers must be at least 18 years old.'**
+  String get driverMinAge;
+
+  /// No description provided for @goToLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to login'**
+  String get goToLogin;
 
   /// No description provided for @emailOptional.
   ///
@@ -1751,7 +1853,7 @@ abstract class AppLocalizations {
   /// No description provided for @vehiclePlateOptional.
   ///
   /// In en, this message translates to:
-  /// **'Plate number (optional)'**
+  /// **'Plate number'**
   String get vehiclePlateOptional;
 
   /// No description provided for @licenseNumberOptional.
@@ -1829,13 +1931,13 @@ abstract class AppLocalizations {
   /// No description provided for @removeDriverConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'This removes their profile from the app. They can use Forgot Password, then log in with the same phone to set up again.'**
+  /// **'This permanently deletes their login and profile. They can register again with the same phone number as a new account.'**
   String get removeDriverConfirmMessage;
 
   /// No description provided for @driverRemoved.
   ///
   /// In en, this message translates to:
-  /// **'Driver account deleted.'**
+  /// **'Driver account deleted successfully.'**
   String get driverRemoved;
 
   /// No description provided for @removeDriverFailed.
@@ -1859,7 +1961,7 @@ abstract class AppLocalizations {
   /// No description provided for @removeCustomerConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'This removes their profile from the app. They can use Forgot Password, then log in with the same phone to set up again.'**
+  /// **'This permanently deletes their login and profile. They can register again with the same phone number as a new account.'**
   String get removeCustomerConfirmMessage;
 
   /// No description provided for @customerRemoved.
@@ -2165,7 +2267,7 @@ abstract class AppLocalizations {
   /// No description provided for @assistantFormInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Enter name, valid email, and password (6+ characters).'**
+  /// **'Enter name, Iraqi phone number, and password (6+ characters).'**
   String get assistantFormInvalid;
 
   /// No description provided for @assistantCreated.
@@ -2201,7 +2303,7 @@ abstract class AppLocalizations {
   /// No description provided for @assistantLoginHint.
   ///
   /// In en, this message translates to:
-  /// **'Use the email and password your manager gave you.'**
+  /// **'Use the phone number and password your manager gave you.'**
   String get assistantLoginHint;
 
   /// No description provided for @assistantNoPermissions.

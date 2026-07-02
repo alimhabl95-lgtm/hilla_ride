@@ -11,7 +11,8 @@ class AdminService {
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ?? FirebaseFunctions.instance;
+        _functions = functions ??
+            FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
@@ -284,8 +285,88 @@ class AdminService {
   }
 
   Future<void> deleteUserAccount(String userId) async {
-    final callable = _functions.httpsCallable('deleteUserAccount');
-    await callable.call({'userId': userId});
+    if (userId.startsWith('fake_')) {
+      await _deleteUserAccountLocally(userId);
+      return;
+    }
+
+    final userRef = _firestore.collection('users').doc(userId);
+    final driverRef = _firestore.collection('drivers').doc(userId);
+    final userDoc = await userRef.get();
+    final driverDoc = await driverRef.get();
+
+    if (!userDoc.exists && !driverDoc.exists) {
+      throw StateError('account_not_found');
+    }
+
+    final userData = userDoc.data();
+    final driverData = driverDoc.data();
+    var role = userData?['role'] as String? ?? '';
+    var phone = (userData?['phone'] as String? ?? '').trim();
+
+    if (role.isEmpty && driverDoc.exists) {
+      role = UserRole.driver.value;
+    }
+    if (phone.isEmpty && driverData != null) {
+      phone = (driverData['phone'] as String? ?? '').trim();
+    }
+
+    if (role == UserRole.manager.value || role == UserRole.assistant.value) {
+      throw StateError('admin_account_protected');
+    }
+    if (role.isEmpty) {
+      throw StateError('account_role_missing');
+    }
+
+    FirebaseFunctionsException? cloudError;
+    try {
+      final result = await _functions.httpsCallable('deleteUserAccount').call({
+        'userId': userId,
+        'phone': phone,
+        'role': role,
+      });
+      if (_callableSucceeded(result.data)) {
+        return;
+      }
+      cloudError = FirebaseFunctionsException(
+        code: 'failed-precondition',
+        message: 'Delete did not complete. Try again.',
+      );
+    } on FirebaseFunctionsException catch (error) {
+      cloudError = error;
+    }
+
+    try {
+      await _deleteUserAccountLocally(userId);
+    } catch (_) {
+      throw cloudError ??
+          FirebaseFunctionsException(
+            code: 'failed-precondition',
+            message: 'Could not delete this account.',
+          );
+    }
+
+    if (phone.isNotEmpty) {
+      try {
+        await _functions.httpsCallable('cleanupReleasedPhoneAuth').call({
+          'phone': phone,
+        });
+      } catch (_) {
+        // Auth cleanup may still require cloud function permissions.
+      }
+    }
+  }
+
+  bool _callableSucceeded(dynamic data) {
+    if (data is! Map) return false;
+    final payload = Map<String, dynamic>.from(data);
+    return payload['ok'] == true;
+  }
+
+  Future<void> syncDriverDocumentsFromStorage(String driverId) async {
+    await _functions.httpsCallable('syncDriverDocumentsFromStorage').call({
+      'driverId': driverId,
+    });
   }
 
   Future<void> _deleteCollection(CollectionReference<Map<String, dynamic>> ref) async {

@@ -152,7 +152,9 @@ class _AdminDriverDetailScreenState extends State<AdminDriverDetailScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    '${driver.vehiclePlate.isEmpty ? '—' : driver.vehiclePlate} • ${driver.vehicleType.isEmpty ? '—' : driver.vehicleType}',
+                                    '${driver.vehiclePlate.isEmpty ? '—' : driver.vehiclePlate} • '
+                                    '${driver.vehicleType.isEmpty ? '—' : driver.vehicleType} • '
+                                    '${driver.vehicleColor.isEmpty ? '—' : driver.vehicleColor}',
                                   ),
                                   const SizedBox(height: 12),
                                   Text(

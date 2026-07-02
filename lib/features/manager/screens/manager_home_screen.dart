@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/features/admin/widgets/driver_approval_actions.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -43,22 +44,22 @@ class ManagerHomeScreen extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => driverService.setApprovalStatus(
+                            child: FilledButton(
+                              onPressed: () => approveDriver(
+                                context,
                                 driverId: driver.uid,
-                                status: DriverApprovalStatus.rejected,
                               ),
-                              child: Text(l10n.reject),
+                              child: Text(l10n.approve),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: FilledButton(
-                              onPressed: () => driverService.setApprovalStatus(
+                            child: OutlinedButton(
+                              onPressed: () => rejectDriver(
+                                context,
                                 driverId: driver.uid,
-                                status: DriverApprovalStatus.approved,
                               ),
-                              child: Text(l10n.approve),
+                              child: Text(l10n.reject),
                             ),
                           ),
                         ],

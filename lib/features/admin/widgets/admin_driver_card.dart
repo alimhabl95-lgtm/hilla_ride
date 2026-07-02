@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
@@ -10,6 +11,7 @@ import 'package:hilla_ride/features/admin/widgets/admin_fake_driver_controls.dar
 import 'package:hilla_ride/features/admin/screens/admin_driver_detail_screen.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_customers_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_driver_district_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/driver_approval_actions.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -37,6 +39,9 @@ class AdminDriverCard extends StatelessWidget {
         final liveDriver = driverSnapshot.data ?? driver;
         final isPendingLive =
             liveDriver.approvalStatus == DriverApprovalStatus.pending;
+        final canApprove =
+            liveDriver.approvalStatus == DriverApprovalStatus.pending ||
+                liveDriver.approvalStatus == DriverApprovalStatus.rejected;
 
         return FutureBuilder<AppUser?>(
           future: adminService.getUser(liveDriver.uid),
@@ -160,6 +165,9 @@ class AdminDriverCard extends StatelessWidget {
                       '${l10n.vehiclePlate}: ${liveDriver.vehiclePlate.isEmpty ? '—' : liveDriver.vehiclePlate}',
                     ),
                     Text(
+                      '${l10n.vehicleColor}: ${liveDriver.vehicleColor.isEmpty ? '—' : liveDriver.vehicleColor}',
+                    ),
+                    Text(
                       '${l10n.licenseNumber}: ${liveDriver.licenseNumber.isEmpty ? '—' : liveDriver.licenseNumber}',
                     ),
                     Text(
@@ -240,23 +248,24 @@ class AdminDriverCard extends StatelessWidget {
                             icon: const Icon(Icons.check_circle_outline),
                             label: Text(l10n.receivedProfitsAction),
                           ),
-                        if (isPendingLive) ...[
+                        if (canApprove) ...[
                           FilledButton.icon(
-                            onPressed: () => driverService.setApprovalStatus(
+                            onPressed: () => approveDriver(
+                              context,
                               driverId: liveDriver.uid,
-                              status: DriverApprovalStatus.approved,
                             ),
                             icon: const Icon(Icons.check_circle_outline),
                             label: Text(l10n.approve),
                           ),
-                          OutlinedButton.icon(
-                            onPressed: () => driverService.setApprovalStatus(
-                              driverId: liveDriver.uid,
-                              status: DriverApprovalStatus.rejected,
+                          if (isPendingLive)
+                            OutlinedButton.icon(
+                              onPressed: () => rejectDriver(
+                                context,
+                                driverId: liveDriver.uid,
+                              ),
+                              icon: const Icon(Icons.cancel_outlined),
+                              label: Text(l10n.reject),
                             ),
-                            icon: const Icon(Icons.cancel_outlined),
-                            label: Text(l10n.reject),
-                          ),
                         ],
                         AdminFakeDriverToggleButton(
                           driver: liveDriver,
@@ -367,13 +376,7 @@ class AdminDriverCard extends StatelessWidget {
     } on FirebaseFunctionsException catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error.message?.isNotEmpty == true
-                ? error.message!
-                : l10n.removeDriverFailed,
-          ),
-        ),
+        SnackBar(content: Text(adminDeleteErrorMessage(error, l10n))),
       );
     } on FirebaseException catch (error) {
       if (!context.mounted) return;
@@ -385,6 +388,11 @@ class AdminDriverCard extends StatelessWidget {
                 : l10n.removeDriverFailed,
           ),
         ),
+      );
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
       );
     } catch (_) {
       if (!context.mounted) return;

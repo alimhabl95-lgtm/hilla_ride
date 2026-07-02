@@ -12,12 +12,14 @@ class FirebaseDriverPhotoImage extends StatefulWidget {
     required this.fileName,
     this.imageUrl = '',
     this.fit = BoxFit.cover,
+    this.forAdmin = false,
   });
 
   final String driverId;
   final String fileName;
   final String imageUrl;
   final BoxFit fit;
+  final bool forAdmin;
 
   @override
   State<FirebaseDriverPhotoImage> createState() =>
@@ -47,13 +49,63 @@ class _FirebaseDriverPhotoImageState extends State<FirebaseDriverPhotoImage> {
           driverId: widget.driverId,
           fileName: widget.fileName,
           imageUrl: widget.imageUrl,
+          forAdmin: widget.forAdmin,
         );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.imageUrl.trim().isNotEmpty && !widget.forAdmin && !kIsWeb) {
+      return Image.network(
+        widget.imageUrl,
+        fit: widget.fit,
+        gaplessPlayback: true,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const Center(
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          if (kDebugMode) {
+            debugPrint('Driver photo network load failed: $error');
+          }
+          return _BytesPhoto(
+            bytesFuture: _bytesFuture,
+            fit: widget.fit,
+            onRetry: _refresh,
+          );
+        },
+      );
+    }
+
+    return _BytesPhoto(
+      bytesFuture: _bytesFuture,
+      fit: widget.fit,
+      onRetry: _refresh,
+    );
+  }
+}
+
+class _BytesPhoto extends StatelessWidget {
+  const _BytesPhoto({
+    required this.bytesFuture,
+    required this.fit,
+    required this.onRetry,
+  });
+
+  final Future<Uint8List?>? bytesFuture;
+  final BoxFit fit;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
     return FutureBuilder<Uint8List?>(
-      future: _bytesFuture,
+      future: bytesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -69,23 +121,23 @@ class _FirebaseDriverPhotoImageState extends State<FirebaseDriverPhotoImage> {
           if (kDebugMode) {
             debugPrint('Driver photo load failed: ${snapshot.error}');
           }
-          return _PhotoError(onRetry: _refresh);
+          return _PhotoError(onRetry: onRetry);
         }
 
         final bytes = snapshot.data;
         if (bytes == null || bytes.isEmpty) {
-          return _PhotoError(onRetry: _refresh);
+          return _PhotoError(onRetry: onRetry);
         }
 
         return Image.memory(
           bytes,
-          fit: widget.fit,
+          fit: fit,
           gaplessPlayback: true,
           errorBuilder: (context, error, stackTrace) {
             if (kDebugMode) {
               debugPrint('Driver photo render failed: $error');
             }
-            return _PhotoError(onRetry: _refresh);
+            return _PhotoError(onRetry: onRetry);
           },
         );
       },
@@ -131,6 +183,7 @@ void showDriverPhotoPreview(
   showDialog<void>(
     context: context,
     builder: (context) => Dialog(
+      clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.sizeOf(context).width * 0.9,
@@ -147,6 +200,7 @@ void showDriverPhotoPreview(
                   fileName: fileName,
                   imageUrl: imageUrl,
                   fit: BoxFit.contain,
+                  forAdmin: true,
                 ),
               ),
             ),

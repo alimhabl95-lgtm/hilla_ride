@@ -5,7 +5,14 @@ class PhoneAuthCredentials {
   PhoneAuthCredentials._();
 
   static String normalizePhone(String raw) {
-    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    final normalized = raw
+        .replaceAllMapped(RegExp(r'[٠-٩]'), (match) {
+          return String.fromCharCode(match.group(0)!.codeUnitAt(0) - 1632 + 48);
+        })
+        .replaceAllMapped(RegExp(r'[۰-۹]'), (match) {
+          return String.fromCharCode(match.group(0)!.codeUnitAt(0) - 1776 + 48);
+        });
+    var digits = normalized.replaceAll(RegExp(r'\D'), '');
     if (digits.startsWith('964')) {
       digits = digits.substring(3);
     }
@@ -23,7 +30,7 @@ class PhoneAuthCredentials {
   static bool isValidPassword(String password) => password.length >= 6;
 
   static bool isValidIraqiPhone(String raw) {
-    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    var digits = normalizePhone(raw).replaceAll(RegExp(r'\D'), '');
     if (digits.startsWith('964')) {
       digits = digits.substring(3);
     }

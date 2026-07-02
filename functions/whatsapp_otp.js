@@ -309,7 +309,12 @@ async function resolveAuthUidForPhone(phone) {
     if (error.code === "auth/user-not-found") {
       return null;
     }
-    throw error;
+    functions.logger.warn("resolveAuthUidForPhone failed", {
+      phoneKey,
+      code: error.code,
+      message: error.message,
+    });
+    return null;
   }
 }
 
@@ -614,8 +619,8 @@ async function runResetPasswordByPhone(normalizePhone, data) {
     assertValidVerification(phoneKey, "reset_password", verificationToken);
   }
 
-  let uid = await resolveAuthUidForPhone(phone);
-  if (!uid) {
+  let uid = null;
+  try {
     const snapshot = await admin
       .firestore()
       .collection("users")
@@ -625,7 +630,26 @@ async function runResetPasswordByPhone(normalizePhone, data) {
     if (!snapshot.empty) {
       uid = snapshot.docs[0].id;
     }
+  } catch (error) {
+    functions.logger.warn("resetPasswordByPhone Firestore lookup failed", {
+      phoneKey,
+      code: error.code,
+      message: error.message,
+    });
   }
+
+  if (!uid) {
+    try {
+      uid = await resolveAuthUidForPhone(phone);
+    } catch (error) {
+      functions.logger.warn("resetPasswordByPhone auth lookup failed", {
+        phoneKey,
+        code: error.code,
+        message: error.message,
+      });
+    }
+  }
+
   if (!uid) {
     throw new functions.https.HttpsError("not-found", "No account found for this phone number.");
   }

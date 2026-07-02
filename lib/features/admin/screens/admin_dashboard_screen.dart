@@ -310,13 +310,36 @@ class _AdminSideNavigation extends StatelessWidget {
   }
 }
 
-class _PendingDriversPanel extends StatelessWidget {
+class _PendingDriversPanel extends StatefulWidget {
   const _PendingDriversPanel();
+
+  @override
+  State<_PendingDriversPanel> createState() => _PendingDriversPanelState();
+}
+
+class _PendingDriversPanelState extends State<_PendingDriversPanel> {
+  String? _cityFilterId;
+  String? _subDistrictFilterId;
+
+  bool _matchesDriverFilter(DriverProfile driver) {
+    if (_cityFilterId != null &&
+        driver.assignedDistrictId != _cityFilterId) {
+      return false;
+    }
+    if (_subDistrictFilterId != null &&
+        driver.assignedSubDistrictId != _subDistrictFilterId) {
+      return false;
+    }
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final adminService = context.read<AppState>().adminService;
+    final selectedDistrict = _cityFilterId == null
+        ? null
+        : BabilRegions.districtById(_cityFilterId!);
 
     return StreamBuilder<List<DriverProfile>>(
       stream: adminService.watchAllDrivers(),
@@ -354,6 +377,7 @@ class _PendingDriversPanel extends StatelessWidget {
         final drivers = (snapshot.data ?? const [])
             .where((driver) =>
                 driver.approvalStatus == DriverApprovalStatus.pending)
+            .where(_matchesDriverFilter)
             .toList()
           ..sort(
             (a, b) => (b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
@@ -361,31 +385,77 @@ class _PendingDriversPanel extends StatelessWidget {
           );
 
         if (drivers.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(l10n.noPendingDrivers, textAlign: TextAlign.center),
-                  const SizedBox(height: 12),
-                  Text(
-                    l10n.checkAllDriversTab,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                child: _AdminDriverDistrictFilter(
+                  cityFilterId: _cityFilterId,
+                  subDistrictFilterId: _subDistrictFilterId,
+                  selectedDistrict: selectedDistrict,
+                  localeName: l10n.localeName,
+                  onCityChanged: (value) {
+                    setState(() {
+                      _cityFilterId = value;
+                      _subDistrictFilterId = null;
+                    });
+                  },
+                  onSubDistrictChanged: (value) {
+                    setState(() => _subDistrictFilterId = value);
+                  },
+                ),
               ),
-            ),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(l10n.noPendingDrivers, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        Text(
+                          l10n.checkAllDriversTab,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
         return ListView.separated(
           padding: const EdgeInsets.all(24),
-          itemCount: drivers.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) =>
-              AdminDriverCard(driver: drivers[index]),
+          itemCount: drivers.length + 1,
+          separatorBuilder: (_, index) {
+            if (index == 0) return const SizedBox(height: 12);
+            return const SizedBox(height: 12);
+          },
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return _AdminDriverDistrictFilter(
+                cityFilterId: _cityFilterId,
+                subDistrictFilterId: _subDistrictFilterId,
+                selectedDistrict: selectedDistrict,
+                localeName: l10n.localeName,
+                onCityChanged: (value) {
+                  setState(() {
+                    _cityFilterId = value;
+                    _subDistrictFilterId = null;
+                  });
+                },
+                onSubDistrictChanged: (value) {
+                  setState(() => _subDistrictFilterId = value);
+                },
+              );
+            }
+            return AdminDriverCard(driver: drivers[index - 1]);
+          },
         );
       },
     );
@@ -513,21 +583,45 @@ class _ActiveRidesPanelState extends State<_ActiveRidesPanel> {
   }
 }
 
-class _AllDriversPanel extends StatelessWidget {
+class _AllDriversPanel extends StatefulWidget {
   const _AllDriversPanel({required this.adminUser});
 
   final AppUser adminUser;
 
   @override
+  State<_AllDriversPanel> createState() => _AllDriversPanelState();
+}
+
+class _AllDriversPanelState extends State<_AllDriversPanel> {
+  String? _cityFilterId;
+  String? _subDistrictFilterId;
+
+  bool _matchesDriverFilter(DriverProfile driver) {
+    if (_cityFilterId != null &&
+        driver.assignedDistrictId != _cityFilterId) {
+      return false;
+    }
+    if (_subDistrictFilterId != null &&
+        driver.assignedSubDistrictId != _subDistrictFilterId) {
+      return false;
+    }
+    return true;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final adminService = context.read<AppState>().adminService;
-    final isManager = adminUser.isOwnerManager;
+    final isManager = widget.adminUser.isOwnerManager;
+    final selectedDistrict = _cityFilterId == null
+        ? null
+        : BabilRegions.districtById(_cityFilterId!);
 
     return StreamBuilder<List<DriverProfile>>(
       stream: adminService.watchAllDrivers(),
       builder: (context, snapshot) {
         final drivers = List<DriverProfile>.from(snapshot.data ?? const [])
+          ..retainWhere(_matchesDriverFilter)
           ..sort(
             (a, b) => (b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
                 .compareTo(a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0)),
@@ -535,19 +629,36 @@ class _AllDriversPanel extends StatelessWidget {
 
         return ListView.separated(
           padding: const EdgeInsets.all(24),
-          itemCount: drivers.isEmpty ? 1 : drivers.length + 1,
+          itemCount: drivers.isEmpty ? 2 : drivers.length + 2,
           separatorBuilder: (_, index) {
-            if (index == 0) return const SizedBox(height: 12);
+            if (index <= 1) return const SizedBox(height: 12);
             return const SizedBox(height: 12);
           },
           itemBuilder: (context, index) {
             if (index == 0) {
+              return _AdminDriverDistrictFilter(
+                cityFilterId: _cityFilterId,
+                subDistrictFilterId: _subDistrictFilterId,
+                selectedDistrict: selectedDistrict,
+                localeName: l10n.localeName,
+                onCityChanged: (value) {
+                  setState(() {
+                    _cityFilterId = value;
+                    _subDistrictFilterId = null;
+                  });
+                },
+                onSubDistrictChanged: (value) {
+                  setState(() => _subDistrictFilterId = value);
+                },
+              );
+            }
+            if (index == 1) {
               return AdminFakeDriverBar(isManager: isManager);
             }
             if (drivers.isEmpty) {
               return Center(child: Text(l10n.noDriversYet));
             }
-            final driver = drivers[index - 1];
+            final driver = drivers[index - 2];
             return AdminDriverCard(
               driver: driver,
               isManager: isManager,
@@ -555,6 +666,81 @@ class _AllDriversPanel extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _AdminDriverDistrictFilter extends StatelessWidget {
+  const _AdminDriverDistrictFilter({
+    required this.cityFilterId,
+    required this.subDistrictFilterId,
+    required this.selectedDistrict,
+    required this.localeName,
+    required this.onCityChanged,
+    required this.onSubDistrictChanged,
+  });
+
+  final String? cityFilterId;
+  final String? subDistrictFilterId;
+  final BabilDistrict? selectedDistrict;
+  final String localeName;
+  final ValueChanged<String?> onCityChanged;
+  final ValueChanged<String?> onSubDistrictChanged;
+
+  String _districtLabel(BabilDistrict district) {
+    return localeName.startsWith('ar') ? district.nameAr : district.nameEn;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Column(
+      children: [
+        DropdownButtonFormField<String?>(
+          value: cityFilterId,
+          decoration: InputDecoration(
+            labelText: l10n.filterByCity,
+            prefixIcon: const Icon(Icons.location_city_outlined),
+          ),
+          items: [
+            DropdownMenuItem<String?>(
+              value: null,
+              child: Text(l10n.allCities),
+            ),
+            for (final district in BabilRegions.districts)
+              DropdownMenuItem<String?>(
+                value: district.id,
+                child: Text(_districtLabel(district)),
+              ),
+          ],
+          onChanged: onCityChanged,
+        ),
+        if (selectedDistrict != null) ...[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String?>(
+            value: subDistrictFilterId,
+            decoration: InputDecoration(
+              labelText: l10n.filterBySubDistrict,
+              prefixIcon: const Icon(Icons.place_outlined),
+            ),
+            items: [
+              DropdownMenuItem<String?>(
+                value: null,
+                child: Text(l10n.allSubDistricts),
+              ),
+              for (final sub in selectedDistrict!.subDistricts)
+                DropdownMenuItem<String?>(
+                  value: sub.id,
+                  child: Text(
+                    localeName.startsWith('ar') ? sub.nameAr : sub.nameEn,
+                  ),
+                ),
+            ],
+            onChanged: onSubDistrictChanged,
+          ),
+        ],
+      ],
     );
   }
 }

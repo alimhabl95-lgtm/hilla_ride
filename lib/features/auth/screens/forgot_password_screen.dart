@@ -82,10 +82,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
-      showAuthErrorSnackBar(context, error);
+      if (error.code == 'internal') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.passwordResetFailed)),
+        );
+      } else {
+        showAuthErrorSnackBar(context, error);
+      }
     } on FirebaseFunctionsException catch (error) {
       if (!mounted) return;
-      showFunctionsErrorSnackBar(context, error);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.code == 'internal'
+                ? l10n.passwordResetFailed
+                : functionsErrorMessage(error, l10n),
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

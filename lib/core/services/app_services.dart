@@ -67,23 +67,141 @@ class AuthService {
     }
 
     final phone = PhoneAuthCredentials.normalizePhone(phoneRaw);
+    final authEmail = PhoneAuthCredentials.toAuthEmail(phone);
 
+    UserCredential credential;
     try {
-      final callable = _functions.httpsCallable('registerWithPhonePassword');
-      await callable.call({
-        'phone': phone,
-        'password': password,
-        'fullName': fullName.trim(),
-        'role': role.value,
-        if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
-        'age': age,
-      });
-      return signInWithPhonePassword(
-        phoneRaw: phoneRaw,
+      credential = await _auth.createUserWithEmailAndPassword(
+        email: authEmail,
         password: password,
       );
-    } on FirebaseFunctionsException catch (error) {
-      throw authExceptionFromFunctions(error);
+    } on FirebaseAuthException catch (error) {
+      if (error.code == 'email-already-in-use') {
+        credential = await _retrySignupAfterReleasedPhone(
+          phone: phone,
+          authEmail: authEmail,
+          password: password,
+        );
+      } else {
+        rethrow;
+      }
+    }
+
+    final user = credential.user;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'internal',
+        message: 'Registration failed. Try again.',
+      );
+    }
+
+    try {
+      final trimmedName = fullName.trim();
+      if (trimmedName.isNotEmpty && user.displayName != trimmedName) {
+        await user.updateDisplayName(trimmedName);
+      }
+
+      await _createUserProfileAfterSignup(
+        uid: user.uid,
+        phone: phone,
+        role: role,
+        fullName: trimmedName,
+        email: email,
+        age: age,
+      );
+      await _sessionService.claimSession(user.uid);
+    } catch (error) {
+      try {
+        await user.delete();
+      } catch (_) {
+        // Best effort cleanup if profile save fails.
+      }
+      if (error is FirebaseAuthException) {
+        rethrow;
+      }
+      throw FirebaseAuthException(
+        code: 'internal',
+        message: 'Could not save account profile. Try again.',
+      );
+    }
+
+    return credential;
+  }
+
+  Future<void> _createUserProfileAfterSignup({
+    required String uid,
+    required String phone,
+    required UserRole role,
+    required String fullName,
+    String? email,
+    int age = 18,
+  }) async {
+    final docRef = _firestore.collection('users').doc(uid);
+    final existing = await docRef.get();
+    if (existing.exists && existing.data() != null) {
+      return;
+    }
+
+    await docRef.set({
+      'phone': phone,
+      'role': role.value,
+      'name': fullName,
+      'age': age,
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      'createdAt': FieldValue.serverTimestamp(),
+      if (role == UserRole.customer) ...await _customerPromoFields(),
+    });
+
+    final phoneKey = phone.replaceAll(RegExp(r'\D'), '');
+    if (phoneKey.isNotEmpty) {
+      try {
+        await _firestore.collection('released_phones').doc(phoneKey).delete();
+      } catch (_) {
+        // Best effort cleanup after successful registration.
+      }
+    }
+  }
+
+  Future<UserCredential> _retrySignupAfterReleasedPhone({
+    required String phone,
+    required String authEmail,
+    required String password,
+  }) async {
+    final phoneKey = phone.replaceAll(RegExp(r'\D'), '');
+    final released =
+        await _firestore.collection('released_phones').doc(phoneKey).get();
+    if (!released.exists) {
+      throw FirebaseAuthException(
+        code: 'email-already-in-use',
+        message: 'An account with this phone number already exists.',
+      );
+    }
+
+    try {
+      await _functions.httpsCallable('cleanupReleasedPhoneAuth').call({
+        'phone': phone,
+      });
+    } on FirebaseFunctionsException {
+      throw FirebaseAuthException(
+        code: 'email-already-in-use',
+        message:
+            'This phone number was deleted but is not ready for registration yet. Try again later.',
+      );
+    }
+
+    try {
+      return await _auth.createUserWithEmailAndPassword(
+        email: authEmail,
+        password: password,
+      );
+    } on FirebaseAuthException catch (error) {
+      if (error.code == 'email-already-in-use') {
+        throw FirebaseAuthException(
+          code: 'email-already-in-use',
+          message: 'An account with this phone number already exists.',
+        );
+      }
+      rethrow;
     }
   }
 
@@ -393,10 +511,15 @@ class AuthService {
 }
 
 class DriverService {
-  DriverService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  DriverService({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _functions = functions ??
+            FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
   StreamSubscription<Position>? _locationSubscription;
   DateTime? _lastLocationWriteAt;
   Position? _lastWrittenPosition;
@@ -409,26 +532,21 @@ class DriverService {
     required String name,
     required String vehicleType,
     String vehiclePlate = '',
+    String vehicleColor = '',
     String licenseNumber = '',
     required String idPhotoUrl,
     required String profilePhotoUrl,
   }) async {
-    await _firestore.collection('drivers').doc(uid).set({
+    await _functions.httpsCallable('submitDriverRegistration').call({
       'phone': phone,
       'name': name,
       'vehicleType': vehicleType,
       'vehiclePlate': vehiclePlate,
+      'vehicleColor': vehicleColor,
       'licenseNumber': licenseNumber,
       'idPhotoUrl': idPhotoUrl,
       'profilePhotoUrl': profilePhotoUrl,
-      'termsAcceptedAt': FieldValue.serverTimestamp(),
-      'approvalStatus': DriverApprovalStatus.pending.value,
-      'isOnline': false,
-      'isBlocked': false,
-      'hasActiveRide': false,
-      'cancelledRidesCount': 0,
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    });
   }
 
   Future<void> updateProfile({
@@ -495,7 +613,17 @@ class DriverService {
       final subDistrictId =
           existing.data()?['assignedSubDistrictId'] as String? ?? '';
       if (districtId.isEmpty || subDistrictId.isEmpty) {
-        // Manager must assign work city/sub-district before the driver can go online.
+        final defaults = BabilRegions.customerDistrict;
+        final defaultSub = defaults.subDistricts.first;
+        payload.addAll({
+          'assignedDistrictId': defaults.id,
+          'assignedSubDistrictId': defaultSub.id,
+          'latitude': defaultSub.center.latitude,
+          'longitude': defaultSub.center.longitude,
+          'geohash':
+              Geohash.encode(defaultSub.center.latitude, defaultSub.center.longitude),
+          'locationUpdatedAt': FieldValue.serverTimestamp(),
+        });
       } else {
         final sub = BabilRegions.subDistrictById(districtId, subDistrictId);
         payload.addAll({
@@ -510,7 +638,10 @@ class DriverService {
       }
     }
 
-    await _firestore.collection('drivers').doc(driverId).update(payload);
+    await _firestore.collection('drivers').doc(driverId).set(
+      payload,
+      SetOptions(merge: true),
+    );
   }
 
   Future<void> setDriverBlocked({

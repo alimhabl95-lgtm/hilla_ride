@@ -3,13 +3,20 @@ Hello Tuk-Tuk — Google Play upload package
 
 Ready when your Play Console account is approved.
 
-ANDROID APP BUNDLE (.aab)
--------------------------
+ANDROID APP BUNDLE (.aab) — for Google Play upload
+--------------------------------------------------
 File: app-release.aab (in this folder)
-Version: 1.0.24 (25)
+Version: 1.0.34 (35)
 Package: com.hillaride.hilla_ride
 
 Upload in Play Console → Production (or Internal testing) → Create release.
+
+ANDROID APK — for direct install / testing only
+-----------------------------------------------
+File: app-release.apk (in this folder)
+Version: 1.0.34 (35)
+
+Do not upload APK to Play Store (use the AAB above). Share APK with testers for sideload install.
 
 APP ICON (512 x 512 PNG)
 ------------------------

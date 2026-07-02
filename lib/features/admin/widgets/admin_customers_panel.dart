@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/admin_service.dart';
@@ -121,9 +122,11 @@ class AdminCustomersPanel extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            error.message?.isNotEmpty == true
-                ? error.message!
-                : l10n.removeCustomerFailed,
+            adminDeleteErrorMessage(
+              error,
+              l10n,
+              fallback: l10n.removeCustomerFailed,
+            ),
           ),
         ),
       );
@@ -147,14 +150,55 @@ class AdminCustomersPanel extends StatelessWidget {
   }
 }
 
-class DriverDocumentPhotos extends StatelessWidget {
+class DriverDocumentPhotos extends StatefulWidget {
   const DriverDocumentPhotos({super.key, required this.driver});
 
   final DriverProfile driver;
 
   @override
+  State<DriverDocumentPhotos> createState() => _DriverDocumentPhotosState();
+}
+
+class _DriverDocumentPhotosState extends State<DriverDocumentPhotos> {
+  var _syncAttempted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncIfNeeded());
+  }
+
+  @override
+  void didUpdateWidget(covariant DriverDocumentPhotos oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.driver.uid != widget.driver.uid) {
+      _syncAttempted = false;
+      _syncIfNeeded();
+    }
+  }
+
+  Future<void> _syncIfNeeded() async {
+    if (_syncAttempted || !mounted) return;
+    _syncAttempted = true;
+
+    final driver = widget.driver;
+    if (driver.idPhotoUrl.isNotEmpty && driver.profilePhotoUrl.isNotEmpty) {
+      return;
+    }
+
+    try {
+      await context.read<AppState>().adminService.syncDriverDocumentsFromStorage(
+            driver.uid,
+          );
+    } catch (_) {
+      // Photos may still load directly from Storage via admin cloud function.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final driver = widget.driver;
 
     return Row(
       children: [
@@ -220,6 +264,7 @@ class _PhotoPreviewCard extends StatelessWidget {
                     fileName: fileName,
                     imageUrl: imageUrl,
                     fit: BoxFit.cover,
+                    forAdmin: true,
                   ),
                 ),
               ),

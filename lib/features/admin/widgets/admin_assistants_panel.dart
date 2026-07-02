@@ -1,4 +1,7 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/auth/auth_error_messages.dart';
+import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/manager_permissions.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
@@ -15,7 +18,7 @@ class AdminAssistantsPanel extends StatefulWidget {
 
 class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _selectedPermissions = {...AdminPermissions.defaultAssistant};
   var _isSaving = false;
@@ -23,7 +26,7 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -49,10 +52,12 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
   Future<void> _createAssistant() async {
     final l10n = AppLocalizations.of(context)!;
     final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
     final password = _passwordController.text;
 
-    if (name.isEmpty || email.isEmpty || password.length < 6) {
+    if (name.isEmpty ||
+        !PhoneAuthCredentials.isValidIraqiPhone(phone) ||
+        password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.assistantFormInvalid)),
       );
@@ -64,7 +69,7 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
       final assistantService = context.read<AppState>().assistantService;
       await assistantService.createAssistant(
         name: name,
-        email: email,
+        phone: phone,
         password: password,
         permissions: assistantService.sanitizePermissions(
           _selectedPermissions.toList(),
@@ -72,10 +77,19 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
       );
       if (!mounted) return;
       _nameController.clear();
-      _emailController.clear();
+      _phoneController.clear();
       _passwordController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.assistantCreated)),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${l10n.assistantCreateFailed}\n${assistantCreateErrorMessage(error, l10n)}',
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -186,9 +200,12 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(labelText: l10n.emailLabel),
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: l10n.phoneHint,
+                        hintText: '7701234567',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     PasswordTextField(
@@ -250,7 +267,7 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
                   child: ListTile(
                     title: Text(assistant.name),
                     subtitle: Text(
-                      '${assistant.email ?? ''}\n'
+                      '${assistant.phone}\n'
                       '${assistant.permissions.map((p) => _permissionLabel(l10n, p)).join(', ')}',
                     ),
                     isThreeLine: true,
