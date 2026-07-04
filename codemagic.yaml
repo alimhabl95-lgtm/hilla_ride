@@ -11,6 +11,7 @@ workflows:
         bundle_identifier: com.hillaride.hillaRide
       vars:
         APP_STORE_APPLE_ID: "YOUR_APPLE_ID_EMAIL"
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -39,7 +40,7 @@ workflows:
         script: |
           flutter build ipa --release \
             --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.42 \
+            --build-name=1.0.43 \
             --build-number=$PROJECT_BUILD_NUMBER
     artifacts:
       - build/ios/ipa/*.ipa
