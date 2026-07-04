@@ -14,7 +14,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     let engine = FlutterEngine(name: "hilla_ride_engine")
     engine.run()
-    GeneratedPluginRegistrant.register(with: engine)
     self.engine = engine
 
     let controller = FlutterViewController(engine: engine, nibName: nil, bundle: nil)
@@ -22,5 +21,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     window.rootViewController = controller
     window.makeKeyAndVisible()
     self.window = window
+
+    DispatchQueue.main.async {
+      SafePluginRegistrant.register(with: controller)
+    }
   }
 }
