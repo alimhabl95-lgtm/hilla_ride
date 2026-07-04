@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/app.dart';
@@ -25,12 +27,10 @@ Future<void> bootstrapApp(AppVariant variant) async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
       firebaseReady = true;
-      if (!AppConfig.variant.isWebAdmin) {
-        await NotificationService.initialize();
-      }
     }
-  } catch (error) {
+  } catch (error, stackTrace) {
     firebaseError = error.toString();
+    debugPrint('Firebase.initializeApp failed: $error\n$stackTrace');
   }
 
   runApp(
@@ -47,4 +47,18 @@ Future<void> bootstrapApp(AppVariant variant) async {
       ),
     ),
   );
+
+  if (firebaseReady && !AppConfig.variant.isWebAdmin) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(() async {
+        try {
+          await NotificationService.initialize();
+        } catch (error, stackTrace) {
+          debugPrint(
+            'NotificationService.initialize failed: $error\n$stackTrace',
+          );
+        }
+      }());
+    });
+  }
 }
