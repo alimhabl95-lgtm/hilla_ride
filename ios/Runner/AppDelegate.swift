@@ -4,7 +4,9 @@ import UIKit
 import UserNotifications
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+@objc class AppDelegate: FlutterAppDelegate {
+  let flutterEngine = FlutterEngine(name: "hilla_ride_engine")
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -19,10 +21,8 @@ import UserNotifications
     }
     application.registerForRemoteNotifications()
 
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
+    flutterEngine.run()
 
-  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
-    SafePluginRegistrant.register(with: engineBridge.pluginRegistry)
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }
