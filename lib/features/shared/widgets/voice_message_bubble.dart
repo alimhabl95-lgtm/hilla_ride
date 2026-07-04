@@ -1,11 +1,7 @@
-import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
-import 'package:provider/provider.dart';
 
-class VoiceMessageBubble extends StatefulWidget {
+class VoiceMessageBubble extends StatelessWidget {
   const VoiceMessageBubble({
     super.key,
     required this.voiceUrl,
@@ -29,76 +25,18 @@ class VoiceMessageBubble extends StatefulWidget {
         '${seconds.toString().padLeft(2, '0')}';
   }
 
-  @override
-  State<VoiceMessageBubble> createState() => _VoiceMessageBubbleState();
-}
-
-class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
-  final _player = AudioPlayer();
-  var _isPlaying = false;
-  var _isLoading = false;
-  var _showPlaybackError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _player.onPlayerComplete.listen((_) {
-      if (mounted) setState(() => _isPlaying = false);
-    });
-  }
-
-  @override
-  void dispose() {
-    _player.dispose();
-    super.dispose();
-  }
-
-  Future<void> _togglePlayback() async {
-    if (_isLoading || widget.voiceUrl.trim().isEmpty) return;
-
-    if (_isPlaying) {
-      await _player.pause();
-      if (mounted) setState(() => _isPlaying = false);
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _showPlaybackError = false;
-    });
-
-    try {
-      await _player.stop();
-      await _player.setVolume(1.0);
-
-      if (!mounted) return;
-      final storageService = context.read<AppState>().storageService;
-      final bytes = await storageService.downloadRideVoiceMessage(
-        voiceUrl: widget.voiceUrl,
-      );
-
-      if (bytes != null && bytes.isNotEmpty) {
-        await _player.play(BytesSource(bytes));
-      } else {
-        await _player.play(UrlSource(widget.voiceUrl));
-      }
-
-      if (mounted) setState(() => _isPlaying = true);
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('Voice playback failed: $error');
-      }
-      if (mounted) setState(() => _showPlaybackError = true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _showPlaybackUnavailable(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.voiceMessagePlaybackFailed)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final durationLabel = widget.durationMs > 0
-        ? VoiceMessageBubble.formatDuration(widget.durationMs)
+    final durationLabel = durationMs > 0
+        ? VoiceMessageBubble.formatDuration(durationMs)
         : '--:--';
 
     return Row(
@@ -108,23 +46,24 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          onPressed: _isLoading ? null : _togglePlayback,
-          icon: _isLoading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle),
+          onPressed: voiceUrl.trim().isEmpty
+              ? null
+              : () => _showPlaybackUnavailable(context),
+          icon: Icon(
+            Icons.play_circle,
+            color: Theme.of(context).colorScheme.onSurface.withValues(
+                  alpha: 0.6,
+                ),
+          ),
         ),
         const SizedBox(width: 4),
         Flexible(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (!widget.isMine && widget.senderName.isNotEmpty)
+              if (!isMine && senderName.isNotEmpty)
                 Text(
-                  widget.senderName,
+                  senderName,
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
               Text(
@@ -135,16 +74,9 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
                 durationLabel,
                 style: Theme.of(context).textTheme.labelSmall,
               ),
-              if (_showPlaybackError)
+              if (timeLabel.isNotEmpty)
                 Text(
-                  l10n.voiceMessagePlaybackFailed,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                ),
-              if (widget.timeLabel.isNotEmpty)
-                Text(
-                  widget.timeLabel,
+                  timeLabel,
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
             ],

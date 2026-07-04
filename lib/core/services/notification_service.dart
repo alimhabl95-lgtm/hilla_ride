@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -38,7 +37,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   static final StreamController<RideAlertEvent> _rideAlertController =
       StreamController<RideAlertEvent>.broadcast();
-  static final AudioPlayer _alertPlayer = AudioPlayer();
+  static Timer? _alertSoundTimer;
   static StreamSubscription<Ride?>? _driverRideSubscription;
   static StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
       _driverOfferSubscription;
@@ -52,6 +51,7 @@ class NotificationService {
   static var _initialized = false;
   static var _backgroundReady = false;
   static var _audioUnlocked = false;
+  static var _alertSoundLoopActive = false;
 
   static const _driverChannelId = 'driver_ride_requests_v3';
   static const _customerChannelId = 'customer_ride_updates_v3';
@@ -68,27 +68,6 @@ class NotificationService {
   static Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
-
-    if (!kIsWeb) {
-      await AudioPlayer.global.setAudioContext(
-        AudioContext(
-          android: AudioContextAndroid(
-            isSpeakerphoneOn: true,
-            stayAwake: true,
-            contentType: AndroidContentType.sonification,
-            usageType: AndroidUsageType.alarm,
-            audioFocus: AndroidAudioFocus.gain,
-          ),
-          iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.playback,
-            options: {
-              AVAudioSessionOptions.mixWithOthers,
-              AVAudioSessionOptions.duckOthers,
-            },
-          ),
-        ),
-      );
-    }
 
     if (!kIsWeb) {
       await _requestPlatformPermissions();
@@ -118,11 +97,7 @@ class NotificationService {
   static Future<void> unlockAudioIfNeeded() async {
     if (_audioUnlocked) return;
     try {
-      await _alertPlayer.setVolume(0.01);
-      await _alertPlayer.play(AssetSource('sounds/$_driverSound.wav'));
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-      await _alertPlayer.stop();
-      await _alertPlayer.setVolume(1.0);
+      await SystemSound.play(SystemSoundType.click);
       _audioUnlocked = true;
     } catch (_) {
       _audioUnlocked = false;
@@ -488,9 +463,9 @@ class NotificationService {
   }
 
   static Future<void> stopAlertSound() async {
-    try {
-      await _alertPlayer.stop();
-    } catch (_) {}
+    _alertSoundLoopActive = false;
+    _alertSoundTimer?.cancel();
+    _alertSoundTimer = null;
   }
 
   static Future<void> _triggerRideAlert({
@@ -568,11 +543,6 @@ class NotificationService {
   static Future<void> _playAlertSound(RideAlertType type) async {
     if (kIsWeb) return;
 
-    final asset = switch (type) {
-      RideAlertType.driverRideRequest => 'sounds/$_driverSound.wav',
-      RideAlertType.customerRideAccepted => 'sounds/$_customerSound.wav',
-      RideAlertType.chatMessage => 'sounds/$_chatSound.wav',
-    };
     final repeats = switch (type) {
       RideAlertType.driverRideRequest => 6,
       RideAlertType.customerRideAccepted => 3,
@@ -580,33 +550,35 @@ class NotificationService {
     };
     final loopUntilStopped = type == RideAlertType.driverRideRequest;
 
+    await stopAlertSound();
+
     try {
       await HapticFeedback.heavyImpact();
-      await _alertPlayer.stop();
-      await _alertPlayer.setReleaseMode(
-        loopUntilStopped ? ReleaseMode.loop : ReleaseMode.stop,
-      );
-      await _alertPlayer.setVolume(1.0);
-      await _alertPlayer.play(AssetSource(asset));
+    } catch (_) {}
 
-      if (loopUntilStopped) {
-        return;
-      }
-
-      for (var i = 0; i < repeats - 1; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 900));
-        await _alertPlayer.stop();
-        await _alertPlayer.play(AssetSource(asset));
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 900));
-      await _alertPlayer.stop();
-    } catch (error) {
-      debugPrint('Ride alert sound failed: $error');
-      for (var i = 0; i < repeats; i++) {
+    Future<void> playOnce() async {
+      try {
         await SystemSound.play(SystemSoundType.alert);
-        if (i + 1 < repeats) {
-          await Future<void>.delayed(const Duration(milliseconds: 450));
-        }
+      } catch (_) {}
+    }
+
+    if (loopUntilStopped) {
+      _alertSoundLoopActive = true;
+      await playOnce();
+      _alertSoundTimer = Timer.periodic(
+        const Duration(milliseconds: 900),
+        (_) {
+          if (!_alertSoundLoopActive) return;
+          unawaited(playOnce());
+        },
+      );
+      return;
+    }
+
+    for (var i = 0; i < repeats; i++) {
+      await playOnce();
+      if (i + 1 < repeats) {
+        await Future<void>.delayed(const Duration(milliseconds: 450));
       }
     }
   }
