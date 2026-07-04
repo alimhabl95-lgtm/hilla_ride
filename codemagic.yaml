@@ -27,7 +27,7 @@ workflows:
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
-      - name: Upgrade Flutter SDK
+      - name: Upgrade Flutter SDK for iOS 26.5
         script: |
           flutter --version
           flutter channel stable
@@ -36,6 +36,7 @@ workflows:
           flutter --version
       - name: Get Flutter packages
         script: |
+          flutter clean
           flutter pub get
       - name: Install CocoaPods dependencies
         script: |
@@ -46,7 +47,7 @@ workflows:
         script: |
           flutter build ipa --release \
             --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.48 \
+            --build-name=1.0.49 \
             --build-number=$PROJECT_BUILD_NUMBER
     artifacts:
       - build/ios/ipa/*.ipa
