@@ -31,12 +31,15 @@ workflows:
           flutter pub get
       - name: Install CocoaPods dependencies
         script: |
-          find . -name "Podfile" -execdir pod install \;
+          cd ios
+          pod repo update
+          pod update audioplayers_darwin
+          pod install
       - name: Flutter build ipa
         script: |
           flutter build ipa --release \
             --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.40 \
+            --build-name=1.0.41 \
             --build-number=$PROJECT_BUILD_NUMBER
     artifacts:
       - build/ios/ipa/*.ipa
