@@ -1,0 +1,472 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* HelloTukTukApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* HelloTukTukApp.swift */; };
+		A10000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppState.swift */; };
+		A10000000000000000000003 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* RootView.swift */; };
+		A10000000000000000000004 /* PhoneAuthCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* PhoneAuthCredentials.swift */; };
+		A10000000000000000000005 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* AuthService.swift */; };
+		A10000000000000000000006 /* AuthErrorMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* AuthErrorMessages.swift */; };
+		A10000000000000000000007 /* LegalConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* LegalConfig.swift */; };
+		A10000000000000000000008 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* L10n.swift */; };
+		A10000000000000000000009 /* UserRole.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* UserRole.swift */; };
+		A10000000000000000000010 /* FirebaseBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* FirebaseBootstrap.swift */; };
+		A10000000000000000000011 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* PushNotificationService.swift */; };
+		A10000000000000000000012 /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* SessionService.swift */; };
+		A10000000000000000000013 /* UserRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* UserRepository.swift */; };
+		A10000000000000000000014 /* BrandColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* BrandColors.swift */; };
+		A10000000000000000000015 /* AppComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* AppComponents.swift */; };
+		A10000000000000000000016 /* ModeChooserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* ModeChooserView.swift */; };
+		A10000000000000000000017 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* LoginView.swift */; };
+		A10000000000000000000018 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* SignupView.swift */; };
+		A10000000000000000000019 /* PlaceholderHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* PlaceholderHomeView.swift */; };
+		A10000000000000000000020 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* Assets.xcassets */; };
+		A10000000000000000000021 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* GoogleService-Info.plist */; };
+		A10000000000000000000022 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000001 /* FirebaseAuth */; };
+		A10000000000000000000023 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000002 /* FirebaseFirestore */; };
+		A10000000000000000000024 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000003 /* FirebaseMessaging */; };
+		A10000000000000000000025 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000004 /* FirebaseFunctions */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* HelloTukTukApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelloTukTukApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* PhoneAuthCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneAuthCredentials.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* AuthErrorMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthErrorMessages.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* LegalConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConfig.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* UserRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserRole.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* FirebaseBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseBootstrap.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* UserRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserRepository.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* BrandColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandColors.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* AppComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppComponents.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* ModeChooserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModeChooserView.swift; sourceTree = "<group>"; };
+		A20000000000000000000017 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		A20000000000000000000018 /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
+		A20000000000000000000019 /* PlaceholderHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderHomeView.swift; sourceTree = "<group>"; };
+		A20000000000000000000020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000000000000000000021 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		A20000000000000000000022 /* HelloTukTuk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HelloTukTuk.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000023 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000024 /* HelloTukTuk.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HelloTukTuk.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000022 /* FirebaseAuth in Frameworks */,
+				A10000000000000000000023 /* FirebaseFirestore in Frameworks */,
+				A10000000000000000000024 /* FirebaseMessaging in Frameworks */,
+				A10000000000000000000025 /* FirebaseFunctions in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000002 /* HelloTukTuk */,
+				A40000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* HelloTukTuk */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* HelloTukTukApp.swift */,
+				A40000000000000000000004 /* App */,
+				A40000000000000000000005 /* Core */,
+				A40000000000000000000006 /* Features */,
+				A20000000000000000000020 /* Assets.xcassets */,
+				A20000000000000000000021 /* GoogleService-Info.plist */,
+				A20000000000000000000023 /* Info.plist */,
+				A20000000000000000000024 /* HelloTukTuk.entitlements */,
+			);
+			path = HelloTukTuk;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000022 /* HelloTukTuk.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000004 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000002 /* AppState.swift */,
+				A20000000000000000000003 /* RootView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000005 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000007 /* Auth */,
+				A40000000000000000000008 /* Config */,
+				A40000000000000000000009 /* Localization */,
+				A40000000000000000000010 /* Models */,
+				A40000000000000000000011 /* Services */,
+				A40000000000000000000012 /* Theme */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000006 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000013 /* Auth */,
+				A40000000000000000000014 /* Home */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000007 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000004 /* PhoneAuthCredentials.swift */,
+				A20000000000000000000005 /* AuthService.swift */,
+				A20000000000000000000006 /* AuthErrorMessages.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000008 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000007 /* LegalConfig.swift */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000009 /* Localization */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000008 /* L10n.swift */,
+			);
+			path = Localization;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000010 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000009 /* UserRole.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000011 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000010 /* FirebaseBootstrap.swift */,
+				A20000000000000000000011 /* PushNotificationService.swift */,
+				A20000000000000000000012 /* SessionService.swift */,
+				A20000000000000000000013 /* UserRepository.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000012 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000014 /* BrandColors.swift */,
+				A20000000000000000000015 /* AppComponents.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000013 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000016 /* ModeChooserView.swift */,
+				A20000000000000000000017 /* LoginView.swift */,
+				A20000000000000000000018 /* SignupView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000014 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000019 /* PlaceholderHomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A60000000000000000000001 /* HelloTukTuk */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A80000000000000000000003 /* Build configuration list for PBXNativeTarget "HelloTukTuk" */;
+			buildPhases = (
+				A30000000000000000000002 /* Sources */,
+				A30000000000000000000001 /* Frameworks */,
+				A30000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HelloTukTuk;
+			packageProductDependencies = (
+				A50000000000000000000001 /* FirebaseAuth */,
+				A50000000000000000000002 /* FirebaseFirestore */,
+				A50000000000000000000003 /* FirebaseMessaging */,
+				A50000000000000000000004 /* FirebaseFunctions */,
+			);
+			productName = HelloTukTuk;
+			productReference = A20000000000000000000022 /* HelloTukTuk.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A70000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					A60000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = A80000000000000000000001 /* Build configuration list for PBXProject "HelloTukTuk" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				ar,
+			);
+			mainGroup = A40000000000000000000001;
+			packageReferences = (
+				A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
+			productRefGroup = A40000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A60000000000000000000001 /* HelloTukTuk */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A30000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000020 /* Assets.xcassets in Resources */,
+				A10000000000000000000021 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A30000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* HelloTukTukApp.swift in Sources */,
+				A10000000000000000000002 /* AppState.swift in Sources */,
+				A10000000000000000000003 /* RootView.swift in Sources */,
+				A10000000000000000000004 /* PhoneAuthCredentials.swift in Sources */,
+				A10000000000000000000005 /* AuthService.swift in Sources */,
+				A10000000000000000000006 /* AuthErrorMessages.swift in Sources */,
+				A10000000000000000000007 /* LegalConfig.swift in Sources */,
+				A10000000000000000000008 /* L10n.swift in Sources */,
+				A10000000000000000000009 /* UserRole.swift in Sources */,
+				A10000000000000000000010 /* FirebaseBootstrap.swift in Sources */,
+				A10000000000000000000011 /* PushNotificationService.swift in Sources */,
+				A10000000000000000000012 /* SessionService.swift in Sources */,
+				A10000000000000000000013 /* UserRepository.swift in Sources */,
+				A10000000000000000000014 /* BrandColors.swift in Sources */,
+				A10000000000000000000015 /* AppComponents.swift in Sources */,
+				A10000000000000000000016 /* ModeChooserView.swift in Sources */,
+				A10000000000000000000017 /* LoginView.swift in Sources */,
+				A10000000000000000000018 /* SignupView.swift in Sources */,
+				A10000000000000000000019 /* PlaceholderHomeView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A80000000000000000000004 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A80000000000000000000005 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A80000000000000000000006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XAZ6V7UTYT;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HelloTukTuk/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Hello Tuk-Tuk";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hillaride.hillaRide;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A80000000000000000000007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XAZ6V7UTYT;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HelloTukTuk/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Hello Tuk-Tuk";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hillaride.hillaRide;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A80000000000000000000001 /* Build configuration list for PBXProject "HelloTukTuk" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A80000000000000000000004 /* Debug */,
+				A80000000000000000000005 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A80000000000000000000003 /* Build configuration list for PBXNativeTarget "HelloTukTuk" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A80000000000000000000006 /* Debug */,
+				A80000000000000000000007 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A50000000000000000000001 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		A50000000000000000000002 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		A50000000000000000000003 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		A50000000000000000000004 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A70000000000000000000001 /* Project object */;
+}

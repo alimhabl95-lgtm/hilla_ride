@@ -1,0 +1,7 @@
+# Native Swift iOS app — see README.md
+
+.DS_Store
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
