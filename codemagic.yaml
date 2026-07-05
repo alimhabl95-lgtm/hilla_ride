@@ -24,46 +24,38 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Upgrade Flutter SDK
+      - name: Prepare Flutter release engine
         script: |
           flutter --version
-          flutter channel stable
-          flutter upgrade
-          flutter precache --ios
-          flutter --version
-      - name: Prepare release iOS project
+          flutter precache --ios --force
+          flutter doctor -v
+      - name: Prepare iOS dependencies
         script: |
           flutter clean
-          rm -rf ios/build ios/.symlinks ios/Flutter/ephemeral
+          rm -rf build ios/build ios/.symlinks ios/Flutter/ephemeral
           flutter pub get
-          flutter build ios --config-only --release
-          echo "Generated iOS config:"
-          cat ios/Flutter/Generated.xcconfig
-          if grep -q "FLUTTER_BUILD_MODE=debug" ios/Flutter/Generated.xcconfig; then
-            echo "ERROR: iOS project is debug mode"
-            exit 1
-          fi
-      - name: Install CocoaPods dependencies
-        script: |
           cd ios
           pod repo update
           pod install
-      - name: Set up code signing settings on Xcode project
+          cd ..
+      - name: Set up code signing
         script: |
           xcode-project use-profiles
       - name: Build and verify release IPA
         script: |
           flutter build ipa --release \
             --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.56 \
+            --build-name=1.0.57 \
             --build-number=$PROJECT_BUILD_NUMBER
+          echo "Generated iOS config after build:"
+          cat ios/Flutter/Generated.xcconfig
           BUILD_MODE=$(grep FLUTTER_BUILD_MODE ios/Flutter/Generated.xcconfig | cut -d= -f2)
           if [ "$BUILD_MODE" != "release" ]; then
             echo "ERROR: Expected release IPA, got FLUTTER_BUILD_MODE=$BUILD_MODE"
             exit 1
           fi
           bash ios/verify_release_ipa.sh
-          echo "SUCCESS: Release IPA ready for TestFlight upload"
+          echo "SUCCESS: Verified release IPA for TestFlight"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log

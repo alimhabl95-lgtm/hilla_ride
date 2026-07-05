@@ -18,6 +18,18 @@ VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")"
 echo "IPA bundle version: $VERSION ($BUILD)"
 
+FLUTTER_FRAMEWORK="$APP/Frameworks/Flutter.framework/Flutter"
+if [ ! -f "$FLUTTER_FRAMEWORK" ]; then
+  echo "ERROR: Flutter.framework not found in IPA"
+  exit 1
+fi
+
+# Debug Flutter.framework links iOS ptrace/JIT helpers; release builds omit them.
+if nm -gU "$FLUTTER_FRAMEWORK" 2>/dev/null | grep -q "EnableTracingIfNecessaryImpl"; then
+  echo "ERROR: Debug Flutter.framework detected (JIT/ptrace build)"
+  exit 1
+fi
+
 if [ -f "$APP/Frameworks/App.framework/flutter_assets/vm_snapshot_data" ] || \
    [ -f "$APP/Frameworks/App.framework/flutter_assets/isolate_snapshot_data" ]; then
   echo "ERROR: Debug Dart snapshots found in IPA (not a release build)"

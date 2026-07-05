@@ -42,11 +42,11 @@ static void HillaRideLoadView(id self, SEL _cmd) {
         [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"] ?: @"?";
     label.text =
         [NSString stringWithFormat:
-                      @"Installed build %@ (%@) is a DEBUG iOS build.\n\n"
+                      @"TestFlight build %@ (%@) was packaged as DEBUG.\n\n"
                       @"iOS 26 cannot run debug builds from the home screen.\n\n"
-                      @"Delete this app, open TestFlight, install the latest "
-                      @"Hello Tuk-Tuk build, then launch from TestFlight.",
-                      version, build];
+                      @"Delete this app and wait for the next Codemagic release "
+                      @"(Hello Tuk-Tuk %@ on TestFlight).",
+                      version, build, version];
     label.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     break;
   }
