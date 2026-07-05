@@ -4,13 +4,13 @@ import UIKit
 import UserNotifications
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
-  let flutterEngine = FlutterEngine(name: "hilla_ride_engine")
-
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    HillaRideInstallVSyncWorkaround()
+
     if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String,
        !apiKey.isEmpty {
       GMSServices.provideAPIKey(apiKey)
@@ -21,8 +21,10 @@ import UserNotifications
     }
     application.registerForRemoteNotifications()
 
-    flutterEngine.run()
-
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    SafePluginRegistrant.register(with: engineBridge.pluginRegistry)
   }
 }

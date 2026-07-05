@@ -53,6 +53,7 @@
 		B1SAFE022EC3CC0700C636F2 /* SafePluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SafePluginRegistrant.m; sourceTree = "<group>"; };
 		B1SAFE032EC3CC0700C636F2 /* SafePluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SafePluginRegistrant.h; sourceTree = "<group>"; };
 		B1VSYNC022EC3CC0700C636F2 /* VSyncWorkaround.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = VSyncWorkaround.m; sourceTree = "<group>"; };
+		B1VSYNC032EC3CC0700C636F2 /* VSyncWorkaround.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VSyncWorkaround.h; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
@@ -142,6 +143,7 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				B1SAFE032EC3CC0700C636F2 /* SafePluginRegistrant.h */,
 				B1SAFE022EC3CC0700C636F2 /* SafePluginRegistrant.m */,
+				B1VSYNC032EC3CC0700C636F2 /* VSyncWorkaround.h */,
 				B1VSYNC022EC3CC0700C636F2 /* VSyncWorkaround.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
