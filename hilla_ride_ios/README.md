@@ -36,12 +36,21 @@ Select the **HelloTukTuk** scheme, choose a device or simulator, and run.
 
 ### One-time setup in Codemagic (required)
 
-If you only see **"Default Workflow"** with Flutter options, Codemagic is using the **UI editor**, not this repo’s YAML.
-
 1. Open [Codemagic](https://codemagic.io) → your **hilla_ride** app  
-2. Click **App settings** (gear icon)  
-3. Under **Build configuration**, choose **codemagic.yaml** (not Workflow Editor)  
-4. Save  
+2. **App settings** → **Build configuration** → select **`codemagic.yaml`**  
+3. **Team settings** → **Integrations** → **Developer Portal** → confirm API key named **`codemagic`** is connected  
+
+### Code signing (automatic)
+
+The workflow uses **automatic signing** via App Store Connect:
+
+- `app-store-connect fetch-signing-files` downloads/creates the App Store profile for `com.hillaride.hillaRide`
+- `xcode-project use-profiles` applies it **only** to `HelloTukTuk.xcodeproj` (not the old Flutter `ios/` project)
+
+If signing fails, in Codemagic **Team settings → Code signing identities**:
+
+1. **iOS certificates** → **Fetch certificate** → select your **Apple Distribution** cert  
+2. **iOS provisioning profiles** → **Fetch profiles** → select **App Store** profile for `com.hillaride.hillaRide`  
 
 ### Start a native Swift build
 
