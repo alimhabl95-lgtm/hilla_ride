@@ -1,2 +1,3 @@
 #include "Generated.xcconfig"
 APS_ENVIRONMENT=production
+DISPLAY_NAME=Hello Tuk-Tuk $(FLUTTER_BUILD_NAME)

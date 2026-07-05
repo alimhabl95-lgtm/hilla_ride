@@ -55,7 +55,7 @@ workflows:
         script: |
           flutter build ipa --release \
             --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.55 \
+            --build-name=1.0.56 \
             --build-number=$PROJECT_BUILD_NUMBER
           BUILD_MODE=$(grep FLUTTER_BUILD_MODE ios/Flutter/Generated.xcconfig | cut -d= -f2)
           if [ "$BUILD_MODE" != "release" ]; then
