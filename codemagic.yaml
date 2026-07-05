@@ -37,7 +37,15 @@ workflows:
       - name: Get Flutter packages
         script: |
           flutter clean
+          rm -rf ios/build ios/.symlinks ios/Flutter/ephemeral
           flutter pub get
+          flutter build ios --config-only --release
+          echo "Generated iOS config:"
+          cat ios/Flutter/Generated.xcconfig
+          if grep -q "FLUTTER_BUILD_MODE=debug" ios/Flutter/Generated.xcconfig; then
+            echo "ERROR: iOS config is debug before build"
+            exit 1
+          fi
       - name: Install CocoaPods dependencies
         script: |
           cd ios
@@ -47,8 +55,14 @@ workflows:
         script: |
           flutter build ipa --release \
             --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.52 \
+            --build-name=1.0.53 \
             --build-number=$PROJECT_BUILD_NUMBER
+          BUILD_MODE=$(grep FLUTTER_BUILD_MODE ios/Flutter/Generated.xcconfig | cut -d= -f2)
+          if [ "$BUILD_MODE" != "release" ]; then
+            echo "ERROR: Expected release IPA, got FLUTTER_BUILD_MODE=$BUILD_MODE"
+            exit 1
+          fi
+          echo "Verified release build: FLUTTER_BUILD_MODE=$BUILD_MODE"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
