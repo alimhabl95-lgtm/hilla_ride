@@ -24,9 +24,6 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Set up code signing settings on Xcode project
-        script: |
-          xcode-project use-profiles
       - name: Upgrade Flutter SDK
         script: |
           flutter --version
@@ -34,7 +31,7 @@ workflows:
           flutter upgrade
           flutter precache --ios
           flutter --version
-      - name: Get Flutter packages
+      - name: Prepare release iOS project
         script: |
           flutter clean
           rm -rf ios/build ios/.symlinks ios/Flutter/ephemeral
@@ -43,7 +40,7 @@ workflows:
           echo "Generated iOS config:"
           cat ios/Flutter/Generated.xcconfig
           if grep -q "FLUTTER_BUILD_MODE=debug" ios/Flutter/Generated.xcconfig; then
-            echo "ERROR: iOS config is debug before build"
+            echo "ERROR: iOS project is debug mode"
             exit 1
           fi
       - name: Install CocoaPods dependencies
@@ -51,19 +48,22 @@ workflows:
           cd ios
           pod repo update
           pod install
-      - name: Flutter build ipa
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles
+      - name: Build and verify release IPA
         script: |
           flutter build ipa --release \
             --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.54 \
+            --build-name=1.0.55 \
             --build-number=$PROJECT_BUILD_NUMBER
           BUILD_MODE=$(grep FLUTTER_BUILD_MODE ios/Flutter/Generated.xcconfig | cut -d= -f2)
           if [ "$BUILD_MODE" != "release" ]; then
             echo "ERROR: Expected release IPA, got FLUTTER_BUILD_MODE=$BUILD_MODE"
             exit 1
           fi
-          echo "Verified release build: FLUTTER_BUILD_MODE=$BUILD_MODE"
           bash ios/verify_release_ipa.sh
+          echo "SUCCESS: Release IPA ready for TestFlight upload"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
