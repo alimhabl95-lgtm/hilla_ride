@@ -1,1 +1,2 @@
 *.sh text eol=lf
+ios/Flutter/*.xcconfig text eol=lf

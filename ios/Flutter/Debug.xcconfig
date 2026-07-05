@@ -1,3 +1,4 @@
 #include "Generated.xcconfig"
+FLUTTER_BUILD_MODE=debug
 APS_ENVIRONMENT=development
 DISPLAY_NAME=Hello Tuk-Tuk DEBUG

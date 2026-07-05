@@ -12,6 +12,7 @@ workflows:
       vars:
         APP_STORE_APPLE_ID: "YOUR_APPLE_ID_EMAIL"
         IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        BUILD_NAME: "1.0.59"
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -29,43 +30,12 @@ workflows:
           flutter --version
           flutter precache --ios --force
           flutter doctor -v
-      - name: Prepare iOS dependencies
-        script: |
-          flutter clean
-          rm -rf build ios/build ios/.symlinks ios/Flutter/ephemeral ios/Flutter/Flutter.framework
-          flutter pub get
-          flutter build ios --release --config-only \
-            --build-name=1.0.58 \
-            --build-number=$PROJECT_BUILD_NUMBER
-          echo "Generated iOS config before pod install:"
-          cat ios/Flutter/Generated.xcconfig
-          BUILD_MODE=$(grep FLUTTER_BUILD_MODE ios/Flutter/Generated.xcconfig | cut -d= -f2)
-          if [ "$BUILD_MODE" != "release" ]; then
-            echo "ERROR: Expected release config before pod install, got FLUTTER_BUILD_MODE=$BUILD_MODE"
-            exit 1
-          fi
-          cd ios
-          pod repo update
-          pod install
-          cd ..
       - name: Set up code signing
         script: |
           xcode-project use-profiles
       - name: Build and verify release IPA
         script: |
-          flutter build ipa --release \
-            --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.58 \
-            --build-number=$PROJECT_BUILD_NUMBER
-          echo "Generated iOS config after IPA build:"
-          cat ios/Flutter/Generated.xcconfig
-          BUILD_MODE=$(grep FLUTTER_BUILD_MODE ios/Flutter/Generated.xcconfig | cut -d= -f2)
-          if [ "$BUILD_MODE" != "release" ]; then
-            echo "ERROR: Expected release IPA, got FLUTTER_BUILD_MODE=$BUILD_MODE"
-            exit 1
-          fi
-          bash ios/verify_release_ipa.sh
-          echo "SUCCESS: Verified release IPA for TestFlight"
+          bash ios/build_release_ipa.sh
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log

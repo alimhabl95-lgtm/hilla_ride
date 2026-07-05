@@ -16,42 +16,6 @@ static void HillaRideSkipKeyboardAnimationVsync(id self, SEL _cmd) {
   // No-op: same engine timing issue as touch-rate correction on iOS 26.
 }
 
-static IMP gOriginalLoadViewIMP = NULL;
-
-static void HillaRideLoadView(id self, SEL _cmd) {
-  ((void (*)(id, SEL))gOriginalLoadViewIMP)(self, _cmd);
-
-  if (!HillaRideIsIOS26OrLater()) {
-    return;
-  }
-
-  UIView* view = [self view];
-  for (UIView* subview in view.subviews) {
-    if (![subview isKindOfClass:[UILabel class]]) {
-      continue;
-    }
-
-    UILabel* label = (UILabel*)subview;
-    if (![label.text containsString:@"debug mode Flutter apps"]) {
-      continue;
-    }
-
-    NSString* version =
-        [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"?";
-    NSString* build =
-        [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"] ?: @"?";
-    label.text =
-        [NSString stringWithFormat:
-                      @"TestFlight build %@ (%@) was packaged as DEBUG.\n\n"
-                      @"iOS 26 cannot run debug builds from the home screen.\n\n"
-                      @"Delete this app and wait for build 1.0.58 on TestFlight "
-                      @"(home screen must say Hello Tuk-Tuk 1.0.58, not DEBUG).",
-                      version, build];
-    label.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    break;
-  }
-}
-
 void HillaRideInstallVSyncWorkaround(void) {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
@@ -74,13 +38,6 @@ void HillaRideInstallVSyncWorkaround(void) {
     Method keyboardMethod = class_getInstanceMethod(flutterViewControllerClass, keyboardSelector);
     if (keyboardMethod != NULL) {
       method_setImplementation(keyboardMethod, (IMP)HillaRideSkipKeyboardAnimationVsync);
-    }
-
-    SEL loadViewSelector = @selector(loadView);
-    Method loadViewMethod = class_getInstanceMethod(flutterViewControllerClass, loadViewSelector);
-    if (loadViewMethod != NULL) {
-      gOriginalLoadViewIMP = method_getImplementation(loadViewMethod);
-      method_setImplementation(loadViewMethod, (IMP)HillaRideLoadView);
     }
   });
 }
