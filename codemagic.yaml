@@ -32,8 +32,18 @@ workflows:
       - name: Prepare iOS dependencies
         script: |
           flutter clean
-          rm -rf build ios/build ios/.symlinks ios/Flutter/ephemeral
+          rm -rf build ios/build ios/.symlinks ios/Flutter/ephemeral ios/Flutter/Flutter.framework
           flutter pub get
+          flutter build ios --release --config-only \
+            --build-name=1.0.58 \
+            --build-number=$PROJECT_BUILD_NUMBER
+          echo "Generated iOS config before pod install:"
+          cat ios/Flutter/Generated.xcconfig
+          BUILD_MODE=$(grep FLUTTER_BUILD_MODE ios/Flutter/Generated.xcconfig | cut -d= -f2)
+          if [ "$BUILD_MODE" != "release" ]; then
+            echo "ERROR: Expected release config before pod install, got FLUTTER_BUILD_MODE=$BUILD_MODE"
+            exit 1
+          fi
           cd ios
           pod repo update
           pod install
@@ -45,9 +55,9 @@ workflows:
         script: |
           flutter build ipa --release \
             --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.57 \
+            --build-name=1.0.58 \
             --build-number=$PROJECT_BUILD_NUMBER
-          echo "Generated iOS config after build:"
+          echo "Generated iOS config after IPA build:"
           cat ios/Flutter/Generated.xcconfig
           BUILD_MODE=$(grep FLUTTER_BUILD_MODE ios/Flutter/Generated.xcconfig | cut -d= -f2)
           if [ "$BUILD_MODE" != "release" ]; then

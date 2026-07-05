@@ -44,9 +44,8 @@ static void HillaRideLoadView(id self, SEL _cmd) {
         [NSString stringWithFormat:
                       @"TestFlight build %@ (%@) was packaged as DEBUG.\n\n"
                       @"iOS 26 cannot run debug builds from the home screen.\n\n"
-                      @"Delete this app and wait for the next Codemagic release "
-                      @"(Hello Tuk-Tuk %@ on TestFlight).",
-                      version, build, version];
+                      @"Delete this app and wait for build 1.0.58 on TestFlight "
+                      @"(home screen must say Hello Tuk-Tuk 1.0.58, not DEBUG).",
     label.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     break;
   }
