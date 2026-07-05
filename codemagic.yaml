@@ -1,5 +1,13 @@
+# Hello Tuk-Tuk — Native Swift iOS (TestFlight)
+#
+# IMPORTANT: In Codemagic app settings → Build configuration → select
+# "codemagic.yaml" (not the Workflow Editor / Default Workflow).
+#
+# After pushing this file, start a build and choose workflow:
+#   "Hello Tuk-Tuk Native iOS"
+
 workflows:
-  ios-native-release:
+  hello-tuk-tuk-native-ios:
     name: Hello Tuk-Tuk Native iOS
     max_build_duration: 120
     instance_type: mac_mini_m2
@@ -10,8 +18,8 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.hillaride.hillaRide
       vars:
-        XCODE_PROJECT: "hilla_ride_ios/HelloTukTuk.xcodeproj"
-        XCODE_SCHEME: HelloTukTuk
+        MARKETING_VERSION: "2.0.0"
+        BUILD_NUMBER: "61"
       xcode: latest
     triggering:
       events:
@@ -22,14 +30,27 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Set up code signing
+      - name: Verify native Swift project
         script: |
-          cd hilla_ride_ios
-          xcode-project use-profiles
-      - name: Build and export IPA
+          set -euo pipefail
+          echo "=========================================="
+          echo " NATIVE SWIFT BUILD (NOT Flutter)"
+          echo " Version: ${MARKETING_VERSION} (${BUILD_NUMBER})"
+          echo " Project: hilla_ride_ios/HelloTukTuk.xcodeproj"
+          echo "=========================================="
+          test -f hilla_ride_ios/HelloTukTuk.xcodeproj/project.pbxproj
+          test -f hilla_ride_ios/HelloTukTuk/HelloTukTukApp.swift
+          grep -q 'MARKETING_VERSION = 2.0.0' hilla_ride_ios/HelloTukTuk.xcodeproj/project.pbxproj
+      - name: Set up code signing
         script: |
           set -euo pipefail
           cd hilla_ride_ios
+          xcode-project use-profiles
+      - name: Build Release IPA (Swift)
+        script: |
+          set -euo pipefail
+          cd hilla_ride_ios
+          xcodebuild -resolvePackageDependencies -project HelloTukTuk.xcodeproj -scheme HelloTukTuk
           xcodebuild -project HelloTukTuk.xcodeproj \
             -scheme HelloTukTuk \
             -configuration Release \
@@ -37,15 +58,30 @@ workflows:
             -archivePath build/HelloTukTuk.xcarchive \
             archive \
             DEVELOPMENT_TEAM=XAZ6V7UTYT \
-            MARKETING_VERSION=2.0.0 \
-            CURRENT_PROJECT_VERSION=61
+            MARKETING_VERSION="$MARKETING_VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
           xcodebuild -exportArchive \
             -archivePath build/HelloTukTuk.xcarchive \
             -exportPath build/ipa \
             -exportOptionsPlist exportOptions.plist
-          echo "Native iOS IPA ready for TestFlight"
+          IPA="$(ls build/ipa/*.ipa | head -1)"
+          echo "Built IPA: $IPA"
+          TMP="$(mktemp -d)"
+          unzip -q "$IPA" -d "$TMP"
+          PLIST="$TMP/Payload/HelloTukTuk.app/Info.plist"
+          if [ ! -f "$PLIST" ]; then
+            PLIST="$(find "$TMP/Payload" -name Info.plist | head -1)"
+          fi
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")"
+          BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
+          DISPLAY="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$PLIST")"
+          echo "Bundle version: $VERSION ($BUILD)"
+          echo "Display name: $DISPLAY"
+          rm -rf "$TMP"
+          echo "Native Swift IPA ready for TestFlight"
     artifacts:
       - hilla_ride_ios/build/ipa/*.ipa
+      - hilla_ride_ios/build/HelloTukTuk.xcarchive/**/*
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
@@ -53,41 +89,3 @@ workflows:
         submit_to_testflight: true
         beta_groups:
           - Internal Testers
-
-  ios-release:
-    name: Flutter iOS (deprecated backup)
-    max_build_duration: 120
-    instance_type: mac_mini_m2
-    integrations:
-      app_store_connect: codemagic
-    environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.hillaride.hillaRide
-      vars:
-        APP_STORE_APPLE_ID: "YOUR_APPLE_ID_EMAIL"
-        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
-        BUILD_NAME: "1.0.59"
-      flutter: stable
-      xcode: latest
-      cocoapods: default
-    scripts:
-      - name: Prepare Flutter release engine
-        script: |
-          flutter --version
-          flutter precache --ios --force
-          flutter doctor -v
-      - name: Set up code signing
-        script: |
-          xcode-project use-profiles
-      - name: Build and verify release IPA
-        script: |
-          bash ios/build_release_ipa.sh
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
-      - flutter_drive.log
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: false

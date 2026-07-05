@@ -34,7 +34,27 @@ Select the **HelloTukTuk** scheme, choose a device or simulator, and run.
 
 ## Codemagic / TestFlight
 
-The repo root `codemagic.yaml` includes workflow **`ios-native-release`**, which builds from this folder and uploads to TestFlight.
+### One-time setup in Codemagic (required)
+
+If you only see **"Default Workflow"** with Flutter options, Codemagic is using the **UI editor**, not this repo’s YAML.
+
+1. Open [Codemagic](https://codemagic.io) → your **hilla_ride** app  
+2. Click **App settings** (gear icon)  
+3. Under **Build configuration**, choose **codemagic.yaml** (not Workflow Editor)  
+4. Save  
+
+### Start a native Swift build
+
+1. Click **Start new build**  
+2. Select workflow: **Hello Tuk-Tuk Native iOS**  
+3. Branch: **master**  
+4. Start build  
+
+Pushes to `master` auto-trigger this workflow when YAML mode is enabled.
+
+Expected TestFlight version: **2.0.0 (61)** — not 1.0.59 (Flutter).
+
+The repo root `codemagic.yaml` contains **only** the native Swift workflow (Flutter iOS CI was removed to avoid wrong builds).
 
 ## Next phases
 
