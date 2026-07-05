@@ -55,7 +55,7 @@ workflows:
         script: |
           flutter build ipa --release \
             --export-options-plist=ios/exportOptions.plist \
-            --build-name=1.0.53 \
+            --build-name=1.0.54 \
             --build-number=$PROJECT_BUILD_NUMBER
           BUILD_MODE=$(grep FLUTTER_BUILD_MODE ios/Flutter/Generated.xcconfig | cut -d= -f2)
           if [ "$BUILD_MODE" != "release" ]; then
@@ -63,6 +63,7 @@ workflows:
             exit 1
           fi
           echo "Verified release build: FLUTTER_BUILD_MODE=$BUILD_MODE"
+          bash ios/verify_release_ipa.sh
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
