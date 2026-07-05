@@ -38,7 +38,7 @@ workflows:
             archive \
             DEVELOPMENT_TEAM=XAZ6V7UTYT \
             MARKETING_VERSION=2.0.0 \
-            CURRENT_PROJECT_VERSION=$PROJECT_BUILD_NUMBER
+            CURRENT_PROJECT_VERSION=61
           xcodebuild -exportArchive \
             -archivePath build/HelloTukTuk.xcarchive \
             -exportPath build/ipa \
