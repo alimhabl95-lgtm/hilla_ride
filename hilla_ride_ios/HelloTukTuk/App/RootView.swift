@@ -10,7 +10,7 @@ struct RootView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(BrandColors.surface.ignoresSafeArea())
             } else if appState.currentUser != nil {
-                PlaceholderHomeView()
+                AppShellView()
             } else {
                 ModeChooserView()
             }

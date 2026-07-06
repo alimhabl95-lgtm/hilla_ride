@@ -24,13 +24,6 @@ struct SignupView: View {
                     Text(L10n.string(.signupTitle, language: appState.language))
                         .font(.largeTitle.bold())
 
-                    if selectedMode == .driver {
-                        Text(L10n.string(.driverSignupPhaseNote, language: appState.language))
-                            .font(.footnote)
-                            .foregroundStyle(.orange)
-                            .padding(.bottom, 4)
-                    }
-
                     TextField(L10n.string(.fullName, language: appState.language), text: $fullName)
                         .textFieldStyle(AppTextFieldStyle())
 
@@ -76,7 +69,7 @@ struct SignupView: View {
                         Task { await signup() }
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(isLoading || selectedMode == .driver)
+                    .disabled(isLoading)
                 }
                 .padding(24)
             }

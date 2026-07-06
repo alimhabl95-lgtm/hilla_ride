@@ -17,14 +17,22 @@ open HelloTukTuk.xcodeproj
 
 Select the **HelloTukTuk** scheme, choose a device or simulator, and run.
 
-## Phase 0 (current)
+## Phase 2A Week 1 (current)
+
+- Forgot password (reset via `resetPasswordByPhone` Cloud Function)
+- Profile screen with change password and logout
+- Full driver signup with photo upload + `submitDriverRegistration`
+- Role-based post-login routing (customer home, driver pending/approved/rejected/blocked)
+- Arabic / English for all new screens
+
+## Phase 0 (complete)
 
 - SwiftUI app shell
 - Firebase Auth, Firestore, Messaging, Functions (SPM)
 - Mode chooser (Customer / Driver)
 - Login + customer signup (matches Flutter phone→email auth)
 - Arabic / English toggle
-- Placeholder home after login
+- TestFlight builds via Codemagic
 
 ## Firebase
 

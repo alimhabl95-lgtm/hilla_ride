@@ -51,8 +51,48 @@ enum L10nKey {
     case privacyPolicy
     case termsOfService
     case welcomeSignedIn
-    case driverSignupPhaseNote
     case loading
+    case forgotPasswordTitle
+    case forgotPasswordHint
+    case newPassword
+    case confirmPassword
+    case currentPassword
+    case resetPasswordButton
+    case passwordChangedTitle
+    case passwordChangedMessage
+    case passwordFieldsRequired
+    case passwordsDoNotMatch
+    case passwordResetFailed
+    case profileTitle
+    case changePasswordTitle
+    case savePasswordButton
+    case accountType
+    case driverStatus
+    case customerHomeTitle
+    case mapsComingSoon
+    case driverHomeTitle
+    case driverTripsComingSoon
+    case driverPendingTitle
+    case driverPendingMessage
+    case driverRejectedTitle
+    case driverRejectedMessage
+    case driverBlockedTitle
+    case driverBlockedMessage
+    case driverSignupTitle
+    case driverSignupSubtitle
+    case age
+    case vehiclePlate
+    case vehicleColor
+    case idPhotoLabel
+    case profilePhotoLabel
+    case tapToUploadPhoto
+    case submitDriverApplication
+    case driverSignupSuccessTitle
+    case driverSignupSuccessMessage
+    case driverMinAge
+    case vehiclePlateRequired
+    case vehicleColorRequired
+    case registrationPhotosRequired
 }
 
 enum L10n {
@@ -120,10 +160,89 @@ enum L10n {
         .privacyPolicy: [.english: "Privacy policy", .arabic: "سياسة الخصوصية"],
         .termsOfService: [.english: "Terms of service", .arabic: "شروط الاستخدام"],
         .welcomeSignedIn: [.english: "Signed in successfully", .arabic: "تم تسجيل الدخول بنجاح"],
-        .driverSignupPhaseNote: [
-            .english: "Driver photo upload will be enabled in the next build. Customer signup is fully available.",
-            .arabic: "رفع صور السائق سيتوفر في الإصدار القادم. تسجيل الزبون متاح بالكامل."
+        .loading: [.english: "Loading...", .arabic: "جاري التحميل..."],
+        .forgotPasswordTitle: [.english: "Reset password", .arabic: "إعادة تعيين كلمة المرور"],
+        .forgotPasswordHint: [
+            .english: "Enter your phone number and choose a new password.",
+            .arabic: "أدخل رقم هاتفك واختر كلمة مرور جديدة."
         ],
-        .loading: [.english: "Loading...", .arabic: "جاري التحميل..."]
+        .newPassword: [.english: "New password", .arabic: "كلمة المرور الجديدة"],
+        .confirmPassword: [.english: "Confirm password", .arabic: "تأكيد كلمة المرور"],
+        .currentPassword: [.english: "Current password", .arabic: "كلمة المرور الحالية"],
+        .resetPasswordButton: [.english: "Reset password", .arabic: "إعادة تعيين كلمة المرور"],
+        .passwordChangedTitle: [.english: "Password updated", .arabic: "تم تحديث كلمة المرور"],
+        .passwordChangedMessage: [
+            .english: "Your password was updated successfully.",
+            .arabic: "تم تحديث كلمة المرور بنجاح."
+        ],
+        .passwordFieldsRequired: [
+            .english: "Please fill in all password fields.",
+            .arabic: "يرجى تعبئة جميع حقول كلمة المرور."
+        ],
+        .passwordsDoNotMatch: [
+            .english: "Passwords do not match.",
+            .arabic: "كلمتا المرور غير متطابقتين."
+        ],
+        .passwordResetFailed: [
+            .english: "Could not reset password. Try again.",
+            .arabic: "تعذر إعادة تعيين كلمة المرور. حاول مرة أخرى."
+        ],
+        .profileTitle: [.english: "Profile", .arabic: "الملف الشخصي"],
+        .changePasswordTitle: [.english: "Change password", .arabic: "تغيير كلمة المرور"],
+        .savePasswordButton: [.english: "Save password", .arabic: "حفظ كلمة المرور"],
+        .accountType: [.english: "Account type", .arabic: "نوع الحساب"],
+        .driverStatus: [.english: "Driver status", .arabic: "حالة السائق"],
+        .customerHomeTitle: [.english: "Ready to ride", .arabic: "جاهز للمشوار"],
+        .mapsComingSoon: [
+            .english: "Google Maps and ride booking arrive in the next TestFlight build.",
+            .arabic: "خرائط Google وحجز المشاوير في الإصدار القادم على TestFlight."
+        ],
+        .driverHomeTitle: [.english: "Driver dashboard", .arabic: "لوحة السائق"],
+        .driverTripsComingSoon: [
+            .english: "Trip requests and navigation arrive in the next TestFlight build.",
+            .arabic: "طلبات الرحلات والملاحة في الإصدار القادم على TestFlight."
+        ],
+        .driverPendingTitle: [.english: "Application under review", .arabic: "طلبك قيد المراجعة"],
+        .driverPendingMessage: [
+            .english: "Your driver application is being reviewed by our team. You will be notified once approved.",
+            .arabic: "طلب السائق قيد المراجعة. سيتم إشعارك عند الموافقة."
+        ],
+        .driverRejectedTitle: [.english: "Application not approved", .arabic: "لم تتم الموافقة على الطلب"],
+        .driverRejectedMessage: [
+            .english: "Your driver application was not approved. Contact support for help.",
+            .arabic: "لم تتم الموافقة على طلب السائق. تواصل مع الدعم للمساعدة."
+        ],
+        .driverBlockedTitle: [.english: "Account blocked", .arabic: "الحساب محظور"],
+        .driverBlockedMessage: [
+            .english: "Your driver account has been blocked. Contact support.",
+            .arabic: "تم حظر حساب السائق. تواصل مع الدعم."
+        ],
+        .driverSignupTitle: [.english: "Driver registration", .arabic: "تسجيل السائق"],
+        .driverSignupSubtitle: [
+            .english: "Upload your ID and profile photo. Our team will review your application.",
+            .arabic: "ارفع صورة الهوية والصورة الشخصية. سيراجع فريقنا طلبك."
+        ],
+        .age: [.english: "Age", .arabic: "العمر"],
+        .vehiclePlate: [.english: "Vehicle plate", .arabic: "رقم اللوحة"],
+        .vehicleColor: [.english: "Vehicle color", .arabic: "لون المركبة"],
+        .idPhotoLabel: [.english: "ID photo", .arabic: "صورة الهوية"],
+        .profilePhotoLabel: [.english: "Profile photo", .arabic: "الصورة الشخصية"],
+        .tapToUploadPhoto: [.english: "Tap to upload photo", .arabic: "اضغط لرفع الصورة"],
+        .submitDriverApplication: [.english: "Submit application", .arabic: "إرسال الطلب"],
+        .driverSignupSuccessTitle: [.english: "Application submitted", .arabic: "تم إرسال الطلب"],
+        .driverSignupSuccessMessage: [
+            .english: "Your driver application was submitted. Please log in after approval.",
+            .arabic: "تم إرسال طلب السائق. يرجى تسجيل الدخول بعد الموافقة."
+        ],
+        .driverMinAge: [
+            .english: "Drivers must be at least 18 years old.",
+            .arabic: "يجب أن يكون عمر السائق 18 سنة على الأقل."
+        ],
+        .vehiclePlateRequired: [.english: "Vehicle plate is required.", .arabic: "رقم اللوحة مطلوب."],
+        .vehicleColorRequired: [.english: "Vehicle color is required.", .arabic: "لون المركبة مطلوب."],
+        .registrationPhotosRequired: [
+            .english: "ID photo and profile photo are required.",
+            .arabic: "صورة الهوية والصورة الشخصية مطلوبتان."
+        ]
     ]
 }

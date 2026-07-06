@@ -3,11 +3,19 @@ import SwiftUI
 struct AuthFlowView: View {
     @EnvironmentObject private var appState: AppState
     @State private var showSignup = false
+    @State private var showForgotPassword = false
 
     var body: some View {
-        LoginView(showSignup: $showSignup)
+        LoginView(showSignup: $showSignup, showForgotPassword: $showForgotPassword)
             .navigationDestination(isPresented: $showSignup) {
-                SignupView()
+                if appState.selectedMode == .driver {
+                    DriverSignupView()
+                } else {
+                    SignupView()
+                }
+            }
+            .navigationDestination(isPresented: $showForgotPassword) {
+                ForgotPasswordView()
             }
     }
 }
@@ -15,6 +23,7 @@ struct AuthFlowView: View {
 struct LoginView: View {
     @EnvironmentObject private var appState: AppState
     @Binding var showSignup: Bool
+    @Binding var showForgotPassword: Bool
 
     @State private var phone = ""
     @State private var password = ""
@@ -48,8 +57,15 @@ struct LoginView: View {
                     SecureField(L10n.string(.passwordLabel, language: appState.language), text: $password)
                         .textFieldStyle(AppTextFieldStyle())
 
-                    Toggle(L10n.string(.rememberMe, language: appState.language), isOn: $rememberMe)
-                        .tint(BrandColors.teal)
+                    HStack {
+                        Toggle(L10n.string(.rememberMe, language: appState.language), isOn: $rememberMe)
+                            .tint(BrandColors.teal)
+                        Spacer()
+                        Button(L10n.string(.forgotPassword, language: appState.language)) {
+                            showForgotPassword = true
+                        }
+                        .font(.footnote)
+                    }
 
                     if let errorMessage {
                         Text(errorMessage)

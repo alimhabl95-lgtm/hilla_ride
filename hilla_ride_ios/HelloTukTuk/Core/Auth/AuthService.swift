@@ -31,7 +31,7 @@ final class AuthService: ObservableObject {
         fullName: String,
         email: String?
     ) async throws {
-        try await signUp(
+        _ = try await signUp(
             phoneRaw: phoneRaw,
             password: password,
             fullName: fullName,
@@ -41,6 +41,55 @@ final class AuthService: ObservableObject {
         )
     }
 
+    func signUpDriverAccount(
+        phoneRaw: String,
+        password: String,
+        fullName: String,
+        age: Int
+    ) async throws -> String {
+        try await signUp(
+            phoneRaw: phoneRaw,
+            password: password,
+            fullName: fullName,
+            role: .driver,
+            email: nil,
+            age: age
+        )
+    }
+
+    func resetPasswordByPhone(phoneRaw: String, newPassword: String) async throws {
+        guard PhoneAuthCredentials.isValidIraqiPhone(phoneRaw) else {
+            throw AuthError(code: "invalid-phone", message: L10n.string(.phoneNumberInvalid))
+        }
+        guard PhoneAuthCredentials.isValidPassword(newPassword) else {
+            throw AuthError(code: "weak-password", message: L10n.string(.passwordMinLength))
+        }
+
+        let phone = PhoneAuthCredentials.normalizePhone(phoneRaw)
+        do {
+            _ = try await functions.httpsCallable("resetPasswordByPhone").call([
+                "phone": phone,
+                "newPassword": newPassword
+            ])
+        } catch let error as NSError {
+            throw mapFunctionsError(error)
+        }
+    }
+
+    func changePassword(currentPassword: String, newPassword: String) async throws {
+        guard let user = auth.currentUser, let email = user.email else {
+            throw AuthError(code: "internal", message: "Not signed in.")
+        }
+        guard PhoneAuthCredentials.isValidPassword(newPassword) else {
+            throw AuthError(code: "weak-password", message: L10n.string(.passwordMinLength))
+        }
+
+        let credential = EmailAuthProvider.credential(withEmail: email, password: currentPassword)
+        try await user.reauthenticate(with: credential)
+        try await user.updatePassword(newPassword)
+    }
+
+    @discardableResult
     func signUp(
         phoneRaw: String,
         password: String,
@@ -48,7 +97,7 @@ final class AuthService: ObservableObject {
         role: UserRole,
         email: String?,
         age: Int
-    ) async throws {
+    ) async throws -> String {
         guard PhoneAuthCredentials.isValidPassword(password) else {
             throw AuthError(code: "weak-password", message: L10n.string(.passwordMinLength))
         }
@@ -90,10 +139,25 @@ final class AuthService: ObservableObject {
                 age: age
             )
             try await sessionService.claimSession(uid: user.uid)
+            return user.uid
         } catch {
             try? await user.delete()
             throw error
         }
+    }
+
+    private func mapFunctionsError(_ error: NSError) -> Error {
+        if error.domain == FunctionsErrorDomain {
+            switch FunctionsErrorCode(rawValue: error.code) {
+            case .notFound:
+                return AuthError(code: "user-not-found", message: L10n.string(.userNotFound))
+            case .internal:
+                return AuthError(code: "internal", message: L10n.string(.passwordResetFailed))
+            default:
+                return AuthError(code: "internal", message: error.localizedDescription)
+            }
+        }
+        return error
     }
 
     func signOut() async throws {

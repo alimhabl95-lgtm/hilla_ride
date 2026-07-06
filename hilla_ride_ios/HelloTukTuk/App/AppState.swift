@@ -14,9 +14,11 @@ final class AppState: ObservableObject {
         }
     }
     @Published private(set) var currentUser: AppUser?
+    @Published private(set) var currentDriver: DriverProfile?
     @Published private(set) var isBootstrapping = true
 
     let authService = AuthService()
+    private let driverRepository = DriverRepository()
     private var authListener: AuthStateDidChangeListenerHandle?
 
     init() {
@@ -48,6 +50,7 @@ final class AppState: ObservableObject {
     func setCurrentUser(_ user: AppUser) {
         currentUser = user
         Task {
+            await refreshDriverProfileIfNeeded()
             await PushNotificationService.shared.saveToken(for: user.uid, role: user.role)
         }
     }
@@ -55,22 +58,37 @@ final class AppState: ObservableObject {
     func signOut() async throws {
         try await authService.signOut()
         currentUser = nil
+        currentDriver = nil
+    }
+
+    func refreshDriverProfileIfNeeded() async {
+        guard let user = currentUser, user.role == .driver else {
+            currentDriver = nil
+            return
+        }
+        currentDriver = try? await driverRepository.fetchDriver(uid: user.uid)
     }
 
     private func refreshCurrentUser(firebaseUser: User?) async {
         guard let firebaseUser else {
             currentUser = nil
+            currentDriver = nil
             return
         }
 
         do {
             let repository = UserRepository()
-            currentUser = try await repository.fetchUser(uid: firebaseUser.uid)
-            if let currentUser {
-                await PushNotificationService.shared.saveToken(for: currentUser.uid, role: currentUser.role)
+            guard let user = try await repository.fetchUser(uid: firebaseUser.uid) else {
+                currentUser = nil
+                currentDriver = nil
+                return
             }
+            currentUser = user
+            await refreshDriverProfileIfNeeded()
+            await PushNotificationService.shared.saveToken(for: user.uid, role: user.role)
         } catch {
             currentUser = nil
+            currentDriver = nil
         }
     }
 }

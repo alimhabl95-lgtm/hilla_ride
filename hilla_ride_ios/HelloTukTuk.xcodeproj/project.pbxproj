@@ -25,7 +25,6 @@
 		A10000000000000000000016 /* ModeChooserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* ModeChooserView.swift */; };
 		A10000000000000000000017 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* LoginView.swift */; };
 		A10000000000000000000018 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* SignupView.swift */; };
-		A10000000000000000000019 /* PlaceholderHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* PlaceholderHomeView.swift */; };
 		A10000000000000000000020 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* Assets.xcassets */; };
 		A10000000000000000000021 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* GoogleService-Info.plist */; };
 		A10000000000000000000022 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000001 /* FirebaseAuth */; };
@@ -33,6 +32,15 @@
 		A10000000000000000000024 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000003 /* FirebaseMessaging */; };
 		A10000000000000000000025 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000004 /* FirebaseFunctions */; };
 		A10000000000000000000026 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000005 /* FirebaseCore */; };
+		A10000000000000000000027 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* AppShellView.swift */; };
+		A10000000000000000000028 /* DriverModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* DriverModels.swift */; };
+		A10000000000000000000029 /* StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* StorageService.swift */; };
+		A10000000000000000000030 /* DriverRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* DriverRepository.swift */; };
+		A10000000000000000000031 /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* ForgotPasswordView.swift */; };
+		A10000000000000000000032 /* PhotoUploadField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* PhotoUploadField.swift */; };
+		A10000000000000000000033 /* DriverSignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* DriverSignupView.swift */; };
+		A10000000000000000000034 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* ProfileView.swift */; };
+		A10000000000000000000035 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000006 /* FirebaseStorage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,12 +62,19 @@
 		A20000000000000000000016 /* ModeChooserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModeChooserView.swift; sourceTree = "<group>"; };
 		A20000000000000000000017 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A20000000000000000000018 /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
-		A20000000000000000000019 /* PlaceholderHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderHomeView.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000000000000000000021 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		A20000000000000000000022 /* HelloTukTuk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HelloTukTuk.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000023 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000024 /* HelloTukTuk.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HelloTukTuk.entitlements; sourceTree = "<group>"; };
+		A20000000000000000000025 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
+		A20000000000000000000026 /* DriverModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000027 /* StorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageService.swift; sourceTree = "<group>"; };
+		A20000000000000000000028 /* DriverRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverRepository.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
+		A20000000000000000000030 /* PhotoUploadField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUploadField.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* DriverSignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverSignupView.swift; sourceTree = "<group>"; };
+		A20000000000000000000032 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +87,7 @@
 				A10000000000000000000024 /* FirebaseMessaging in Frameworks */,
 				A10000000000000000000025 /* FirebaseFunctions in Frameworks */,
 				A10000000000000000000026 /* FirebaseCore in Frameworks */,
+				A10000000000000000000035 /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -114,6 +130,7 @@
 			children = (
 				A20000000000000000000002 /* AppState.swift */,
 				A20000000000000000000003 /* RootView.swift */,
+				A20000000000000000000025 /* AppShellView.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -135,7 +152,7 @@
 			isa = PBXGroup;
 			children = (
 				A40000000000000000000013 /* Auth */,
-				A40000000000000000000014 /* Home */,
+				A40000000000000000000015 /* Profile */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -170,6 +187,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000009 /* UserRole.swift */,
+				A20000000000000000000026 /* DriverModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -181,6 +199,8 @@
 				A20000000000000000000011 /* PushNotificationService.swift */,
 				A20000000000000000000012 /* SessionService.swift */,
 				A20000000000000000000013 /* UserRepository.swift */,
+				A20000000000000000000027 /* StorageService.swift */,
+				A20000000000000000000028 /* DriverRepository.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -200,16 +220,19 @@
 				A20000000000000000000016 /* ModeChooserView.swift */,
 				A20000000000000000000017 /* LoginView.swift */,
 				A20000000000000000000018 /* SignupView.swift */,
+				A20000000000000000000029 /* ForgotPasswordView.swift */,
+				A20000000000000000000030 /* PhotoUploadField.swift */,
+				A20000000000000000000031 /* DriverSignupView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
 		};
-		A40000000000000000000014 /* Home */ = {
+		A40000000000000000000015 /* Profile */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000019 /* PlaceholderHomeView.swift */,
+				A20000000000000000000032 /* ProfileView.swift */,
 			);
-			path = Home;
+			path = Profile;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -233,6 +256,8 @@
 				A50000000000000000000002 /* FirebaseFirestore */,
 				A50000000000000000000003 /* FirebaseMessaging */,
 				A50000000000000000000004 /* FirebaseFunctions */,
+				A50000000000000000000005 /* FirebaseCore */,
+				A50000000000000000000006 /* FirebaseStorage */,
 			);
 			productName = HelloTukTuk;
 			productReference = A20000000000000000000022 /* HelloTukTuk.app */;
@@ -310,7 +335,14 @@
 				A10000000000000000000016 /* ModeChooserView.swift in Sources */,
 				A10000000000000000000017 /* LoginView.swift in Sources */,
 				A10000000000000000000018 /* SignupView.swift in Sources */,
-				A10000000000000000000019 /* PlaceholderHomeView.swift in Sources */,
+				A10000000000000000000027 /* AppShellView.swift in Sources */,
+				A10000000000000000000028 /* DriverModels.swift in Sources */,
+				A10000000000000000000029 /* StorageService.swift in Sources */,
+				A10000000000000000000030 /* DriverRepository.swift in Sources */,
+				A10000000000000000000031 /* ForgotPasswordView.swift in Sources */,
+				A10000000000000000000032 /* PhotoUploadField.swift in Sources */,
+				A10000000000000000000033 /* DriverSignupView.swift in Sources */,
+				A10000000000000000000034 /* ProfileView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -360,7 +392,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 61;
+				CURRENT_PROJECT_VERSION = 64;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -372,7 +404,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 2.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hillaride.hillaRide;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -391,7 +423,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 61;
+				CURRENT_PROJECT_VERSION = 64;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -403,7 +435,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 2.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hillaride.hillaRide;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -474,6 +506,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCore;
+		};
+		A50000000000000000000006 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
