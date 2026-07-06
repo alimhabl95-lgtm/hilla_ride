@@ -5,7 +5,7 @@
 set -euo pipefail
 
 BUNDLE_ID="${1:-com.hillaride.hillaRide}"
-TEAM_CERT_NAME="${2:-Apple Distribution: Ali Al-Isawi}"
+TEAM_CERT_NAME="${2:-Ali Al-Isawi}"
 PROFILES_DIR="${HOME}/Library/MobileDevice/Provisioning Profiles"
 
 echo "Looking up Bundle ID resource: ${BUNDLE_ID}"
