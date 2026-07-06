@@ -17,7 +17,7 @@ struct RideAlertOverlay<Content: View>: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: alertService.activeAlert?.id)
-        .onChange(of: alertService.activeAlert?.id) { _, _ in
+           .onChange(of: alertService.activeAlert?.id) { _ in
             if alertService.activeAlert != nil {
                 showDialog = true
             }
