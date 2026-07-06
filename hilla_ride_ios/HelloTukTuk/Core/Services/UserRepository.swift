@@ -72,4 +72,12 @@ final class UserRepository {
             try? await firestore.collection("released_phones").document(phoneKey).delete()
         }
     }
+
+    func updateUserName(uid: String, name: String) async throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        try await firestore.collection("users").document(uid).updateData([
+            "name": trimmed
+        ])
+    }
 }

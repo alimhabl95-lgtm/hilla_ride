@@ -24,10 +24,27 @@ struct AppUser: Identifiable, Equatable {
     let age: Int
     let email: String?
     let isBlocked: Bool
+    let promoCode: String
+    let promoRidesUsed: Int
+    let promoRidesLimit: Int
 
     var id: String { uid }
+    var hasPromoRemaining: Bool {
+        !promoCode.isEmpty && promoRidesUsed < promoRidesLimit
+    }
 
-    init(uid: String, phone: String, role: UserRole, name: String, age: Int = 18, email: String? = nil, isBlocked: Bool = false) {
+    init(
+        uid: String,
+        phone: String,
+        role: UserRole,
+        name: String,
+        age: Int = 18,
+        email: String? = nil,
+        isBlocked: Bool = false,
+        promoCode: String = "",
+        promoRidesUsed: Int = 0,
+        promoRidesLimit: Int = 0
+    ) {
         self.uid = uid
         self.phone = phone
         self.role = role
@@ -35,6 +52,9 @@ struct AppUser: Identifiable, Equatable {
         self.age = age
         self.email = email
         self.isBlocked = isBlocked
+        self.promoCode = promoCode
+        self.promoRidesUsed = promoRidesUsed
+        self.promoRidesLimit = promoRidesLimit
     }
 
     init?(documentID: String, data: [String: Any]) {
@@ -49,5 +69,8 @@ struct AppUser: Identifiable, Equatable {
         age = data["age"] as? Int ?? 18
         email = data["email"] as? String
         isBlocked = data["isBlocked"] as? Bool ?? false
+        promoCode = data["promoCode"] as? String ?? ""
+        promoRidesUsed = (data["promoRidesUsed"] as? NSNumber)?.intValue ?? 0
+        promoRidesLimit = (data["promoRidesLimit"] as? NSNumber)?.intValue ?? 0
     }
 }

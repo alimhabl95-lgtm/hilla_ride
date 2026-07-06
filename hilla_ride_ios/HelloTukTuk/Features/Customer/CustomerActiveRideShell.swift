@@ -70,6 +70,8 @@ struct FindingDriverView: View {
     var onSessionEnded: (() -> Void)?
 
     @State private var isRetrying = false
+    @State private var waitingForDrivers = false
+    @State private var retryTask: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -77,11 +79,21 @@ struct FindingDriverView: View {
                 .scaleEffect(1.4)
             Text(L10n.string(.findingDriver, language: appState.language))
                 .font(.title2.bold())
-            Text(L10n.string(.findingDriverHint, language: appState.language))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+            Text(
+                waitingForDrivers
+                    ? L10n.string(.noDriversInDistrict, language: appState.language)
+                    : L10n.string(.findingDriverHint, language: appState.language)
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal)
+
+            if waitingForDrivers {
+                Text(L10n.string(.retryDriverSearch, language: appState.language))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             Button(L10n.string(.retryDriverSearch, language: appState.language)) {
                 Task { await retryAssignment() }
@@ -98,16 +110,43 @@ struct FindingDriverView: View {
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
+        .onAppear {
+            Task { await retryAssignment() }
+        }
+        .onDisappear {
+            retryTask?.cancel()
+        }
     }
 
     private func retryAssignment() async {
+        guard !isRetrying else { return }
         isRetrying = true
         defer { isRetrying = false }
-        try? await RideRepository().assignNearestDriver(rideId: ride.id)
+
+        do {
+            try await RideRepository().assignNearestDriver(rideId: ride.id)
+            waitingForDrivers = false
+            retryTask?.cancel()
+        } catch RideServiceError.noDrivers {
+            waitingForDrivers = true
+            scheduleAutoRetry()
+        } catch {
+            waitingForDrivers = false
+        }
+    }
+
+    private func scheduleAutoRetry() {
+        retryTask?.cancel()
+        retryTask = Task {
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            guard !Task.isCancelled else { return }
+            await retryAssignment()
+        }
     }
 
     private func cancelRide() async {
         guard let customerId = appState.currentUser?.uid else { return }
+        retryTask?.cancel()
         try? await RideRepository().cancelRide(rideId: ride.id, cancelledBy: customerId)
         onSessionEnded?()
     }
@@ -154,31 +193,46 @@ struct ActiveRideMapView: View {
 
     @State private var driverCoordinate: CLLocationCoordinate2D?
     @State private var driverTask: Task<Void, Never>?
+    @State private var showChat = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            if MapsConfig.isConfigured {
-                GoogleMapView(
-                    cameraTarget: ride.pickupCoordinate,
-                    zoom: 14,
-                    pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
-                    destination: MapPlace(label: ride.destinationLabel, coordinate: ride.destinationCoordinate),
-                    driverCoordinate: driverCoordinate
-                )
-                .ignoresSafeArea()
-            }
+        NavigationStack {
+            ZStack(alignment: .bottom) {
+                if MapsConfig.isConfigured {
+                    GoogleMapView(
+                        cameraTarget: ride.pickupCoordinate,
+                        zoom: 14,
+                        pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
+                        destination: MapPlace(label: ride.destinationLabel, coordinate: ride.destinationCoordinate),
+                        driverCoordinate: driverCoordinate
+                    )
+                    .ignoresSafeArea()
+                }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(statusTitle)
-                    .font(.headline)
-                Text(formatIqd(ride.fareAmountIqd))
-                    .font(.title3.bold())
-                    .foregroundStyle(BrandColors.tealDark)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(statusTitle)
+                        .font(.headline)
+                    Text(formatIqd(ride.fareAmountIqd))
+                        .font(.title3.bold())
+                        .foregroundStyle(BrandColors.tealDark)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .padding(12)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-            .padding(12)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showChat = true
+                    } label: {
+                        Image(systemName: "message.fill")
+                    }
+                }
+            }
+            .navigationDestination(isPresented: $showChat) {
+                RideChatView(rideId: ride.id)
+            }
         }
         .onAppear { startWatchingDriver() }
         .onDisappear {

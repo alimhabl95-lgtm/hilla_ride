@@ -60,6 +60,16 @@
 		A10000000000000000000052 /* DriverAppEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000048 /* DriverAppEntryView.swift */; };
 		A10000000000000000000053 /* DriverHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000049 /* DriverHomeView.swift */; };
 		A10000000000000000000054 /* TripCompletedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000050 /* TripCompletedView.swift */; };
+		A10000000000000000000055 /* SessionGuardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000051 /* SessionGuardView.swift */; };
+		A10000000000000000000056 /* GooglePlacesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000052 /* GooglePlacesService.swift */; };
+		A10000000000000000000057 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000053 /* ChatService.swift */; };
+		A10000000000000000000058 /* SupportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000054 /* SupportService.swift */; };
+		A10000000000000000000059 /* PromoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000055 /* PromoModels.swift */; };
+		A10000000000000000000060 /* PlaceSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000056 /* PlaceSearchView.swift */; };
+		A10000000000000000000061 /* RideChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000057 /* RideChatView.swift */; };
+		A10000000000000000000062 /* SupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000058 /* SupportView.swift */; };
+		A10000000000000000000063 /* RideHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000059 /* RideHistoryView.swift */; };
+		A10000000000000000000064 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* EditProfileView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -112,6 +122,16 @@
 		A20000000000000000000048 /* DriverAppEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverAppEntryView.swift; sourceTree = "<group>"; };
 		A20000000000000000000049 /* DriverHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverHomeView.swift; sourceTree = "<group>"; };
 		A20000000000000000000050 /* TripCompletedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripCompletedView.swift; sourceTree = "<group>"; };
+		A20000000000000000000051 /* SessionGuardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGuardView.swift; sourceTree = "<group>"; };
+		A20000000000000000000052 /* GooglePlacesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooglePlacesService.swift; sourceTree = "<group>"; };
+		A20000000000000000000053 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
+		A20000000000000000000054 /* SupportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportService.swift; sourceTree = "<group>"; };
+		A20000000000000000000055 /* PromoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromoModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000056 /* PlaceSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSearchView.swift; sourceTree = "<group>"; };
+		A20000000000000000000057 /* RideChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideChatView.swift; sourceTree = "<group>"; };
+		A20000000000000000000058 /* SupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportView.swift; sourceTree = "<group>"; };
+		A20000000000000000000059 /* RideHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideHistoryView.swift; sourceTree = "<group>"; };
+		A20000000000000000000060 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -169,6 +189,7 @@
 				A20000000000000000000002 /* AppState.swift */,
 				A20000000000000000000003 /* RootView.swift */,
 				A20000000000000000000025 /* AppShellView.swift */,
+				A20000000000000000000051 /* SessionGuardView.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -196,6 +217,7 @@
 				A40000000000000000000019 /* Customer */,
 				A40000000000000000000020 /* Driver */,
 				A40000000000000000000015 /* Profile */,
+				A40000000000000000000021 /* Shared */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -234,6 +256,7 @@
 				A20000000000000000000026 /* DriverModels.swift */,
 				A20000000000000000000036 /* RideModels.swift */,
 				A20000000000000000000037 /* PricingModels.swift */,
+				A20000000000000000000055 /* PromoModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -252,6 +275,9 @@
 				A20000000000000000000040 /* RideRepository.swift */,
 				A20000000000000000000046 /* CommissionService.swift */,
 				A20000000000000000000047 /* DriverLocationPublisher.swift */,
+				A20000000000000000000052 /* GooglePlacesService.swift */,
+				A20000000000000000000053 /* ChatService.swift */,
+				A20000000000000000000054 /* SupportService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -282,6 +308,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000032 /* ProfileView.swift */,
+				A20000000000000000000060 /* EditProfileView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -318,8 +345,19 @@
 				A20000000000000000000044 /* BookRideView.swift */,
 				A20000000000000000000045 /* CustomerActiveRideShell.swift */,
 				A20000000000000000000050 /* TripCompletedView.swift */,
+				A20000000000000000000056 /* PlaceSearchView.swift */,
 			);
 			path = Customer;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000021 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000057 /* RideChatView.swift */,
+				A20000000000000000000058 /* SupportView.swift */,
+				A20000000000000000000059 /* RideHistoryView.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000020 /* Driver */ = {
@@ -459,6 +497,16 @@
 				A10000000000000000000052 /* DriverAppEntryView.swift in Sources */,
 				A10000000000000000000053 /* DriverHomeView.swift in Sources */,
 				A10000000000000000000054 /* TripCompletedView.swift in Sources */,
+				A10000000000000000000055 /* SessionGuardView.swift in Sources */,
+				A10000000000000000000056 /* GooglePlacesService.swift in Sources */,
+				A10000000000000000000057 /* ChatService.swift in Sources */,
+				A10000000000000000000058 /* SupportService.swift in Sources */,
+				A10000000000000000000059 /* PromoModels.swift in Sources */,
+				A10000000000000000000060 /* PlaceSearchView.swift in Sources */,
+				A10000000000000000000061 /* RideChatView.swift in Sources */,
+				A10000000000000000000062 /* SupportView.swift in Sources */,
+				A10000000000000000000063 /* RideHistoryView.swift in Sources */,
+				A10000000000000000000064 /* EditProfileView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -508,7 +556,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 66;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -540,7 +588,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 66;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;

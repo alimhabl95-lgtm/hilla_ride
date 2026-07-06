@@ -36,6 +36,14 @@ struct ProfileView: View {
                             value: driver.approvalStatus.rawValue.capitalized
                         )
                     }
+
+                    NavigationLink {
+                        EditProfileView()
+                    } label: {
+                        Text(L10n.string(.editProfileTitle, language: appState.language))
+                            .font(.subheadline.bold())
+                            .foregroundStyle(BrandColors.tealDark)
+                    }
                 }
 
                 Divider().padding(.vertical, 8)

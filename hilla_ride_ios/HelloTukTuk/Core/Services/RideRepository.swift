@@ -71,7 +71,10 @@ final class RideRepository {
         districtId: String,
         subDistrictId: String,
         fareAmountIqd: Int,
-        distanceKm: Double
+        distanceKm: Double,
+        originalFareIqd: Int = 0,
+        promoDiscountIqd: Int = 0,
+        promoCode: String = ""
     ) async throws -> Ride {
         guard RideLocationRules.areDistinct(pickup.coordinate, destination.coordinate) else {
             throw RideServiceError.pickupDestinationSame
@@ -84,7 +87,7 @@ final class RideRepository {
 
         let rideId = UUID().uuidString
         let rideRef = firestore.collection("rides").document(rideId)
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "customerId": customerId,
             "pickupLabel": pickup.label,
             "destinationLabel": destination.label,
@@ -100,6 +103,15 @@ final class RideRepository {
             "distanceKm": distanceKm,
             "createdAt": FieldValue.serverTimestamp()
         ]
+        if originalFareIqd > 0 {
+            payload["originalFareIqd"] = originalFareIqd
+        }
+        if promoDiscountIqd > 0 {
+            payload["promoDiscountIqd"] = promoDiscountIqd
+        }
+        if !promoCode.isEmpty {
+            payload["promoCode"] = promoCode
+        }
 
         try await rideRef.setData(payload)
 
@@ -328,7 +340,44 @@ final class RideRepository {
                     "hasActiveRide": false
                 ], forDocument: driverRef)
             }
+
+            let customerId = data["customerId"] as? String
+            let promoCode = data["promoCode"] as? String ?? ""
+            let promoDiscount = (data["promoDiscountIqd"] as? NSNumber)?.intValue ?? 0
+            if let customerId, !customerId.isEmpty, !promoCode.isEmpty, promoDiscount > 0 {
+                let userRef = self.firestore.collection("users").document(customerId)
+                transaction.updateData([
+                    "promoRidesUsed": FieldValue.increment(1)
+                ], forDocument: userRef)
+            }
             return nil
+        }
+    }
+
+    func watchRideHistoryForCustomer(customerId: String) -> AsyncStream<[Ride]> {
+        watchRideHistory(queryField: "customerId", id: customerId)
+    }
+
+    func watchRideHistoryForDriver(driverId: String) -> AsyncStream<[Ride]> {
+        watchRideHistory(queryField: "driverId", id: driverId)
+    }
+
+    private func watchRideHistory(queryField: String, id: String) -> AsyncStream<[Ride]> {
+        AsyncStream { continuation in
+            let listener = firestore.collection("rides")
+                .whereField(queryField, isEqualTo: id)
+                .order(by: "createdAt", descending: true)
+                .limit(to: 40)
+                .addSnapshotListener { snapshot, _ in
+                    let rides = snapshot?.documents.compactMap { doc in
+                        Ride(documentID: doc.documentID, data: doc.data())
+                    } ?? []
+                    let history = rides.filter {
+                        $0.status == .completed || $0.status == .cancelled
+                    }
+                    continuation.yield(history)
+                }
+            continuation.onTermination = { _ in listener.remove() }
         }
     }
 

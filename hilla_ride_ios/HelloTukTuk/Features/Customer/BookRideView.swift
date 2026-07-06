@@ -11,6 +11,7 @@ struct BookRideView: View {
     let subDistrictId: String
 
     @State private var quote: RideQuote?
+    @State private var promo: PromoApplication?
     @State private var isLoadingQuote = true
     @State private var isBooking = false
     @State private var errorMessage: String?
@@ -41,10 +42,29 @@ struct BookRideView: View {
                             title: L10n.string(.distance, language: appState.language),
                             value: String(format: "%.1f km", quote.distanceKm)
                         )
-                        summaryRow(
-                            title: L10n.string(.estimatedFare, language: appState.language),
-                            value: formatIqd(quote.fareIqd ?? 0)
-                        )
+                        if let promo, promo.hasDiscount, let baseFare = quote.fareIqd {
+                            summaryRow(
+                                title: L10n.string(.estimatedFare, language: appState.language),
+                                value: formatIqd(baseFare)
+                            )
+                            .strikethrough()
+                            Text(L10n.promoDiscountApplied(
+                                code: promo.promoCode,
+                                amount: formatIqd(promo.discountIqd),
+                                language: appState.language
+                            ))
+                                .font(.footnote)
+                                .foregroundStyle(BrandColors.gold)
+                            summaryRow(
+                                title: L10n.string(.finalFare, language: appState.language),
+                                value: formatIqd(promo.finalFareIqd)
+                            )
+                        } else {
+                            summaryRow(
+                                title: L10n.string(.estimatedFare, language: appState.language),
+                                value: formatIqd(quote.fareIqd ?? 0)
+                            )
+                        }
                     }
                 }
 
@@ -95,16 +115,25 @@ struct BookRideView: View {
         defer { isLoadingQuote = false }
 
         let pricing = PricingService()
-        quote = await pricing.quoteRide(
+        let rideQuote = await pricing.quoteRide(
             pickup: pickup.coordinate,
             destination: destination.coordinate,
             districtId: districtId,
             subDistrictId: subDistrictId
         )
+        quote = rideQuote
+
+        if let baseFare = rideQuote.fareIqd, user.hasPromoRemaining {
+            let config = await PromoService().getPromoCode(user.promoCode)
+            promo = PromoService().applyPromo(user: user, config: config, baseFareIqd: baseFare)
+        } else {
+            promo = nil
+        }
     }
 
     private func bookRide() async {
-        guard let quote, let fare = quote.fareIqd else { return }
+        guard let quote, let baseFare = quote.fareIqd else { return }
+        let finalFare = promo?.hasDiscount == true ? promo!.finalFareIqd : baseFare
         errorMessage = nil
         isBooking = true
         defer { isBooking = false }
@@ -117,8 +146,11 @@ struct BookRideView: View {
                 destination: destination,
                 districtId: districtId,
                 subDistrictId: subDistrictId,
-                fareAmountIqd: fare,
-                distanceKm: quote.distanceKm
+                fareAmountIqd: finalFare,
+                distanceKm: quote.distanceKm,
+                originalFareIqd: promo?.hasDiscount == true ? baseFare : 0,
+                promoDiscountIqd: promo?.discountIqd ?? 0,
+                promoCode: promo?.promoCode ?? ""
             )
             dismiss()
         } catch {

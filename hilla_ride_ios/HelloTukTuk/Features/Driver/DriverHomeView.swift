@@ -11,6 +11,9 @@ struct DriverHomeView: View {
     @State private var isUpdatingOnline = false
     @State private var errorMessage: String?
     @State private var showProfile = false
+    @State private var showHistory = false
+    @State private var showSupport = false
+    @State private var showChat = false
 
     private var currentDriver: DriverProfile {
         liveDriver ?? driver
@@ -30,7 +33,24 @@ struct DriverHomeView: View {
                     LanguageToggle()
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
+                        if activeRide != nil {
+                            Button {
+                                showChat = true
+                            } label: {
+                                Image(systemName: "message.fill")
+                            }
+                        }
+                        Button {
+                            showHistory = true
+                        } label: {
+                            Image(systemName: "clock.arrow.circlepath")
+                        }
+                        Button {
+                            showSupport = true
+                        } label: {
+                            Image(systemName: "lifepreserver")
+                        }
                         onlineToggle
                         Button {
                             showProfile = true
@@ -42,6 +62,17 @@ struct DriverHomeView: View {
             }
             .navigationDestination(isPresented: $showProfile) {
                 ProfileView()
+            }
+            .navigationDestination(isPresented: $showHistory) {
+                RideHistoryView(customerId: nil, driverId: driver.uid)
+            }
+            .navigationDestination(isPresented: $showSupport) {
+                SupportView()
+            }
+            .navigationDestination(isPresented: $showChat) {
+                if let ride = activeRide {
+                    RideChatView(rideId: ride.id)
+                }
             }
         }
         .onAppear { startWatching() }

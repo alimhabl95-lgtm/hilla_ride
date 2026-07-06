@@ -11,6 +11,10 @@ struct CustomerHomeMapView: View {
     @State private var destination: MapPlace?
     @State private var showBookRide = false
     @State private var showProfile = false
+    @State private var showPickupSearch = false
+    @State private var showDestinationSearch = false
+    @State private var showHistory = false
+    @State private var showSupport = false
     @State private var errorMessage: String?
 
     private var subDistrict: BabilSubDistrict {
@@ -42,10 +46,22 @@ struct CustomerHomeMapView: View {
                     LanguageToggle()
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showProfile = true
-                    } label: {
-                        Image(systemName: "person.circle")
+                    HStack(spacing: 8) {
+                        Button {
+                            showHistory = true
+                        } label: {
+                            Image(systemName: "clock.arrow.circlepath")
+                        }
+                        Button {
+                            showSupport = true
+                        } label: {
+                            Image(systemName: "lifepreserver")
+                        }
+                        Button {
+                            showProfile = true
+                        } label: {
+                            Image(systemName: "person.circle")
+                        }
                     }
                 }
             }
@@ -62,6 +78,32 @@ struct CustomerHomeMapView: View {
             }
             .navigationDestination(isPresented: $showProfile) {
                 ProfileView()
+            }
+            .navigationDestination(isPresented: $showHistory) {
+                RideHistoryView(customerId: user.uid, driverId: nil)
+            }
+            .navigationDestination(isPresented: $showSupport) {
+                SupportView()
+            }
+            .navigationDestination(isPresented: $showPickupSearch) {
+                PlaceSearchView(
+                    title: L10n.string(.pickupLabel, language: appState.language),
+                    center: subDistrict.center,
+                    radiusKm: 12,
+                    onSelect: { place in
+                        pickup = place
+                    }
+                )
+            }
+            .navigationDestination(isPresented: $showDestinationSearch) {
+                PlaceSearchView(
+                    title: L10n.string(.destinationLabel, language: appState.language),
+                    center: destination?.coordinate ?? pickup?.coordinate ?? subDistrict.center,
+                    radiusKm: 12,
+                    onSelect: { place in
+                        destination = place
+                    }
+                )
             }
             .task {
                 locationService.requestAuthorizationIfNeeded()
@@ -95,19 +137,29 @@ struct CustomerHomeMapView: View {
             }
             .pickerStyle(.menu)
 
-            locationRow(
-                icon: "circle.fill",
-                color: .green,
-                title: L10n.string(.pickupLabel, language: appState.language),
-                value: pickup?.label ?? L10n.string(.selectPickup, language: appState.language)
-            )
+            Button {
+                showPickupSearch = true
+            } label: {
+                locationRow(
+                    icon: "circle.fill",
+                    color: .green,
+                    title: L10n.string(.pickupLabel, language: appState.language),
+                    value: pickup?.label ?? L10n.string(.selectPickup, language: appState.language)
+                )
+            }
+            .buttonStyle(.plain)
 
-            locationRow(
-                icon: "mappin.circle.fill",
-                color: .red,
-                title: L10n.string(.destinationLabel, language: appState.language),
-                value: destination?.label ?? L10n.string(.selectDestination, language: appState.language)
-            )
+            Button {
+                showDestinationSearch = true
+            } label: {
+                locationRow(
+                    icon: "mappin.circle.fill",
+                    color: .red,
+                    title: L10n.string(.destinationLabel, language: appState.language),
+                    value: destination?.label ?? L10n.string(.selectDestination, language: appState.language)
+                )
+            }
+            .buttonStyle(.plain)
 
             if let errorMessage {
                 Text(errorMessage)
@@ -144,8 +196,11 @@ struct CustomerHomeMapView: View {
                 Text(value)
                     .font(.subheadline)
                     .lineLimit(2)
+                    .foregroundStyle(BrandColors.navy)
             }
             Spacer()
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
         }
     }
 

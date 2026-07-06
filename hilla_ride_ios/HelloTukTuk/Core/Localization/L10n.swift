@@ -141,11 +141,36 @@ enum L10nKey {
     case submitRating
     case done
     case rideCancelled
+    case searchPlacesHint
+    case finalFare
+    case noDriversInDistrict
+    case rideChatTitle
+    case chatHint
+    case send
+    case supportTitle
+    case supportMessageHint
+    case supportMessageSent
+    case rideHistoryTitle
+    case noRideHistory
+    case editProfileTitle
+    case saveProfileButton
+    case profileSaved
+    case accountBlockedTitle
+    case accountBlockedMessage
 }
 
 enum L10n {
     static func string(_ key: L10nKey, language: AppLanguage = .arabic) -> String {
         table[key]?[language] ?? table[key]?[.english] ?? String(describing: key)
+    }
+
+    static func promoDiscountApplied(code: String, amount: String, language: AppLanguage) -> String {
+        switch language {
+        case .english:
+            return "\(code): you save \(amount)"
+        case .arabic:
+            return "\(code): توفر \(amount)"
+        }
     }
 
     private static let table: [L10nKey: [AppLanguage: String]] = [
@@ -296,8 +321,8 @@ enum L10n {
         .destinationLabel: [.english: "Destination", .arabic: "الوجهة"],
         .bookRide: [.english: "Book ride", .arabic: "احجز مشوار"],
         .bookRideTitle: [.english: "Confirm your ride", .arabic: "تأكيد المشوار"],
-        .selectPickup: [.english: "Set pickup first", .arabic: "حدد نقطة الانطلاق"],
-        .selectDestination: [.english: "Long-press map to set destination", .arabic: "اضغط مطولاً على الخريطة لتحديد الوجهة"],
+        .selectPickup: [.english: "Tap to search pickup", .arabic: "اضغط للبحث عن نقطة الانطلاق"],
+        .selectDestination: [.english: "Tap to search or long-press map", .arabic: "اضغط للبحث أو اضغط مطولاً على الخريطة"],
         .useMyLocation: [.english: "Use my location", .arabic: "استخدم موقعي"],
         .subDistrict: [.english: "Area", .arabic: "المنطقة"],
         .estimatedFare: [.english: "Estimated fare", .arabic: "الأجرة التقديرية"],
@@ -372,6 +397,28 @@ enum L10n {
         .feedbackOptional: [.english: "Feedback (optional)", .arabic: "ملاحظات (اختياري)"],
         .submitRating: [.english: "Submit rating", .arabic: "إرسال التقييم"],
         .done: [.english: "Done", .arabic: "تم"],
-        .rideCancelled: [.english: "Ride cancelled", .arabic: "تم إلغاء المشوار"]
+        .rideCancelled: [.english: "Ride cancelled", .arabic: "تم إلغاء المشوار"],
+        .searchPlacesHint: [.english: "Search places in Hilla", .arabic: "ابحث عن أماكن في الحلة"],
+        .finalFare: [.english: "Your fare", .arabic: "أجرتك"],
+        .noDriversInDistrict: [
+            .english: "No drivers are online in this city right now. We will keep searching.",
+            .arabic: "لا يوجد سائقون متصلون في هذه المدينة حالياً. سنواصل البحث."
+        ],
+        .rideChatTitle: [.english: "Ride chat", .arabic: "محادثة المشوار"],
+        .chatHint: [.english: "Type a message", .arabic: "اكتب رسالة"],
+        .send: [.english: "Send", .arabic: "إرسال"],
+        .supportTitle: [.english: "Support", .arabic: "الدعم"],
+        .supportMessageHint: [.english: "Describe your issue", .arabic: "صف مشكلتك"],
+        .supportMessageSent: [.english: "Message sent. We will contact you soon.", .arabic: "تم إرسال الرسالة. سنتواصل معك قريباً."],
+        .rideHistoryTitle: [.english: "My trips", .arabic: "رحلاتي"],
+        .noRideHistory: [.english: "No trips yet", .arabic: "لا توجد رحلات بعد"],
+        .editProfileTitle: [.english: "Edit profile", .arabic: "تعديل الملف"],
+        .saveProfileButton: [.english: "Save profile", .arabic: "حفظ الملف"],
+        .profileSaved: [.english: "Profile updated", .arabic: "تم تحديث الملف"],
+        .accountBlockedTitle: [.english: "Account blocked", .arabic: "الحساب محظور"],
+        .accountBlockedMessage: [
+            .english: "Your account has been blocked. Contact support for help.",
+            .arabic: "تم حظر حسابك. تواصل مع الدعم للمساعدة."
+        ]
     ]
 }

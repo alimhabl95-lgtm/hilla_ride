@@ -49,4 +49,33 @@ final class SessionService {
         }
         clearLocalSession(uid: uid)
     }
+
+    func validateLocalSession(uid: String) async throws -> Bool {
+        let remote = try await readRemoteSession(uid: uid)
+        if remote == nil {
+            try await claimSession(uid: uid)
+            return true
+        }
+        guard let local = readLocalSession(uid: uid), local == remote else {
+            return false
+        }
+        return true
+    }
+
+    func isSessionValid(uid: String) async -> Bool {
+        guard let remote = try? await readRemoteSession(uid: uid) else { return true }
+        guard let local = readLocalSession(uid: uid) else { return false }
+        return local == remote
+    }
+
+    func watchRemoteSession(uid: String) -> AsyncStream<String?> {
+        AsyncStream { continuation in
+            let listener = firestore.collection("users").document(uid)
+                .addSnapshotListener { snapshot, _ in
+                    let value = snapshot?.data()?["activeSessionId"] as? String
+                    continuation.yield(value?.isEmpty == false ? value : nil)
+                }
+            continuation.onTermination = { _ in listener.remove() }
+        }
+    }
 }
