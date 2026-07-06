@@ -49,10 +49,6 @@ workflows:
           keychain add-certificates
           echo "Code signing identities in keychain:"
           security find-identity -v -p codesigning || true
-      - name: Create matching App Store provisioning profile
-        script: |
-          set -euo pipefail
-          bash "$CM_BUILD_DIR/hilla_ride_ios/scripts/create_appstore_profile.sh" "$BUNDLE_ID"
       - name: Apply signing to native Xcode project only
         script: |
           set -euo pipefail
