@@ -19,6 +19,11 @@ struct RideHistoryView: View {
                 Text(formatIqd(ride.fareAmountIqd))
                     .font(.headline)
                     .foregroundStyle(BrandColors.tealDark)
+                if ride.driverEarningsIqd > 0 {
+                    Text("\(L10n.string(.driverNetEarnings, language: appState.language)): \(formatIqd(ride.driverEarningsIqd))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(.vertical, 4)
         }

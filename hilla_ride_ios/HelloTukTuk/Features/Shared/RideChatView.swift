@@ -43,8 +43,14 @@ struct RideChatView: View {
         }
         .navigationTitle(L10n.string(.rideChatTitle, language: appState.language))
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { startWatching() }
-        .onDisappear { chatTask?.cancel() }
+        .onAppear {
+            RideAlertService.shared.setForegroundChatRideId(rideId)
+            startWatching()
+        }
+        .onDisappear {
+            RideAlertService.shared.setForegroundChatRideId(nil)
+            chatTask?.cancel()
+        }
     }
 
     private func chatBubble(_ message: RideMessage) -> some View {

@@ -13,7 +13,10 @@ struct DriverHomeView: View {
     @State private var showProfile = false
     @State private var showHistory = false
     @State private var showSupport = false
+    @State private var showAnnouncements = false
     @State private var showChat = false
+    @State private var monthlyStats: DriverMonthlyStats?
+    @State private var statsTask: Task<Void, Never>?
 
     private var currentDriver: DriverProfile {
         liveDriver ?? driver
@@ -41,6 +44,9 @@ struct DriverHomeView: View {
                                 Image(systemName: "message.fill")
                             }
                         }
+                        CurrentRideIconButton(role: .driver)
+                        AnnouncementIconButton(showAnnouncements: $showAnnouncements)
+                        LegalDocumentsMenu()
                         Button {
                             showHistory = true
                         } label: {
@@ -68,6 +74,9 @@ struct DriverHomeView: View {
             }
             .navigationDestination(isPresented: $showSupport) {
                 SupportView()
+            }
+            .navigationDestination(isPresented: $showAnnouncements) {
+                AnnouncementsView()
             }
             .navigationDestination(isPresented: $showChat) {
                 if let ride = activeRide {
@@ -98,46 +107,88 @@ struct DriverHomeView: View {
     }
 
     private var idleDriverPanel: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "car.side.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(BrandColors.gold)
+        ScrollView {
+            VStack(spacing: 16) {
+                Image(systemName: "car.side.fill")
+                    .font(.system(size: 56))
+                    .foregroundStyle(BrandColors.gold)
 
-            Text(L10n.string(.driverHomeTitle, language: appState.language))
-                .font(.title2.bold())
+                Text(L10n.string(.driverHomeTitle, language: appState.language))
+                    .font(.title2.bold())
 
-            Text(currentDriver.name)
-                .font(.title3)
+                Text(currentDriver.name)
+                    .font(.title3)
 
-            if !currentDriver.hasAssignedWorkArea {
-                Text(L10n.string(.driverWorkAreaRequired, language: appState.language))
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            } else if !currentDriver.isOnline {
-                Text(L10n.string(.driverGoOnlineHint, language: appState.language))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            } else {
-                Text(L10n.string(.driverWaitingForRequests, language: appState.language))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                if let monthlyStats {
+                    monthlyPrizeCard(stats: monthlyStats)
+                }
+
+                earningsCard(driver: currentDriver)
+
+                if !currentDriver.hasAssignedWorkArea {
+                    Text(L10n.string(.driverWorkAreaRequired, language: appState.language))
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                } else if !currentDriver.isOnline {
+                    Text(L10n.string(.driverGoOnlineHint, language: appState.language))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                } else {
+                    Text(L10n.string(.driverWaitingForRequests, language: appState.language))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
             }
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
+            .padding(24)
         }
-        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
+    }
+
+    private func monthlyPrizeCard(stats: DriverMonthlyStats) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(L10n.string(.driverMonthlyPrizeTitle, language: appState.language), systemImage: "trophy.fill")
+                .font(.headline)
+                .foregroundStyle(BrandColors.gold)
+            Text(L10n.driverMonthlyRideCount(stats.rideCount, language: appState.language))
+                .font(.title2.bold())
+            Text(L10n.driverMonthlyRank(stats.rank, stats.totalDrivers, language: appState.language))
+                .font(.subheadline)
+            Text(L10n.driverMonthlyPrizeAmount(formatIqd(stats.prizeAmountIqd), language: appState.language))
+                .font(.subheadline)
+                .foregroundStyle(BrandColors.gold)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(BrandColors.teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func earningsCard(driver: DriverProfile) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.string(.yourEarningsTitle, language: appState.language))
+                .font(.headline)
+            Text("\(L10n.string(.completedRidesCount, language: appState.language)): \(driver.completedRidesCount)")
+            Text("\(L10n.string(.driverNetEarnings, language: appState.language)): \(formatIqd(driver.totalDriverEarningsIqd))")
+            Text("\(L10n.string(.owedToPlatformLabel, language: appState.language)): \(formatIqd(driver.outstandingPlatformCommissionIqd))")
+            if driver.pendingBonusIqd > 0 {
+                Text("\(L10n.string(.pendingBonusLabel, language: appState.language)): \(formatIqd(driver.pendingBonusIqd))")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
     @ViewBuilder
@@ -246,11 +297,18 @@ struct DriverHomeView: View {
                 await MainActor.run { activeRide = ride }
             }
         }
+        statsTask = Task {
+            for await stats in MonthlyPrizeService().watchDriverStats(driverId: driverId) {
+                guard !Task.isCancelled else { break }
+                await MainActor.run { monthlyStats = stats }
+            }
+        }
     }
 
     private func stopWatching() {
         driverTask?.cancel()
         rideTask?.cancel()
+        statsTask?.cancel()
     }
 
     private func setOnline(_ value: Bool) async {

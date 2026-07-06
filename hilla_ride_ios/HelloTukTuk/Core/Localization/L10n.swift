@@ -157,6 +157,24 @@ enum L10nKey {
     case profileSaved
     case accountBlockedTitle
     case accountBlockedMessage
+    case driverAcceptedAlertTitle
+    case driverAcceptedAlertBody
+    case chatWithDriver
+    case chatWithCustomer
+    case savedPlacesTitle
+    case savedPlacesEmptyHint
+    case savedPlaceAdded
+    case deleteSavedPlace
+    case announcementsTitle
+    case announcementsEmpty
+    case legalDocumentsTitle
+    case driverMonthlyPrizeTitle
+    case yourEarningsTitle
+    case completedRidesCount
+    case driverNetEarnings
+    case owedToPlatformLabel
+    case pendingBonusLabel
+    case supportPreviousMessages
 }
 
 enum L10n {
@@ -170,6 +188,27 @@ enum L10n {
             return "\(code): you save \(amount)"
         case .arabic:
             return "\(code): توفر \(amount)"
+        }
+    }
+
+    static func driverMonthlyRideCount(_ count: Int, language: AppLanguage) -> String {
+        switch language {
+        case .english: return "\(count) rides this month"
+        case .arabic: return "\(count) مشاوير هذا الشهر"
+        }
+    }
+
+    static func driverMonthlyRank(_ rank: Int, _ total: Int, language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Rank \(rank) of \(total) drivers"
+        case .arabic: return "الترتيب \(rank) من \(total) سائق"
+        }
+    }
+
+    static func driverMonthlyPrizeAmount(_ amount: String, language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Monthly prize: \(amount)"
+        case .arabic: return "جائزة الشهر: \(amount)"
         }
     }
 
@@ -419,6 +458,24 @@ enum L10n {
         .accountBlockedMessage: [
             .english: "Your account has been blocked. Contact support for help.",
             .arabic: "تم حظر حسابك. تواصل مع الدعم للمساعدة."
-        ]
+        ],
+        .driverAcceptedAlertTitle: [.english: "Driver accepted", .arabic: "قبل السائق المشوار"],
+        .driverAcceptedAlertBody: [.english: "Your driver is on the way", .arabic: "السائق في الطريق إليك"],
+        .chatWithDriver: [.english: "Message from driver", .arabic: "رسالة من السائق"],
+        .chatWithCustomer: [.english: "Message from customer", .arabic: "رسالة من الزبون"],
+        .savedPlacesTitle: [.english: "Saved places", .arabic: "الأماكن المحفوظة"],
+        .savedPlacesEmptyHint: [.english: "Save places from search to reuse them quickly.", .arabic: "احفظ الأماكن من البحث لاستخدامها لاحقاً."],
+        .savedPlaceAdded: [.english: "Place saved", .arabic: "تم حفظ المكان"],
+        .deleteSavedPlace: [.english: "Remove", .arabic: "حذف"],
+        .announcementsTitle: [.english: "Announcements", .arabic: "الإعلانات"],
+        .announcementsEmpty: [.english: "No announcements yet", .arabic: "لا توجد إعلانات بعد"],
+        .legalDocumentsTitle: [.english: "Legal documents", .arabic: "المستندات القانونية"],
+        .driverMonthlyPrizeTitle: [.english: "Monthly prize", .arabic: "جائزة الشهر"],
+        .yourEarningsTitle: [.english: "Your earnings", .arabic: "أرباحك"],
+        .completedRidesCount: [.english: "Completed rides", .arabic: "المشاوير المكتملة"],
+        .driverNetEarnings: [.english: "Net earnings", .arabic: "صافي الأرباح"],
+        .owedToPlatformLabel: [.english: "Owed to platform", .arabic: "المستحق للمنصة"],
+        .pendingBonusLabel: [.english: "Pending bonus", .arabic: "مكافأة معلّقة"],
+        .supportPreviousMessages: [.english: "Previous messages", .arabic: "الرسائل السابقة"]
     ]
 }

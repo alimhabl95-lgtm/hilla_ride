@@ -25,6 +25,25 @@ struct SupportContactInfo {
     }
 }
 
+struct SupportMessage: Identifiable, Equatable {
+    let id: String
+    let message: String
+    let isFromManager: Bool
+    let createdAt: Date?
+
+    init?(documentID: String, data: [String: Any]) {
+        id = documentID
+        message = data["message"] as? String ?? ""
+        isFromManager = data["isFromManager"] as? Bool ?? false
+        if let timestamp = data["createdAt"] as? Timestamp {
+            createdAt = timestamp.dateValue()
+        } else {
+            createdAt = nil
+        }
+        guard !message.isEmpty else { return nil }
+    }
+}
+
 final class SupportService {
     private let firestore = Firestore.firestore()
 
@@ -57,5 +76,21 @@ final class SupportService {
             "status": "open",
             "createdAt": FieldValue.serverTimestamp()
         ])
+    }
+
+    func watchUserMessages(userId: String) -> AsyncStream<[SupportMessage]> {
+        AsyncStream { continuation in
+            let listener = firestore.collection("support_messages")
+                .whereField("userId", isEqualTo: userId)
+                .order(by: "createdAt", descending: false)
+                .limit(to: 50)
+                .addSnapshotListener { snapshot, _ in
+                    let messages = snapshot?.documents.compactMap { doc in
+                        SupportMessage(documentID: doc.documentID, data: doc.data())
+                    } ?? []
+                    continuation.yield(messages)
+                }
+            continuation.onTermination = { _ in listener.remove() }
+        }
     }
 }

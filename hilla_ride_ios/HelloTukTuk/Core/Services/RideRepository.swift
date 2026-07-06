@@ -352,6 +352,10 @@ final class RideRepository {
             }
             return nil
         }
+
+        if let driverId = (try? await rideRef.getDocument())?.data()?["driverId"] as? String {
+            await MonthlyPrizeService().incrementDriverMonthlyRide(driverId: driverId)
+        }
     }
 
     func watchRideHistoryForCustomer(customerId: String) -> AsyncStream<[Ride]> {

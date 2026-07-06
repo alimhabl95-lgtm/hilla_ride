@@ -15,6 +15,7 @@ struct CustomerHomeMapView: View {
     @State private var showDestinationSearch = false
     @State private var showHistory = false
     @State private var showSupport = false
+    @State private var showAnnouncements = false
     @State private var errorMessage: String?
 
     private var subDistrict: BabilSubDistrict {
@@ -47,6 +48,9 @@ struct CustomerHomeMapView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
+                        CurrentRideIconButton(role: .customer)
+                        AnnouncementIconButton(showAnnouncements: $showAnnouncements)
+                        LegalDocumentsMenu()
                         Button {
                             showHistory = true
                         } label: {
@@ -84,6 +88,9 @@ struct CustomerHomeMapView: View {
             }
             .navigationDestination(isPresented: $showSupport) {
                 SupportView()
+            }
+            .navigationDestination(isPresented: $showAnnouncements) {
+                AnnouncementsView()
             }
             .navigationDestination(isPresented: $showPickupSearch) {
                 PlaceSearchView(
@@ -136,6 +143,10 @@ struct CustomerHomeMapView: View {
                 }
             }
             .pickerStyle(.menu)
+
+            SavedPlacesBar { place in
+                destination = place
+            }
 
             Button {
                 showPickupSearch = true

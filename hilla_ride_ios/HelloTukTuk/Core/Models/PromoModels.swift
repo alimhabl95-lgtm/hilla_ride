@@ -46,7 +46,54 @@ struct PromoApplication {
     var hasDiscount: Bool { discountIqd > 0 && !promoCode.isEmpty }
 }
 
-final class PromoService {
+struct MonthlyPrizeConfig: Equatable {
+    let prizeAmountIqd: Int
+    let monthKey: String
+    let winnerDriverId: String
+    let winnerPaid: Bool
+
+    static let defaultPrizeIqd = 50_000
+
+    static func currentMonthKey(from date: Date = Date()) -> String {
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: date)
+        let month = calendar.component(.month, from: date)
+        return String(format: "%04d-%02d", year, month)
+    }
+
+    init(
+        prizeAmountIqd: Int = defaultPrizeIqd,
+        monthKey: String = MonthlyPrizeConfig.currentMonthKey(),
+        winnerDriverId: String = "",
+        winnerPaid: Bool = false
+    ) {
+        self.prizeAmountIqd = prizeAmountIqd
+        self.monthKey = monthKey
+        self.winnerDriverId = winnerDriverId
+        self.winnerPaid = winnerPaid
+    }
+
+    init(data: [String: Any]?) {
+        guard let data else {
+            self = MonthlyPrizeConfig()
+            return
+        }
+        prizeAmountIqd = (data["prizeAmountIqd"] as? NSNumber)?.intValue ?? Self.defaultPrizeIqd
+        monthKey = data["monthKey"] as? String ?? Self.currentMonthKey()
+        winnerDriverId = data["winnerDriverId"] as? String ?? ""
+        winnerPaid = data["winnerPaid"] as? Bool ?? false
+    }
+}
+
+struct DriverMonthlyStats: Equatable {
+    let rideCount: Int
+    let rank: Int
+    let totalDrivers: Int
+    let prizeAmountIqd: Int
+    let monthKey: String
+}
+
+final class MonthlyPrizeService {
     private let firestore = Firestore.firestore()
 
     func getPromoCode(_ code: String) async -> PromoCodeConfig {
@@ -79,6 +126,138 @@ final class PromoService {
             discountIqd: discount,
             finalFareIqd: finalFare,
             promoCode: config.code
+        )
+    }
+}
+
+struct MonthlyPrizeConfig: Equatable {
+    let prizeAmountIqd: Int
+    let monthKey: String
+    let winnerDriverId: String
+    let winnerPaid: Bool
+
+    static let defaultPrizeIqd = 50_000
+
+    static func currentMonthKey(from date: Date = Date()) -> String {
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: date)
+        let month = calendar.component(.month, from: date)
+        return String(format: "%04d-%02d", year, month)
+    }
+
+    init(
+        prizeAmountIqd: Int = defaultPrizeIqd,
+        monthKey: String = MonthlyPrizeConfig.currentMonthKey(),
+        winnerDriverId: String = "",
+        winnerPaid: Bool = false
+    ) {
+        self.prizeAmountIqd = prizeAmountIqd
+        self.monthKey = monthKey
+        self.winnerDriverId = winnerDriverId
+        self.winnerPaid = winnerPaid
+    }
+
+    init(data: [String: Any]?) {
+        guard let data else {
+            self = MonthlyPrizeConfig()
+            return
+        }
+        prizeAmountIqd = (data["prizeAmountIqd"] as? NSNumber)?.intValue ?? Self.defaultPrizeIqd
+        monthKey = data["monthKey"] as? String ?? Self.currentMonthKey()
+        winnerDriverId = data["winnerDriverId"] as? String ?? ""
+        winnerPaid = data["winnerPaid"] as? Bool ?? false
+    }
+}
+
+struct DriverMonthlyStats: Equatable {
+    let rideCount: Int
+    let rank: Int
+    let totalDrivers: Int
+    let prizeAmountIqd: Int
+    let monthKey: String
+}
+
+final class MonthlyPrizeService {
+    private let firestore = Firestore.firestore()
+
+    func getConfig() async -> MonthlyPrizeConfig {
+        do {
+            let doc = try await firestore.collection("config").document("monthly_prize").getDocument()
+            return MonthlyPrizeConfig(data: doc.data())
+        } catch {
+            return MonthlyPrizeConfig()
+        }
+    }
+
+    func watchDriverStats(driverId: String) -> AsyncStream<DriverMonthlyStats> {
+        AsyncStream { continuation in
+            let configListener = firestore.collection("config").document("monthly_prize")
+                .addSnapshotListener { _, _ in }
+            let driversListener = firestore.collection("drivers")
+                .addSnapshotListener { [weak self] snapshot, _ in
+                    guard let self else { return }
+                    Task {
+                        let config = await self.getConfig()
+                        let stats = self.buildStats(
+                            driverId: driverId,
+                            config: config,
+                            docs: snapshot?.documents ?? []
+                        )
+                        continuation.yield(stats)
+                    }
+                }
+            continuation.onTermination = { _ in
+                configListener.remove()
+                driversListener.remove()
+            }
+        }
+    }
+
+    func incrementDriverMonthlyRide(driverId: String) async {
+        guard !driverId.isEmpty else { return }
+        let monthKey = MonthlyPrizeConfig.currentMonthKey()
+        let ref = firestore.collection("drivers").document(driverId)
+        let snapshot = try? await ref.getDocument()
+        guard let data = snapshot?.data() else { return }
+        let currentKey = data["monthlyMonthKey"] as? String ?? ""
+        if currentKey != monthKey {
+            try? await ref.updateData([
+                "monthlyMonthKey": monthKey,
+                "monthlyRideCount": 1
+            ])
+        } else {
+            try? await ref.updateData([
+                "monthlyRideCount": FieldValue.increment(1)
+            ])
+        }
+    }
+
+    private func buildStats(
+        driverId: String,
+        config: MonthlyPrizeConfig,
+        docs: [QueryDocumentSnapshot]
+    ) -> DriverMonthlyStats {
+        var rows: [(id: String, name: String, count: Int)] = []
+        for doc in docs {
+            guard let driver = DriverProfile(documentID: doc.documentID, data: doc.data()),
+                  driver.isApproved,
+                  driver.monthlyMonthKey == config.monthKey,
+                  driver.monthlyRideCount > 0 else { continue }
+            rows.append((driver.uid, driver.name, driver.monthlyRideCount))
+        }
+        rows.sort {
+            if $0.count != $1.count { return $0.count > $1.count }
+            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        let rank = (rows.firstIndex { $0.id == driverId }).map { $0 + 1 }
+            ?? (rows.isEmpty ? 1 : rows.count + 1)
+        let rideCount = rows.first(where: { $0.id == driverId })?.count ?? 0
+        return DriverMonthlyStats(
+            rideCount: rideCount,
+            rank: rank,
+            totalDrivers: rows.count,
+            prizeAmountIqd: config.prizeAmountIqd,
+            monthKey: config.monthKey
         )
     }
 }

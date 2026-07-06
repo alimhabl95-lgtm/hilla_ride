@@ -7,6 +7,8 @@ struct SupportView: View {
     @State private var message = ""
     @State private var isSending = false
     @State private var sent = false
+    @State private var priorMessages: [SupportMessage] = []
+    @State private var messagesTask: Task<Void, Never>?
 
     var body: some View {
         ScrollView {
@@ -17,6 +19,29 @@ struct SupportView: View {
                 contactRow(icon: "phone.fill", value: contact.phone)
                 contactRow(icon: "message.fill", value: contact.whatsapp)
                 contactRow(icon: "envelope.fill", value: contact.email)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L10n.string(.legalDocumentsTitle, language: appState.language))
+                        .font(.headline)
+                    Link(L10n.string(.privacyPolicy, language: appState.language),
+                         destination: LegalConfig.privacyPolicyURL(languageCode: appState.language.rawValue))
+                    Link(L10n.string(.termsOfService, language: appState.language),
+                         destination: LegalConfig.termsOfServiceURL(languageCode: appState.language.rawValue))
+                }
+
+                if !priorMessages.isEmpty {
+                    Text(L10n.string(.supportPreviousMessages, language: appState.language))
+                        .font(.headline)
+                    ForEach(priorMessages) { item in
+                        VStack(alignment: item.isFromManager ? .leading : .trailing, spacing: 4) {
+                            Text(item.message)
+                                .padding(10)
+                                .background(item.isFromManager ? Color.gray.opacity(0.15) : BrandColors.teal.opacity(0.15))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .frame(maxWidth: .infinity, alignment: item.isFromManager ? .leading : .trailing)
+                    }
+                }
 
                 TextField(L10n.string(.supportMessageHint, language: appState.language), text: $message, axis: .vertical)
                     .textFieldStyle(AppTextFieldStyle())
@@ -40,6 +65,8 @@ struct SupportView: View {
         .task {
             contact = await SupportService().getContactInfo()
         }
+        .onAppear { startWatchingMessages() }
+        .onDisappear { messagesTask?.cancel() }
     }
 
     private func contactRow(icon: String, value: String) -> some View {
@@ -47,6 +74,16 @@ struct SupportView: View {
             Image(systemName: icon)
                 .foregroundStyle(BrandColors.teal)
             Text(value)
+        }
+    }
+
+    private func startWatchingMessages() {
+        guard let uid = appState.currentUser?.uid else { return }
+        messagesTask = Task {
+            for await batch in SupportService().watchUserMessages(userId: uid) {
+                guard !Task.isCancelled else { break }
+                await MainActor.run { priorMessages = batch }
+            }
         }
     }
 

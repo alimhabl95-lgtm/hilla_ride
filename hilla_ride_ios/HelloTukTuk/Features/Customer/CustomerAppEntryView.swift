@@ -32,6 +32,11 @@ struct CustomerAppEntryView: View {
                 sessionRideId = newId
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToCurrentRide)) { _ in
+            if let activeRide {
+                sessionRideId = activeRide.id
+            }
+        }
     }
 
     private func startWatchingActiveRide() {

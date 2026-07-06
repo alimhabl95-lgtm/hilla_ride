@@ -9,12 +9,20 @@ struct AppShellView: View {
                 BlockedUserView()
             } else {
                 SessionGuardView {
-                    roleContent
+                    RideAlertOverlay {
+                        roleContent
+                    }
                 }
             }
         }
         .task(id: appState.currentUser?.uid) {
             await appState.refreshDriverProfileIfNeeded()
+            if let user = appState.currentUser {
+                RideAlertService.shared.startListeners(uid: user.uid, role: user.role)
+            }
+        }
+        .onDisappear {
+            RideAlertService.shared.stopListeners()
         }
     }
 

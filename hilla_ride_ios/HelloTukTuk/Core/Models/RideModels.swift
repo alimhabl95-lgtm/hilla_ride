@@ -64,6 +64,8 @@ struct Ride: Identifiable, Equatable {
     let distanceKm: Double
     let offeredDriverIds: [String]
     let driverRating: Int?
+    let driverEarningsIqd: Int
+    let promoDiscountIqd: Int
 
     var pickupCoordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: pickupLat, longitude: pickupLng)
@@ -94,5 +96,7 @@ struct Ride: Identifiable, Equatable {
         distanceKm = (data["distanceKm"] as? NSNumber)?.doubleValue ?? 0
         offeredDriverIds = (data["offeredDriverIds"] as? [String]) ?? []
         driverRating = (data["driverRating"] as? NSNumber)?.intValue
+        driverEarningsIqd = (data["driverEarningsIqd"] as? NSNumber)?.intValue ?? 0
+        promoDiscountIqd = (data["promoDiscountIqd"] as? NSNumber)?.intValue ?? 0
     }
 }

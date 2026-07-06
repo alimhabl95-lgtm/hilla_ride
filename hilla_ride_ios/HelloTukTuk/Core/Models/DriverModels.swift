@@ -32,6 +32,11 @@ struct DriverProfile: Identifiable, Equatable {
     let assignedDistrictId: String
     let assignedSubDistrictId: String
     let completedRidesCount: Int
+    let totalDriverEarningsIqd: Int
+    let outstandingPlatformCommissionIqd: Int
+    let pendingBonusIqd: Int
+    let monthlyRideCount: Int
+    let monthlyMonthKey: String
 
     var id: String { uid }
     var isApproved: Bool { approvalStatus == .approved }
@@ -66,5 +71,10 @@ struct DriverProfile: Identifiable, Equatable {
         assignedDistrictId = data["assignedDistrictId"] as? String ?? ""
         assignedSubDistrictId = data["assignedSubDistrictId"] as? String ?? ""
         completedRidesCount = (data["completedRidesCount"] as? NSNumber)?.intValue ?? 0
+        totalDriverEarningsIqd = (data["totalDriverEarningsIqd"] as? NSNumber)?.intValue ?? 0
+        outstandingPlatformCommissionIqd = (data["outstandingPlatformCommissionIqd"] as? NSNumber)?.intValue ?? 0
+        pendingBonusIqd = (data["pendingBonusIqd"] as? NSNumber)?.intValue ?? 0
+        monthlyRideCount = (data["monthlyRideCount"] as? NSNumber)?.intValue ?? 0
+        monthlyMonthKey = data["monthlyMonthKey"] as? String ?? ""
     }
 }

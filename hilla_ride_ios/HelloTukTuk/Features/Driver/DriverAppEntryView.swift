@@ -18,6 +18,8 @@ struct DriverAppEntryView: View {
                         DriverHomeView(driver: driver)
                     }
                 }
+            } else if appState.currentUser?.role == .driver {
+                DriverSignupView()
             } else {
                 ProgressView(L10n.string(.loading, language: appState.language))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

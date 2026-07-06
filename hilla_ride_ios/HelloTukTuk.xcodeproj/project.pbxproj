@@ -70,6 +70,15 @@
 		A10000000000000000000062 /* SupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000058 /* SupportView.swift */; };
 		A10000000000000000000063 /* RideHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000059 /* RideHistoryView.swift */; };
 		A10000000000000000000064 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* EditProfileView.swift */; };
+		A10000000000000000000070 /* RideAlertService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000070 /* RideAlertService.swift */; };
+		A10000000000000000000071 /* SavedPlaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000071 /* SavedPlaceModels.swift */; };
+		A10000000000000000000072 /* SavedPlacesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000072 /* SavedPlacesService.swift */; };
+		A10000000000000000000073 /* AnnouncementModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000073 /* AnnouncementModels.swift */; };
+		A10000000000000000000074 /* AnnouncementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000074 /* AnnouncementService.swift */; };
+		A10000000000000000000075 /* SavedPlacesBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000075 /* SavedPlacesBar.swift */; };
+		A10000000000000000000076 /* RideAlertOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000076 /* RideAlertOverlay.swift */; };
+		A10000000000000000000077 /* AppToolbarActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000077 /* AppToolbarActions.swift */; };
+		A10000000000000000000078 /* WelcomeSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000078 /* WelcomeSplashView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -132,6 +141,15 @@
 		A20000000000000000000058 /* SupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportView.swift; sourceTree = "<group>"; };
 		A20000000000000000000059 /* RideHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideHistoryView.swift; sourceTree = "<group>"; };
 		A20000000000000000000060 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
+		A20000000000000000000070 /* RideAlertService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideAlertService.swift; sourceTree = "<group>"; };
+		A20000000000000000000071 /* SavedPlaceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlaceModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000072 /* SavedPlacesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesService.swift; sourceTree = "<group>"; };
+		A20000000000000000000073 /* AnnouncementModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000074 /* AnnouncementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementService.swift; sourceTree = "<group>"; };
+		A20000000000000000000075 /* SavedPlacesBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesBar.swift; sourceTree = "<group>"; };
+		A20000000000000000000076 /* RideAlertOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideAlertOverlay.swift; sourceTree = "<group>"; };
+		A20000000000000000000077 /* AppToolbarActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppToolbarActions.swift; sourceTree = "<group>"; };
+		A20000000000000000000078 /* WelcomeSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeSplashView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -257,6 +275,8 @@
 				A20000000000000000000036 /* RideModels.swift */,
 				A20000000000000000000037 /* PricingModels.swift */,
 				A20000000000000000000055 /* PromoModels.swift */,
+				A20000000000000000000071 /* SavedPlaceModels.swift */,
+				A20000000000000000000073 /* AnnouncementModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -278,6 +298,9 @@
 				A20000000000000000000052 /* GooglePlacesService.swift */,
 				A20000000000000000000053 /* ChatService.swift */,
 				A20000000000000000000054 /* SupportService.swift */,
+				A20000000000000000000070 /* RideAlertService.swift */,
+				A20000000000000000000072 /* SavedPlacesService.swift */,
+				A20000000000000000000074 /* AnnouncementService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -346,6 +369,7 @@
 				A20000000000000000000045 /* CustomerActiveRideShell.swift */,
 				A20000000000000000000050 /* TripCompletedView.swift */,
 				A20000000000000000000056 /* PlaceSearchView.swift */,
+				A20000000000000000000075 /* SavedPlacesBar.swift */,
 			);
 			path = Customer;
 			sourceTree = "<group>";
@@ -356,6 +380,9 @@
 				A20000000000000000000057 /* RideChatView.swift */,
 				A20000000000000000000058 /* SupportView.swift */,
 				A20000000000000000000059 /* RideHistoryView.swift */,
+				A20000000000000000000076 /* RideAlertOverlay.swift */,
+				A20000000000000000000077 /* AppToolbarActions.swift */,
+				A20000000000000000000078 /* WelcomeSplashView.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -507,6 +534,14 @@
 				A10000000000000000000062 /* SupportView.swift in Sources */,
 				A10000000000000000000063 /* RideHistoryView.swift in Sources */,
 				A10000000000000000000064 /* EditProfileView.swift in Sources */,
+				A10000000000000000000070 /* RideAlertService.swift in Sources */,
+				A10000000000000000000071 /* SavedPlaceModels.swift in Sources */,
+				A10000000000000000000072 /* SavedPlacesService.swift in Sources */,
+				A10000000000000000000073 /* AnnouncementModels.swift in Sources */,
+				A10000000000000000000074 /* AnnouncementService.swift in Sources */,
+				A10000000000000000000075 /* SavedPlacesBar.swift in Sources */,
+				A10000000000000000000076 /* RideAlertOverlay.swift in Sources */,
+				A10000000000000000000077 /* AppToolbarActions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -556,7 +591,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 67;
+				CURRENT_PROJECT_VERSION = 68;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -588,7 +623,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 67;
+				CURRENT_PROJECT_VERSION = 68;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;

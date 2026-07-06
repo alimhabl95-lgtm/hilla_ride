@@ -10,7 +10,9 @@ struct RootView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(BrandColors.surface.ignoresSafeArea())
             } else if appState.currentUser != nil {
-                AppShellView()
+                WelcomeSplashGate {
+                    AppShellView()
+                }
             } else {
                 ModeChooserView()
             }

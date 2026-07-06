@@ -14,6 +14,7 @@ struct PlaceSearchView: View {
     @State private var results: [PlacesSearchResult] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
+    @State private var savedMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,18 +31,34 @@ struct PlaceSearchView: View {
             }
 
             List(results) { result in
-                Button {
-                    onSelect(result.asMapPlace)
-                    dismiss()
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(result.label)
-                            .font(.body)
-                            .foregroundStyle(BrandColors.navy)
+                HStack {
+                    Button {
+                        onSelect(result.asMapPlace)
+                        dismiss()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(result.label)
+                                .font(.body)
+                                .foregroundStyle(BrandColors.navy)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                    Button {
+                        Task { await savePlace(result) }
+                    } label: {
+                        Image(systemName: "bookmark")
                     }
                 }
             }
             .listStyle(.plain)
+
+            if let savedMessage {
+                Text(savedMessage)
+                    .font(.footnote)
+                    .foregroundStyle(BrandColors.tealDark)
+                    .padding(.horizontal)
+            }
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
@@ -70,6 +87,21 @@ struct PlaceSearchView: View {
                 results = places
                 isSearching = false
             }
+        }
+    }
+
+    private func savePlace(_ result: PlacesSearchResult) async {
+        guard let uid = appState.currentUser?.uid else { return }
+        do {
+            _ = try await SavedPlacesService().addSavedPlace(
+                uid: uid,
+                label: result.label,
+                latitude: result.latitude,
+                longitude: result.longitude
+            )
+            savedMessage = L10n.string(.savedPlaceAdded, language: appState.language)
+        } catch {
+            savedMessage = error.localizedDescription
         }
     }
 }
