@@ -227,7 +227,7 @@ final class MonthlyPrizeService {
             ])
         } else {
             try? await ref.updateData([
-                "monthlyRideCount": FieldValue.increment(1)
+                 "monthlyRideCount": FieldValue.increment(Int64(1))
             ])
         }
     }
