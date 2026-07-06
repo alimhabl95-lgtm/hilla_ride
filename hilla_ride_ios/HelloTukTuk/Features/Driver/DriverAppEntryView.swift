@@ -31,3 +31,24 @@ struct DriverAppEntryView: View {
         }
     }
 }
+
+struct DriverBlockedView: View {
+    var body: some View {
+        Text("Your driver account has been blocked.")
+            .padding()
+    }
+}
+
+struct DriverPendingView: View {
+    var body: some View {
+        Text("Your driver application is pending approval.")
+            .padding()
+    }
+}
+
+struct DriverRejectedView: View {
+    var body: some View {
+        Text("Your driver application was rejected.")
+            .padding()
+    }
+}
