@@ -96,6 +96,39 @@ struct DriverMonthlyStats: Equatable {
 final class MonthlyPrizeService {
     private let firestore = Firestore.firestore()
 
+    func getPromoCode(_ code: String) async -> PromoCodeConfig {
+        do {
+            let doc = try await firestore.collection("config").document("promo_\(code)").getDocument()
+            return PromoCodeConfig(data: doc.data()) ?? .free3Defaults
+        } catch {
+            return .free3Defaults
+        }
+    }
+
+    func applyPromo(user: AppUser, config: PromoCodeConfig, baseFareIqd: Int) -> PromoApplication {
+        guard baseFareIqd > 0,
+              config.enabled,
+              user.promoCode == config.code,
+              user.promoRidesUsed < user.promoRidesLimit else {
+            return PromoApplication(
+                baseFareIqd: baseFareIqd,
+                discountIqd: 0,
+                finalFareIqd: baseFareIqd,
+                promoCode: ""
+            )
+        }
+
+        let rawDiscount = Int((Double(baseFareIqd) * Double(config.discountPercent) / 100.0).rounded())
+        let discount = min(max(rawDiscount, 0), config.maxDiscountIqd)
+        let finalFare = max(baseFareIqd - discount, 0)
+        return PromoApplication(
+            baseFareIqd: baseFareIqd,
+            discountIqd: discount,
+            finalFareIqd: finalFare,
+            promoCode: config.code
+        )
+    }
+
     func getConfig() async -> MonthlyPrizeConfig {
         do {
             let doc = try await firestore.collection("config").document("monthly_prize").getDocument()
@@ -177,4 +210,5 @@ final class MonthlyPrizeService {
         )
     }
 }
+
 typealias PromoService = MonthlyPrizeService
