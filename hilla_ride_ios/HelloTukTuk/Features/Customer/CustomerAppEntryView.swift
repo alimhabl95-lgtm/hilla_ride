@@ -29,7 +29,7 @@ struct CustomerAppEntryView: View {
            .onChange(of: appState.currentUser?.uid) { _ in
             startWatchingActiveRide()
         }
-        .onChange(of: activeRide?.id) { _, newId in
+           .onChange(of: activeRide?.id) { newId in
             if let newId {
                 sessionRideId = newId
             }
