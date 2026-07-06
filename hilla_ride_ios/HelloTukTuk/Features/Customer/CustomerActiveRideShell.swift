@@ -295,4 +295,4 @@ struct ActiveRideMapView: View {
         }
     }
 }
-"Fix iOS 17 onChange"
+
