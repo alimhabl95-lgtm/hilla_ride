@@ -167,11 +167,251 @@ final class RideRepository {
     }
 
     func cancelRide(rideId: String, cancelledBy: String) async throws {
+        let snapshot = try await firestore.collection("rides").document(rideId).getDocument()
+        let driverId = snapshot.data()?["driverId"] as? String
+
         try await firestore.collection("rides").document(rideId).updateData([
             "status": RideStatus.cancelled.rawValue,
             "cancelledAt": FieldValue.serverTimestamp(),
             "cancelledBy": cancelledBy
         ])
+
+        if let driverId, !driverId.isEmpty {
+            try? await setDriverActiveRide(driverId: driverId, active: false)
+        }
+    }
+
+    func acceptRide(rideId: String, driverId: String) async throws {
+        let rideRef = firestore.collection("rides").document(rideId)
+        let driverRef = firestore.collection("drivers").document(driverId)
+
+        try await firestore.runTransaction { transaction, errorPointer in
+            let driverSnap: DocumentSnapshot
+            let rideSnap: DocumentSnapshot
+            do {
+                driverSnap = try transaction.getDocument(driverRef)
+                rideSnap = try transaction.getDocument(rideRef)
+            } catch {
+                errorPointer?.pointee = error as NSError
+                return nil
+            }
+
+            guard let driverData = driverSnap.data(), driverData["hasActiveRide"] as? Bool != true else {
+                errorPointer?.pointee = NSError(domain: "RideRepository", code: 1, userInfo: [
+                    NSLocalizedDescriptionKey: "driver_busy"
+                ])
+                return nil
+            }
+
+            guard let data = rideSnap.data() else {
+                errorPointer?.pointee = NSError(domain: "RideRepository", code: 2, userInfo: [
+                    NSLocalizedDescriptionKey: "ride_not_found"
+                ])
+                return nil
+            }
+
+            let status = RideStatus.fromFirestore(data["status"] as? String)
+            guard status == .matched || status == .searching else {
+                errorPointer?.pointee = NSError(domain: "RideRepository", code: 3, userInfo: [
+                    NSLocalizedDescriptionKey: "ride_unavailable"
+                ])
+                return nil
+            }
+
+            if let assigned = data["driverId"] as? String, !assigned.isEmpty, assigned != driverId {
+                errorPointer?.pointee = NSError(domain: "RideRepository", code: 4, userInfo: [
+                    NSLocalizedDescriptionKey: "ride_taken"
+                ])
+                return nil
+            }
+
+            transaction.updateData([
+                "driverId": driverId,
+                "status": RideStatus.accepted.rawValue,
+                "acceptedAt": FieldValue.serverTimestamp(),
+                "offeredDriverIds": [],
+                "notifyDrivers": false,
+                "notifyCustomer": true
+            ], forDocument: rideRef)
+            transaction.updateData(["hasActiveRide": true], forDocument: driverRef)
+            return nil
+        }
+    }
+
+    func rejectRide(rideId: String, driverId: String) async throws {
+        let rideRef = firestore.collection("rides").document(rideId)
+        let snapshot = try await rideRef.getDocument()
+        guard var data = snapshot.data() else { throw RideServiceError.rideNotFound }
+
+        let status = RideStatus.fromFirestore(data["status"] as? String)
+        guard status == .matched else { throw RideServiceError.rideUnavailable }
+        if data["driverId"] != nil { throw RideServiceError.rideUnavailable }
+
+        var offered = (data["offeredDriverIds"] as? [String]) ?? []
+        guard offered.contains(driverId) else { throw RideServiceError.rideUnavailable }
+
+        var rejected = (data["rejectedDriverIds"] as? [String]) ?? []
+        rejected.append(driverId)
+        offered.removeAll { $0 == driverId }
+
+        if offered.isEmpty {
+            try await rideRef.updateData([
+                "offeredDriverIds": [],
+                "rejectedDriverIds": rejected,
+                "status": RideStatus.searching.rawValue,
+                "notifyDrivers": false
+            ])
+            try? await assignNearestDriver(rideId: rideId)
+        } else {
+            try await rideRef.updateData([
+                "offeredDriverIds": offered,
+                "rejectedDriverIds": rejected
+            ])
+        }
+    }
+
+    func startRide(rideId: String) async throws {
+        try await firestore.collection("rides").document(rideId).updateData([
+            "status": RideStatus.inProgress.rawValue,
+            "startedAt": FieldValue.serverTimestamp()
+        ])
+    }
+
+    func endRideAwaitingCash(rideId: String) async throws {
+        try await firestore.collection("rides").document(rideId).updateData([
+            "status": RideStatus.awaitingCashPayment.rawValue,
+            "endedAt": FieldValue.serverTimestamp()
+        ])
+    }
+
+    func confirmCashCollected(rideId: String) async throws {
+        let rideRef = firestore.collection("rides").document(rideId)
+        let commissionService = CommissionService()
+        let platformPercent = await commissionService.getConfig()
+
+        try await firestore.runTransaction { transaction, errorPointer in
+            let snapshot: DocumentSnapshot
+            do {
+                snapshot = try transaction.getDocument(rideRef)
+            } catch {
+                errorPointer?.pointee = error as NSError
+                return nil
+            }
+
+            guard let data = snapshot.data() else { return nil }
+            if data["earningsApplied"] as? Bool == true { return nil }
+
+            let status = RideStatus.fromFirestore(data["status"] as? String)
+            guard status == .awaitingCashPayment || status == .completed else { return nil }
+
+            let fare = (data["fareAmountIqd"] as? NSNumber)?.intValue ?? 0
+            let split = commissionService.splitFare(fareIqd: fare, platformPercent: platformPercent)
+
+            transaction.updateData([
+                "cashCollectedByDriver": true,
+                "status": RideStatus.completed.rawValue,
+                "completedAt": FieldValue.serverTimestamp(),
+                "commissionPercent": split.commissionPercent,
+                "platformCommissionIqd": split.platformCommissionIqd,
+                "driverEarningsIqd": split.driverEarningsIqd,
+                "earningsApplied": true
+            ], forDocument: rideRef)
+
+            if let driverId = data["driverId"] as? String, !driverId.isEmpty {
+                let driverRef = self.firestore.collection("drivers").document(driverId)
+                transaction.updateData([
+                    "totalFareCollectedIqd": FieldValue.increment(Int64(fare)),
+                    "totalPlatformCommissionIqd": FieldValue.increment(Int64(split.platformCommissionIqd)),
+                    "outstandingPlatformCommissionIqd": FieldValue.increment(Int64(split.platformCommissionIqd)),
+                    "totalDriverEarningsIqd": FieldValue.increment(Int64(split.driverEarningsIqd)),
+                    "completedRidesCount": FieldValue.increment(1),
+                    "hasActiveRide": false
+                ], forDocument: driverRef)
+            }
+            return nil
+        }
+    }
+
+    func submitDriverRating(
+        rideId: String,
+        customerId: String,
+        rating: Int,
+        feedback: String
+    ) async throws {
+        guard (1...5).contains(rating) else { return }
+
+        let rideRef = firestore.collection("rides").document(rideId)
+        let snapshot = try await rideRef.getDocument()
+        guard let data = snapshot.data(),
+              data["customerId"] as? String == customerId,
+              data["status"] as? String == RideStatus.completed.rawValue,
+              data["driverRating"] == nil else { return }
+
+        try await rideRef.updateData([
+            "driverRating": rating,
+            "driverFeedback": feedback.trimmingCharacters(in: .whitespacesAndNewlines),
+            "ratedAt": FieldValue.serverTimestamp()
+        ])
+
+        if let driverId = data["driverId"] as? String, !driverId.isEmpty {
+            let driverRef = firestore.collection("drivers").document(driverId)
+            let driverSnap = try await driverRef.getDocument()
+            let driverData = driverSnap.data() ?? [:]
+            let oldCount = (driverData["ratingCount"] as? NSNumber)?.intValue ?? 0
+            let oldRating = (driverData["rating"] as? NSNumber)?.doubleValue ?? 5.0
+            let newCount = oldCount + 1
+            let newRating = ((oldRating * Double(oldCount)) + Double(rating)) / Double(newCount)
+            try await driverRef.updateData([
+                "rating": newRating,
+                "ratingCount": newCount
+            ])
+        }
+    }
+
+    func watchAssignedRide(for driverId: String) -> AsyncStream<Ride?> {
+        AsyncStream { continuation in
+            var assigned: Ride?
+            var offered: Ride?
+
+            func publish() {
+                continuation.yield(assigned ?? offered)
+            }
+
+            let assignedListener = firestore.collection("rides")
+                .whereField("driverId", isEqualTo: driverId)
+                .whereField("status", in: [
+                    RideStatus.accepted.rawValue,
+                    RideStatus.inProgress.rawValue,
+                    RideStatus.awaitingCashPayment.rawValue,
+                    RideStatus.matched.rawValue
+                ])
+                .addSnapshotListener { snapshot, _ in
+                    assigned = snapshot?.documents.compactMap {
+                        Ride(documentID: $0.documentID, data: $0.data())
+                    }.first
+                    publish()
+                }
+
+            let offeredListener = firestore.collection("rides")
+                .whereField("offeredDriverIds", arrayContains: driverId)
+                .whereField("status", isEqualTo: RideStatus.matched.rawValue)
+                .addSnapshotListener { snapshot, _ in
+                    if assigned != nil {
+                        offered = nil
+                        publish()
+                        return
+                    }
+                    offered = snapshot?.documents.compactMap {
+                        Ride(documentID: $0.documentID, data: $0.data())
+                    }.first
+                    publish()
+                }
+
+            continuation.onTermination = { _ in
+                assignedListener.remove()
+                offeredListener.remove()
+            }
+        }
     }
 
     private func fetchActiveRide(customerId: String) async throws -> Ride? {

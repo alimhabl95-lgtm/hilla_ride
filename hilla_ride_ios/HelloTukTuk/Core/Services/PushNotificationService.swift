@@ -10,6 +10,11 @@ final class PushNotificationService: NSObject, ObservableObject {
 
     @Published private(set) var fcmToken: String?
 
+    override private init() {
+        super.init()
+        Messaging.messaging().delegate = self
+    }
+
     func requestAuthorizationIfNeeded() async {
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
@@ -21,7 +26,7 @@ final class PushNotificationService: NSObject, ObservableObject {
                 await UIApplication.shared.registerForRemoteNotifications()
             }
         } catch {
-            // Non-fatal during Phase 0.
+            // Non-fatal.
         }
     }
 
@@ -38,16 +43,16 @@ final class PushNotificationService: NSObject, ObservableObject {
         guard let fcmToken, !fcmToken.isEmpty else { return }
 
         let firestore = Firestore.firestore()
+        let payload: [String: Any] = [
+            "fcmToken": fcmToken,
+            "fcmTokenUpdatedAt": FieldValue.serverTimestamp(),
+            "fcmUpdatedAt": FieldValue.serverTimestamp()
+        ]
+
         if role == .driver {
-            try? await firestore.collection("drivers").document(userID).setData([
-                "fcmToken": fcmToken,
-                "fcmTokenUpdatedAt": FieldValue.serverTimestamp()
-            ], merge: true)
+            try? await firestore.collection("drivers").document(userID).setData(payload, merge: true)
         } else {
-            try? await firestore.collection("users").document(userID).setData([
-                "fcmToken": fcmToken,
-                "fcmTokenUpdatedAt": FieldValue.serverTimestamp()
-            ], merge: true)
+            try? await firestore.collection("users").document(userID).setData(payload, merge: true)
         }
     }
 }
@@ -58,5 +63,14 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
+    }
+}
+
+extension PushNotificationService: MessagingDelegate {
+    nonisolated func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let fcmToken, !fcmToken.isEmpty else { return }
+        Task { @MainActor in
+            self.fcmToken = fcmToken
+        }
     }
 }

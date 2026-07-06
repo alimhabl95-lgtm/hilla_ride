@@ -121,6 +121,26 @@ enum L10nKey {
     case myLocation
     case mapPinDestination
     case locationUnavailable
+    case goOnline
+    case goOffline
+    case driverWorkAreaRequired
+    case driverGoOnlineHint
+    case driverWaitingForRequests
+    case acceptRide
+    case rejectRide
+    case startRide
+    case endRide
+    case confirmCashCollected
+    case newRideOffer
+    case rideAccepted
+    case tripCompletedTitle
+    case paymentMethodCash
+    case ratingSubmitted
+    case rateYourDriver
+    case feedbackOptional
+    case submitRating
+    case done
+    case rideCancelled
 }
 
 enum L10n {
@@ -323,6 +343,35 @@ enum L10n {
         .locationUnavailable: [
             .english: "Could not get your location. Allow location access or pick on the map.",
             .arabic: "تعذر الحصول على موقعك. اسمح بالوصول للموقع أو اختر على الخريطة."
-        ]
+        ],
+        .goOnline: [.english: "Online", .arabic: "متصل"],
+        .goOffline: [.english: "Offline", .arabic: "غير متصل"],
+        .driverWorkAreaRequired: [
+            .english: "Your work area is not assigned. Contact support.",
+            .arabic: "لم يتم تعيين منطقة عملك. تواصل مع الدعم."
+        ],
+        .driverGoOnlineHint: [
+            .english: "Turn on the switch to receive ride requests.",
+            .arabic: "فعّل المفتاح لاستقبال طلبات المشاوير."
+        ],
+        .driverWaitingForRequests: [
+            .english: "You are online. Waiting for ride requests…",
+            .arabic: "أنت متصل. بانتظار طلبات المشاوير…"
+        ],
+        .acceptRide: [.english: "Accept ride", .arabic: "قبول المشوار"],
+        .rejectRide: [.english: "Reject", .arabic: "رفض"],
+        .startRide: [.english: "Start ride", .arabic: "بدء المشوار"],
+        .endRide: [.english: "End ride", .arabic: "إنهاء المشوار"],
+        .confirmCashCollected: [.english: "Cash collected", .arabic: "تم استلام النقد"],
+        .newRideOffer: [.english: "New ride request", .arabic: "طلب مشوار جديد"],
+        .rideAccepted: [.english: "Ride accepted", .arabic: "تم قبول المشوار"],
+        .tripCompletedTitle: [.english: "Trip completed", .arabic: "اكتمل المشوار"],
+        .paymentMethodCash: [.english: "Cash payment", .arabic: "دفع نقداً"],
+        .ratingSubmitted: [.english: "Thank you for your rating!", .arabic: "شكراً لتقييمك!"],
+        .rateYourDriver: [.english: "Rate your driver", .arabic: "قيّم السائق"],
+        .feedbackOptional: [.english: "Feedback (optional)", .arabic: "ملاحظات (اختياري)"],
+        .submitRating: [.english: "Submit rating", .arabic: "إرسال التقييم"],
+        .done: [.english: "Done", .arabic: "تم"],
+        .rideCancelled: [.english: "Ride cancelled", .arabic: "تم إلغاء المشوار"]
     ]
 }

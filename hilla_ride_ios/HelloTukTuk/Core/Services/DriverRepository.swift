@@ -3,6 +3,20 @@ import FirebaseFirestore
 import FirebaseFunctions
 import Foundation
 
+enum DriverServiceError: LocalizedError {
+    case blocked
+    case notApproved
+    case workAreaRequired
+
+    var errorDescription: String? {
+        switch self {
+        case .blocked: return L10n.string(.driverBlockedTitle)
+        case .notApproved: return L10n.string(.driverRejectedTitle)
+        case .workAreaRequired: return L10n.string(.driverWorkAreaRequired)
+        }
+    }
+}
+
 final class DriverRepository {
     private let firestore = Firestore.firestore()
 
@@ -44,6 +58,53 @@ final class DriverRepository {
                 return lhsDistance < rhsDistance
             }
             return lhs.completedRidesCount < rhs.completedRidesCount
+        }
+    }
+
+    func watchDriver(uid: String) -> AsyncStream<DriverProfile?> {
+        AsyncStream { continuation in
+            let listener = firestore.collection("drivers").document(uid)
+                .addSnapshotListener { snapshot, _ in
+                    guard let snapshot, let data = snapshot.data() else {
+                        continuation.yield(nil)
+                        return
+                    }
+                    continuation.yield(DriverProfile(documentID: snapshot.documentID, data: data))
+                }
+            continuation.onTermination = { _ in listener.remove() }
+        }
+    }
+
+    func setOnlineStatus(driverId: String, isOnline: Bool) async throws {
+        if isOnline {
+            let doc = try await firestore.collection("drivers").document(driverId).getDocument()
+            guard let data = doc.data() else { return }
+            if data["isBlocked"] as? Bool == true { throw DriverServiceError.blocked }
+            if data["approvalStatus"] as? String != DriverApprovalStatus.approved.rawValue {
+                throw DriverServiceError.notApproved
+            }
+            let districtId = data["assignedDistrictId"] as? String ?? ""
+            let subDistrictId = data["assignedSubDistrictId"] as? String ?? ""
+            if districtId.isEmpty || subDistrictId.isEmpty {
+                throw DriverServiceError.workAreaRequired
+            }
+
+            let sub = BabilRegions.subDistrict(byId: subDistrictId)
+            var updates: [String: Any] = [
+                "isOnline": true,
+                "hasActiveRide": false,
+                "locationUpdatedAt": FieldValue.serverTimestamp()
+            ]
+            if data["latitude"] == nil { updates["latitude"] = sub.center.latitude }
+            if data["longitude"] == nil { updates["longitude"] = sub.center.longitude }
+
+            try await firestore.collection("drivers").document(driverId).updateData(updates)
+            await DriverLocationPublisher.shared.start(for: driverId)
+        } else {
+            try await firestore.collection("drivers").document(driverId).updateData([
+                "isOnline": false
+            ])
+            await DriverLocationPublisher.shared.stop()
         }
     }
 

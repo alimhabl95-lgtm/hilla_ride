@@ -3,13 +3,17 @@ import SwiftUI
 struct CustomerAppEntryView: View {
     @EnvironmentObject private var appState: AppState
     @State private var activeRide: Ride?
+    @State private var sessionRideId: String?
     @State private var rideTask: Task<Void, Never>?
 
     var body: some View {
         Group {
             if let user = appState.currentUser {
-                if let activeRide {
-                    CustomerActiveRideShell(rideId: activeRide.id)
+                if let sessionRideId {
+                    CustomerActiveRideShell(
+                        rideId: sessionRideId,
+                        onSessionEnded: { self.sessionRideId = nil }
+                    )
                 } else {
                     CustomerHomeMapView(user: user)
                 }
@@ -22,6 +26,11 @@ struct CustomerAppEntryView: View {
         }
         .onChange(of: appState.currentUser?.uid) { _, _ in
             startWatchingActiveRide()
+        }
+        .onChange(of: activeRide?.id) { _, newId in
+            if let newId {
+                sessionRideId = newId
+            }
         }
     }
 
@@ -38,6 +47,9 @@ struct CustomerAppEntryView: View {
                 guard !Task.isCancelled else { break }
                 await MainActor.run {
                     activeRide = ride
+                    if let ride {
+                        sessionRideId = ride.id
+                    }
                 }
             }
         }

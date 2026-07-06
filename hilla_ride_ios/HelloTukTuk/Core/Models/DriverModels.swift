@@ -35,6 +35,9 @@ struct DriverProfile: Identifiable, Equatable {
 
     var id: String { uid }
     var isApproved: Bool { approvalStatus == .approved }
+    var hasAssignedWorkArea: Bool {
+        !assignedDistrictId.isEmpty && !assignedSubDistrictId.isEmpty
+    }
 
     var sortCoordinate: CLLocationCoordinate2D? {
         guard let latitude, let longitude else { return nil }

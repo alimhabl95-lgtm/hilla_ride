@@ -5,6 +5,7 @@ import SwiftUI
 struct CustomerActiveRideShell: View {
     @EnvironmentObject private var appState: AppState
     let rideId: String
+    var onSessionEnded: (() -> Void)?
 
     @State private var ride: Ride?
     @State private var rideTask: Task<Void, Never>?
@@ -14,15 +15,15 @@ struct CustomerActiveRideShell: View {
             if let ride {
                 switch ride.status {
                 case .searching:
-                    FindingDriverView(ride: ride)
+                    FindingDriverView(ride: ride, onSessionEnded: onSessionEnded)
                 case .matched:
-                    DriverAssignedView(ride: ride)
+                    DriverAssignedView(ride: ride, onSessionEnded: onSessionEnded)
                 case .accepted, .inProgress, .awaitingCashPayment:
                     ActiveRideMapView(ride: ride)
-                case .completed, .cancelled:
-                    if let user = appState.currentUser {
-                        CustomerHomeMapView(user: user)
-                    }
+                case .completed:
+                    TripCompletedView(rideId: ride.id, onFinished: onSessionEnded)
+                case .cancelled:
+                    sessionEndedView
                 }
             } else {
                 ProgressView(L10n.string(.loading, language: appState.language))
@@ -35,6 +36,18 @@ struct CustomerActiveRideShell: View {
             rideTask?.cancel()
             rideTask = nil
         }
+    }
+
+    private var sessionEndedView: some View {
+        VStack {
+            Text(L10n.string(.rideCancelled, language: appState.language))
+            Button(L10n.string(.done, language: appState.language)) {
+                onSessionEnded?()
+            }
+            .buttonStyle(PrimaryButtonStyle())
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(BrandColors.surface.ignoresSafeArea())
     }
 
     private func startWatchingRide() {
@@ -54,6 +67,7 @@ struct CustomerActiveRideShell: View {
 struct FindingDriverView: View {
     @EnvironmentObject private var appState: AppState
     let ride: Ride
+    var onSessionEnded: (() -> Void)?
 
     @State private var isRetrying = false
 
@@ -95,12 +109,14 @@ struct FindingDriverView: View {
     private func cancelRide() async {
         guard let customerId = appState.currentUser?.uid else { return }
         try? await RideRepository().cancelRide(rideId: ride.id, cancelledBy: customerId)
+        onSessionEnded?()
     }
 }
 
 struct DriverAssignedView: View {
     @EnvironmentObject private var appState: AppState
     let ride: Ride
+    var onSessionEnded: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -120,6 +136,7 @@ struct DriverAssignedView: View {
                 Task {
                     guard let customerId = appState.currentUser?.uid else { return }
                     try? await RideRepository().cancelRide(rideId: ride.id, cancelledBy: customerId)
+                    onSessionEnded?()
                 }
             }
             .buttonStyle(PrimaryButtonStyle())

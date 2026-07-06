@@ -5,10 +5,10 @@ struct AppShellView: View {
 
     var body: some View {
         Group {
-            if let user = appState.currentUser {
-                switch user.role {
+            if appState.currentUser != nil {
+                switch appState.currentUser?.role {
                 case .driver:
-                    DriverShellView()
+                    DriverAppEntryView()
                 default:
                     CustomerAppEntryView()
                 }
@@ -16,82 +16,6 @@ struct AppShellView: View {
         }
         .task(id: appState.currentUser?.uid) {
             await appState.refreshDriverProfileIfNeeded()
-        }
-    }
-}
-
-struct DriverShellView: View {
-    @EnvironmentObject private var appState: AppState
-
-    var body: some View {
-        Group {
-            if let driver = appState.currentDriver {
-                if driver.isBlocked {
-                    DriverBlockedView()
-                } else {
-                    switch driver.approvalStatus {
-                    case .pending:
-                        DriverPendingView()
-                    case .rejected:
-                        DriverRejectedView()
-                    case .approved:
-                        DriverHomeView(driver: driver)
-                    }
-                }
-            } else {
-                ProgressView(L10n.string(.loading, language: appState.language))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(BrandColors.surface.ignoresSafeArea())
-            }
-        }
-    }
-}
-
-struct DriverHomeView: View {
-    @EnvironmentObject private var appState: AppState
-    let driver: DriverProfile
-    @State private var showProfile = false
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                Image(systemName: "car.side.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(BrandColors.gold)
-
-                Text(L10n.string(.driverHomeTitle, language: appState.language))
-                    .font(.title2.bold())
-
-                Text(driver.name)
-                    .font(.title3)
-
-                Text("\(driver.vehiclePlate) · \(driver.vehicleColor)")
-                    .foregroundStyle(.secondary)
-
-                Text(L10n.string(.driverTripsComingSoon, language: appState.language))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(BrandColors.surface.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    LanguageToggle()
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showProfile = true
-                    } label: {
-                        Image(systemName: "person.circle")
-                    }
-                }
-            }
-            .navigationDestination(isPresented: $showProfile) {
-                ProfileView()
-            }
         }
     }
 }
@@ -110,9 +34,7 @@ struct DriverPendingView: View {
             )
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showProfile = true
-                    } label: {
+                    Button { showProfile = true } label: {
                         Image(systemName: "person.circle")
                     }
                 }

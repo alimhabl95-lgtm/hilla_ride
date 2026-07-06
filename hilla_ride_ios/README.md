@@ -17,7 +17,21 @@ open HelloTukTuk.xcodeproj
 
 Select the **HelloTukTuk** scheme, choose a device or simulator, and run.
 
-## Phase 2A Week 2 (current)
+## Completion status (building toward full parity — test when complete)
+
+| Area | Status |
+|------|--------|
+| Auth (login, signup, reset, driver registration) | Done |
+| Customer map + book ride + active ride | Done (basic) |
+| Driver online + accept/start/end/cash | Done (basic) |
+| Trip completed + driver rating | Done |
+| Push notifications (FCM token + delegate) | Partial |
+| Place search / saved places | Not started |
+| Ride chat | Not started |
+| Ride history / support / announcements | Not started |
+| Session guard / blocked customer | Not started |
+
+## Phase 2A Week 2 (in progress)
 
 - Google Maps SDK on customer home
 - Sub-district picker (Al-Hashimiya)

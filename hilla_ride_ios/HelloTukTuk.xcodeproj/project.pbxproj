@@ -55,6 +55,11 @@
 		A10000000000000000000047 /* BookRideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000044 /* BookRideView.swift */; };
 		A10000000000000000000048 /* CustomerActiveRideShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000045 /* CustomerActiveRideShell.swift */; };
 		A10000000000000000000049 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000007 /* GoogleMaps */; };
+		A10000000000000000000050 /* CommissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000046 /* CommissionService.swift */; };
+		A10000000000000000000051 /* DriverLocationPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000047 /* DriverLocationPublisher.swift */; };
+		A10000000000000000000052 /* DriverAppEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000048 /* DriverAppEntryView.swift */; };
+		A10000000000000000000053 /* DriverHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000049 /* DriverHomeView.swift */; };
+		A10000000000000000000054 /* TripCompletedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000050 /* TripCompletedView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -102,6 +107,11 @@
 		A20000000000000000000043 /* CustomerHomeMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerHomeMapView.swift; sourceTree = "<group>"; };
 		A20000000000000000000044 /* BookRideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookRideView.swift; sourceTree = "<group>"; };
 		A20000000000000000000045 /* CustomerActiveRideShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerActiveRideShell.swift; sourceTree = "<group>"; };
+		A20000000000000000000046 /* CommissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommissionService.swift; sourceTree = "<group>"; };
+		A20000000000000000000047 /* DriverLocationPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverLocationPublisher.swift; sourceTree = "<group>"; };
+		A20000000000000000000048 /* DriverAppEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverAppEntryView.swift; sourceTree = "<group>"; };
+		A20000000000000000000049 /* DriverHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverHomeView.swift; sourceTree = "<group>"; };
+		A20000000000000000000050 /* TripCompletedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripCompletedView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -184,6 +194,7 @@
 			children = (
 				A40000000000000000000013 /* Auth */,
 				A40000000000000000000019 /* Customer */,
+				A40000000000000000000020 /* Driver */,
 				A40000000000000000000015 /* Profile */,
 			);
 			path = Features;
@@ -239,6 +250,8 @@
 				A20000000000000000000038 /* PricingService.swift */,
 				A20000000000000000000039 /* LocationService.swift */,
 				A20000000000000000000040 /* RideRepository.swift */,
+				A20000000000000000000046 /* CommissionService.swift */,
+				A20000000000000000000047 /* DriverLocationPublisher.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -304,8 +317,18 @@
 				A20000000000000000000043 /* CustomerHomeMapView.swift */,
 				A20000000000000000000044 /* BookRideView.swift */,
 				A20000000000000000000045 /* CustomerActiveRideShell.swift */,
+				A20000000000000000000050 /* TripCompletedView.swift */,
 			);
 			path = Customer;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000020 /* Driver */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000048 /* DriverAppEntryView.swift */,
+				A20000000000000000000049 /* DriverHomeView.swift */,
+			);
+			path = Driver;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -431,6 +454,11 @@
 				A10000000000000000000046 /* CustomerHomeMapView.swift in Sources */,
 				A10000000000000000000047 /* BookRideView.swift in Sources */,
 				A10000000000000000000048 /* CustomerActiveRideShell.swift in Sources */,
+				A10000000000000000000050 /* CommissionService.swift in Sources */,
+				A10000000000000000000051 /* DriverLocationPublisher.swift in Sources */,
+				A10000000000000000000052 /* DriverAppEntryView.swift in Sources */,
+				A10000000000000000000053 /* DriverHomeView.swift in Sources */,
+				A10000000000000000000054 /* TripCompletedView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -480,7 +508,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 65;
+				CURRENT_PROJECT_VERSION = 66;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -512,7 +540,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 65;
+				CURRENT_PROJECT_VERSION = 66;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
