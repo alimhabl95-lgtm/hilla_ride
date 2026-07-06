@@ -36,5 +36,3 @@ struct AppShellView: View {
         }
     }
 }
-
-struct DriverPendingView: View {
