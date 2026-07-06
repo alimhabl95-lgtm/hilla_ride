@@ -17,7 +17,7 @@ final class AppState: ObservableObject {
     @Published private(set) var isBootstrapping = true
 
     let authService = AuthService()
-    nonisolated(unsafe) private var authListener: AuthStateDidChangeListenerHandle?
+    private var authListener: AuthStateDidChangeListenerHandle?
 
     init() {
         let savedLanguage = UserDefaults.standard.string(forKey: "app_language")
@@ -29,13 +29,9 @@ final class AppState: ObservableObject {
         }
 
         authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
-            Task { await self?.refreshCurrentUser(firebaseUser: user) }
-        }
-    }
-
-    deinit {
-        if let authListener {
-            Auth.auth().removeStateDidChangeListener(authListener)
+            Task { @MainActor in
+                await self?.refreshCurrentUser(firebaseUser: user)
+            }
         }
     }
 

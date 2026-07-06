@@ -57,23 +57,57 @@ workflows:
       - name: Build Release IPA (Swift)
         script: |
           set -euo pipefail
+          LOG_DIR="/tmp/hilla_ride_ios_build"
+          mkdir -p "$LOG_DIR"
+
           xcodebuild -resolvePackageDependencies \
             -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME"
+            -scheme "$XCODE_SCHEME" \
+            2>&1 | tee "$LOG_DIR/resolve_packages.log"
+
+          echo "========== Release compile check (no signing) =========="
+          set +e
+          xcodebuild build \
+            -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$LOG_DIR/compile_release.log"
+          COMPILE_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$COMPILE_STATUS" -ne 0 ]; then
+            echo "========== COMPILE ERRORS =========="
+            grep -iE '(^[^/]*\.swift:[0-9]+:[0-9]+: error:| fatal error:|^error: )' "$LOG_DIR/compile_release.log" || true
+            tail -n 80 "$LOG_DIR/compile_release.log"
+            echo "===================================="
+            exit "$COMPILE_STATUS"
+          fi
+
+          echo "========== Archive + export IPA =========="
           set +e
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
+            --export-options-plist "$CM_BUILD_DIR/hilla_ride_ios/exportOptions.plist" \
             --archive-flags="DEVELOPMENT_TEAM=XAZ6V7UTYT MARKETING_VERSION=$MARKETING_VERSION CURRENT_PROJECT_VERSION=$BUILD_NUMBER" \
-            2>&1 | tee /tmp/xcodebuild_release.log
-          BUILD_STATUS=${PIPESTATUS[0]}
-          if [ "$BUILD_STATUS" -ne 0 ]; then
-            echo "========== BUILD ERRORS =========="
-            grep -E " error: | fatal error: |❌" /tmp/xcodebuild_release.log || true
-            echo "=================================="
-            exit "$BUILD_STATUS"
-          fi
+            2>&1 | tee "$LOG_DIR/archive_export.log"
+          ARCHIVE_STATUS=${PIPESTATUS[0]}
           set -e
+          if [ "$ARCHIVE_STATUS" -ne 0 ]; then
+            echo "========== ARCHIVE / EXPORT ERRORS =========="
+            grep -iE '(error:|fatal error:|ARCHIVE FAILED|EXPORT FAILED|BUILD FAILED|command failed|❌|The following build commands failed)' \
+              "$LOG_DIR/archive_export.log" "$LOG_DIR/compile_release.log" || true
+            if [ -d /tmp/xcodebuild_logs ]; then
+              echo "----- xcodebuild log files -----"
+              find /tmp/xcodebuild_logs -type f -name '*.log' -print
+              find /tmp/xcodebuild_logs -type f -name '*.log' -exec grep -iE '(error:|fatal error:)' {} + || true
+            fi
+            tail -n 120 "$LOG_DIR/archive_export.log"
+            echo "============================================="
+            exit "$ARCHIVE_STATUS"
+          fi
+
           IPA="$(ls "$CM_BUILD_DIR"/build/ios/ipa/*.ipa | head -1)"
           echo "Built IPA: $IPA"
           TMP="$(mktemp -d)"
@@ -89,6 +123,7 @@ workflows:
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
+      - /tmp/hilla_ride_ios_build/*.log
     publishing:
       app_store_connect:
         auth: integration

@@ -16,9 +16,7 @@ final class AuthService: ObservableObject {
         let email = PhoneAuthCredentials.toAuthEmail(phone)
 
         let credential = try await auth.signIn(withEmail: email, password: password)
-        guard let uid = credential.user?.uid else {
-            throw AuthError(code: "internal", message: "Login failed.")
-        }
+        let uid = credential.user.uid
 
         try await sessionService.claimSession(uid: uid)
         guard let user = try await userRepository.fetchUser(uid: uid) else {
@@ -73,9 +71,7 @@ final class AuthService: ObservableObject {
             }
         }
 
-        guard let user = credential.user else {
-            throw AuthError(code: "internal", message: "Registration failed.")
-        }
+        let user = credential.user
 
         do {
             let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)

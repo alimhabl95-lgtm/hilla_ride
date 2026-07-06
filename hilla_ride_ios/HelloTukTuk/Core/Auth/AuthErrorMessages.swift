@@ -4,7 +4,10 @@ import Foundation
 enum AuthErrorMessages {
     static func message(for error: Error) -> String {
         if let authError = error as NSError?, authError.domain == AuthErrorDomain {
-            switch AuthErrorCode(rawValue: authError.code) {
+        guard let errorCode = AuthErrorCode(rawValue: authError.code) else {
+                return authError.localizedDescription
+            }
+            switch errorCode {
             case .wrongPassword, .invalidCredential:
                 return L10n.string(.wrongPassword)
             case .userNotFound:
