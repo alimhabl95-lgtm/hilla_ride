@@ -40,17 +40,36 @@ Select the **HelloTukTuk** scheme, choose a device or simulator, and run.
 2. **App settings** → **Build configuration** → select **`codemagic.yaml`**  
 3. **Team settings** → **Integrations** → **Developer Portal** → confirm API key named **`codemagic`** is connected  
 
-### Code signing (automatic)
+### Code signing (required one-time setup)
 
-The workflow uses **automatic signing** via App Store Connect:
+The workflow uses **certificates and profiles stored in Codemagic Team settings** (not live fetch from Apple during the build). Your Flutter iOS builds already used `com.hillaride.hillaRide` — reuse the same signing files.
 
-- `app-store-connect fetch-signing-files` downloads/creates the App Store profile for `com.hillaride.hillaRide`
-- `xcode-project use-profiles` applies it **only** to `HelloTukTuk.xcodeproj` (not the old Flutter `ios/` project)
+**In Codemagic → Team settings → Code signing identities:**
 
-If signing fails, in Codemagic **Team settings → Code signing identities**:
+#### Option A — Generate new certificate in Codemagic (recommended if you have no .p12 file)
 
-1. **iOS certificates** → **Fetch certificate** → select your **Apple Distribution** cert  
-2. **iOS provisioning profiles** → **Fetch profiles** → select **App Store** profile for `com.hillaride.hillaRide`  
+1. **iOS certificates** tab → **Generate certificate**
+2. Type: **Apple Distribution**
+3. API key: **codemagic**
+4. Reference name: `hilla_ride_distribution`
+5. Click **Create certificate** (download backup .p12 if offered)
+
+#### Option B — Upload existing .p12 from your Mac
+
+1. **iOS certificates** tab → **Upload certificate**
+2. Upload your **Apple Distribution** `.p12` + password
+3. Reference name: `hilla_ride_distribution`
+
+#### Provisioning profile (both options)
+
+1. **iOS provisioning profiles** tab → **Fetch profiles**
+2. Select **App Store** profile for **`com.hillaride.hillaRide`**
+3. Reference name: `hilla_ride_appstore`
+4. Click **Download selected**
+
+The build applies signing **only** to `HelloTukTuk.xcodeproj` (not the old Flutter `ios/` project).
+
+If the build log shows empty certificates/profiles, complete the steps above and rebuild.
 
 ### Start a native Swift build
 
