@@ -11,12 +11,15 @@ struct DriverHomeView: View {
     @State private var isUpdatingOnline = false
     @State private var errorMessage: String?
     @State private var showProfile = false
-    @State private var showHistory = false
+    @State private var showCompletedHistory = false
+    @State private var showCancelledHistory = false
     @State private var showSupport = false
     @State private var showAnnouncements = false
     @State private var showChat = false
     @State private var monthlyStats: DriverMonthlyStats?
     @State private var statsTask: Task<Void, Never>?
+    @State private var activeCustomer: AppUser?
+    @State private var customerTask: Task<Void, Never>?
 
     private var currentDriver: DriverProfile {
         liveDriver ?? driver
@@ -48,9 +51,14 @@ struct DriverHomeView: View {
                         AnnouncementIconButton(showAnnouncements: $showAnnouncements)
                         LegalDocumentsMenu()
                         Button {
-                            showHistory = true
+                            showCompletedHistory = true
                         } label: {
-                            Image(systemName: "clock.arrow.circlepath")
+                            Image(systemName: "checkmark.circle")
+                        }
+                        Button {
+                            showCancelledHistory = true
+                        } label: {
+                            Image(systemName: "xmark.circle")
                         }
                         Button {
                             showSupport = true
@@ -69,8 +77,21 @@ struct DriverHomeView: View {
             .navigationDestination(isPresented: $showProfile) {
                 ProfileView()
             }
-            .navigationDestination(isPresented: $showHistory) {
-                RideHistoryView(customerId: nil, driverId: driver.uid)
+            .navigationDestination(isPresented: $showCompletedHistory) {
+                RideHistoryView(
+                    customerId: nil,
+                    driverId: driver.uid,
+                    statusFilter: .completed,
+                    title: L10n.string(.completedRidesCount, language: appState.language)
+                )
+            }
+            .navigationDestination(isPresented: $showCancelledHistory) {
+                RideHistoryView(
+                    customerId: nil,
+                    driverId: driver.uid,
+                    statusFilter: .cancelled,
+                    title: L10n.string(.cancelledRidesCount, language: appState.language)
+                )
             }
             .navigationDestination(isPresented: $showSupport) {
                 SupportView()
@@ -86,6 +107,9 @@ struct DriverHomeView: View {
         }
         .onAppear { startWatching() }
         .onDisappear { stopWatching() }
+        .onChange(of: activeRide?.customerId) { _, customerId in
+            startWatchingCustomer(customerId)
+        }
     }
 
     private var onlineToggle: some View {
@@ -207,8 +231,22 @@ struct DriverHomeView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(rideStatusTitle(ride.status))
-                    .font(.headline)
+                HStack(spacing: 12) {
+                    ProfileAvatarView(
+                        name: activeCustomer?.name ?? "",
+                        photoURL: activeCustomer?.profilePhotoUrl,
+                        size: 56
+                    )
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(rideStatusTitle(ride.status))
+                            .font(.headline)
+                        if let name = activeCustomer?.name, !name.isEmpty {
+                            Text(name)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
                 Text("\(ride.pickupLabel) → \(ride.destinationLabel)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -297,6 +335,7 @@ struct DriverHomeView: View {
                 await MainActor.run { activeRide = ride }
             }
         }
+        startWatchingCustomer(activeRide?.customerId)
         statsTask = Task {
             for await stats in MonthlyPrizeService().watchDriverStats(driverId: driverId) {
                 guard !Task.isCancelled else { break }
@@ -309,6 +348,19 @@ struct DriverHomeView: View {
         driverTask?.cancel()
         rideTask?.cancel()
         statsTask?.cancel()
+        customerTask?.cancel()
+    }
+
+    private func startWatchingCustomer(_ customerId: String?) {
+        customerTask?.cancel()
+        activeCustomer = nil
+        guard let customerId, !customerId.isEmpty else { return }
+        customerTask = Task {
+            for await user in UserRepository().watchUser(uid: customerId) {
+                guard !Task.isCancelled else { break }
+                await MainActor.run { activeCustomer = user }
+            }
+        }
     }
 
     private func setOnline(_ value: Bool) async {

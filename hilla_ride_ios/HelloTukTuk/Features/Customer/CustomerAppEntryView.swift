@@ -9,7 +9,9 @@ struct CustomerAppEntryView: View {
     var body: some View {
         Group {
             if let user = appState.currentUser {
-                if let sessionRideId {
+                if !user.isProfileComplete {
+                    CustomerProfileOnboardingView()
+                } else if let sessionRideId {
                     CustomerActiveRideShell(
                         rideId: sessionRideId,
                         onSessionEnded: { self.sessionRideId = nil }

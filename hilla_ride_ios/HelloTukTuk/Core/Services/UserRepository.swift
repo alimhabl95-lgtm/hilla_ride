@@ -73,11 +73,47 @@ final class UserRepository {
         }
     }
 
+    func updateUserProfile(
+        uid: String,
+        name: String,
+        age: Int,
+        gender: String?,
+        profilePhotoUrl: String?
+    ) async throws {
+        var payload: [String: Any] = [
+            "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
+            "age": age
+        ]
+        if let gender, !gender.isEmpty {
+            payload["gender"] = gender
+        } else {
+            payload["gender"] = FieldValue.delete()
+        }
+        if let profilePhotoUrl, !profilePhotoUrl.isEmpty {
+            payload["profilePhotoUrl"] = profilePhotoUrl
+        }
+        try await firestore.collection("users").document(uid).updateData(payload)
+    }
+
     func updateUserName(uid: String, name: String) async throws {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         try await firestore.collection("users").document(uid).updateData([
             "name": trimmed
         ])
+    }
+
+    func watchUser(uid: String) -> AsyncStream<AppUser?> {
+        AsyncStream { continuation in
+            let listener = firestore.collection("users").document(uid)
+                .addSnapshotListener { snapshot, _ in
+                    guard let data = snapshot?.data() else {
+                        continuation.yield(nil)
+                        return
+                    }
+                    continuation.yield(AppUser(documentID: uid, data: data))
+                }
+            continuation.onTermination = { _ in listener.remove() }
+        }
     }
 }

@@ -167,6 +167,73 @@ final class AuthService: ObservableObject {
         try auth.signOut()
     }
 
+    var currentUID: String? {
+        auth.currentUser?.uid
+    }
+
+    func saveUserProfile(
+        role: UserRole,
+        name: String,
+        age: Int,
+        gender: String?,
+        profilePhotoUrl: String? = nil
+    ) async throws {
+        guard let user = auth.currentUser else {
+            throw AuthError(code: "internal", message: "Not signed in.")
+        }
+        let docRef = firestore.collection("users").document(user.uid)
+        let existing = try await docRef.getDocument()
+        let existingPhone = existing.data()?["phone"] as? String
+        var payload: [String: Any] = [
+            "phone": existingPhone ?? phoneFromAuthEmail(user.email ?? ""),
+            "role": role.rawValue,
+            "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
+            "age": age,
+            "createdAt": FieldValue.serverTimestamp()
+        ]
+        if let gender, !gender.isEmpty {
+            payload["gender"] = gender
+        }
+        if let profilePhotoUrl, !profilePhotoUrl.isEmpty {
+            payload["profilePhotoUrl"] = profilePhotoUrl
+        }
+        try await docRef.setData(payload, merge: true)
+    }
+
+    func restoreMissingProfile(role: UserRole, name: String) async throws {
+        guard let user = auth.currentUser else {
+            throw AuthError(code: "internal", message: "Not signed in.")
+        }
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            throw AuthError(code: "invalid-name", message: L10n.string(.nameRequired))
+        }
+        let docRef = firestore.collection("users").document(user.uid)
+        let existing = try await docRef.getDocument()
+        if existing.exists, existing.data() != nil { return }
+
+        var payload: [String: Any] = [
+            "phone": phoneFromAuthEmail(user.email ?? ""),
+            "role": role.rawValue,
+            "name": trimmedName,
+            "age": 18,
+            "createdAt": FieldValue.serverTimestamp()
+        ]
+        if role == .customer {
+            payload.merge(await userRepository.customerPromoFields()) { _, new in new }
+        }
+        try await docRef.setData(payload)
+        try await sessionService.claimSession(uid: user.uid)
+    }
+
+    private func phoneFromAuthEmail(_ authEmail: String) -> String {
+        guard authEmail.hasSuffix("@hello-tiktok.app") else { return "" }
+        let digits = authEmail.split(separator: "@").first.map(String.init)?.filter(\.isNumber) ?? ""
+        if digits.hasPrefix("964") { return "+\(digits)" }
+        if digits.hasPrefix("7") { return "+964\(digits)" }
+        return digits.isEmpty ? "" : "+\(digits)"
+    }
+
     private func retrySignupAfterReleasedPhone(
         phone: String,
         authEmail: String,

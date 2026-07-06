@@ -4,6 +4,8 @@ struct RideHistoryView: View {
     @EnvironmentObject private var appState: AppState
     let customerId: String?
     let driverId: String?
+    var statusFilter: RideStatus?
+    var title: String?
 
     @State private var rides: [Ride] = []
     @State private var historyTask: Task<Void, Never>?
@@ -33,7 +35,7 @@ struct RideHistoryView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .navigationTitle(L10n.string(.rideHistoryTitle, language: appState.language))
+        .navigationTitle(title ?? L10n.string(.rideHistoryTitle, language: appState.language))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { startWatching() }
         .onDisappear { historyTask?.cancel() }
@@ -48,9 +50,9 @@ struct RideHistoryView: View {
             let repository = RideRepository()
             let stream: AsyncStream<[Ride]>
             if let customerId {
-                stream = repository.watchRideHistoryForCustomer(customerId: customerId)
+                stream = repository.watchRideHistoryForCustomer(customerId: customerId, statusFilter: statusFilter)
             } else if let driverId {
-                stream = repository.watchRideHistoryForDriver(driverId: driverId)
+                stream = repository.watchRideHistoryForDriver(driverId: driverId, statusFilter: statusFilter)
             } else {
                 return
             }

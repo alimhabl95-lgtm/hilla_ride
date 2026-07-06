@@ -9,9 +9,11 @@ struct GoogleMapView: UIViewRepresentable {
     var destination: MapPlace?
     var driverCoordinate: CLLocationCoordinate2D?
     var onLongPress: ((CLLocationCoordinate2D) -> Void)?
+    var onCameraIdle: ((CLLocationCoordinate2D) -> Void)?
+    var pinPickerMode = false
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onLongPress: onLongPress)
+        Coordinator(onLongPress: onLongPress, onCameraIdle: onCameraIdle)
     }
 
     func makeUIView(context: Context) -> GMSMapView {
@@ -33,7 +35,16 @@ struct GoogleMapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: GMSMapView, context: Context) {
         context.coordinator.onLongPress = onLongPress
+        context.coordinator.onCameraIdle = onCameraIdle
         mapView.clear()
+
+        if pinPickerMode {
+            if abs(mapView.camera.target.latitude - cameraTarget.latitude) > 0.00001 ||
+                abs(mapView.camera.target.longitude - cameraTarget.longitude) > 0.00001 {
+                mapView.camera = GMSCameraPosition.camera(withTarget: cameraTarget, zoom: zoom)
+            }
+            return
+        }
 
         if let pickup {
             addMarker(
@@ -88,9 +99,14 @@ struct GoogleMapView: UIViewRepresentable {
 
     final class Coordinator: NSObject, GMSMapViewDelegate {
         var onLongPress: ((CLLocationCoordinate2D) -> Void)?
+        var onCameraIdle: ((CLLocationCoordinate2D) -> Void)?
 
-        init(onLongPress: ((CLLocationCoordinate2D) -> Void)?) {
+        init(
+            onLongPress: ((CLLocationCoordinate2D) -> Void)?,
+            onCameraIdle: ((CLLocationCoordinate2D) -> Void)?
+        ) {
             self.onLongPress = onLongPress
+            self.onCameraIdle = onCameraIdle
         }
 
         @objc func handleLongPress(_ recognizer: UILongPressGestureRecognizer) {
@@ -99,6 +115,10 @@ struct GoogleMapView: UIViewRepresentable {
             let point = recognizer.location(in: mapView)
             let coordinate = mapView.projection.coordinate(for: point)
             onLongPress?(coordinate)
+        }
+
+        func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
+            onCameraIdle?(position.target)
         }
     }
 }

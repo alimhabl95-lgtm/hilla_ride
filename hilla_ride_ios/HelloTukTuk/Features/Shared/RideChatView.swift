@@ -7,6 +7,8 @@ struct RideChatView: View {
     @State private var messages: [RideMessage] = []
     @State private var draft = ""
     @State private var chatTask: Task<Void, Never>?
+    @StateObject private var voiceRecorder = VoiceRecorder()
+    @State private var isSendingVoice = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,17 +31,41 @@ struct RideChatView: View {
                 }
             }
 
-            HStack(spacing: 8) {
-                TextField(L10n.string(.chatHint, language: appState.language), text: $draft)
-                    .textFieldStyle(AppTextFieldStyle())
-                Button(L10n.string(.send, language: appState.language)) {
-                    Task { await sendMessage() }
+            if voiceRecorder.isRecording {
+                HStack {
+                    Image(systemName: "mic.fill")
+                        .foregroundStyle(.red)
+                    Text("\(L10n.string(.recordingVoice, language: appState.language)) \(VoiceMessageBubble.formatDuration(voiceRecorder.elapsedMs))")
+                    Spacer()
+                    Button(L10n.string(.cancel, language: appState.language)) {
+                        voiceRecorder.cancelRecording()
+                    }
+                    Button(L10n.string(.send, language: appState.language)) {
+                        Task { await stopAndSendVoice() }
+                    }
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .padding()
+                .background(.ultraThinMaterial)
+            } else {
+                HStack(spacing: 8) {
+                    Button {
+                        Task { try? voiceRecorder.startRecording() }
+                    } label: {
+                        Image(systemName: "mic.fill")
+                    }
+                    .disabled(isSendingVoice)
+
+                    TextField(L10n.string(.chatHint, language: appState.language), text: $draft)
+                        .textFieldStyle(AppTextFieldStyle())
+                    Button(L10n.string(.send, language: appState.language)) {
+                        Task { await sendMessage() }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding()
+                .background(.ultraThinMaterial)
             }
-            .padding()
-            .background(.ultraThinMaterial)
         }
         .navigationTitle(L10n.string(.rideChatTitle, language: appState.language))
         .navigationBarTitleDisplayMode(.inline)
@@ -50,19 +76,29 @@ struct RideChatView: View {
         .onDisappear {
             RideAlertService.shared.setForegroundChatRideId(nil)
             chatTask?.cancel()
+            voiceRecorder.cancelRecording()
         }
     }
 
+    @ViewBuilder
     private func chatBubble(_ message: RideMessage) -> some View {
         let isMine = message.senderId == appState.currentUser?.uid
-        return VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
+        VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
             Text(message.senderName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text(message.text)
-                .padding(10)
-                .background(isMine ? BrandColors.teal.opacity(0.2) : Color.gray.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            if message.isVoice {
+                VoiceMessageBubble(
+                    voiceUrl: message.voiceUrl,
+                    durationMs: message.voiceDurationMs,
+                    isMine: isMine
+                )
+            } else {
+                Text(message.text)
+                    .padding(10)
+                    .background(isMine ? BrandColors.teal.opacity(0.2) : Color.gray.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
         }
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
     }
@@ -87,5 +123,32 @@ struct RideChatView: View {
             senderName: user.name,
             text: text
         )
+    }
+
+    private func stopAndSendVoice() async {
+        guard let user = appState.currentUser,
+              let recording = voiceRecorder.stopRecording() else { return }
+        isSendingVoice = true
+        defer { isSendingVoice = false }
+        do {
+            let messageId = UUID().uuidString
+            let data = try Data(contentsOf: recording.url)
+            let voiceUrl = try await StorageService().uploadRideVoiceMessage(
+                rideId: rideId,
+                messageId: messageId,
+                data: data
+            )
+            try await ChatService().sendRideVoiceMessage(
+                rideId: rideId,
+                senderId: user.uid,
+                senderRole: user.role,
+                senderName: user.name,
+                voiceUrl: voiceUrl,
+                voiceDurationMs: recording.durationMs
+            )
+            try? FileManager.default.removeItem(at: recording.url)
+        } catch {
+            // Non-fatal.
+        }
     }
 }

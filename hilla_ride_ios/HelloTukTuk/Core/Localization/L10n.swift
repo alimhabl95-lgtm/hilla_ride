@@ -175,6 +175,23 @@ enum L10nKey {
     case owedToPlatformLabel
     case pendingBonusLabel
     case supportPreviousMessages
+    case confirmPinLocation
+    case pickOnMap
+    case restoreProfileTitle
+    case restoreProfileMessage
+    case restoreProfileAction
+    case useDifferentAccount
+    case customerProfileTitle
+    case customerProfileHint
+    case profileFieldsRequired
+    case gender
+    case genderOptional
+    case genderMale
+    case genderFemale
+    case recordingVoice
+    case voiceMessagePreview
+    case cancelledRidesCount
+    case cancel
 }
 
 enum L10n {
@@ -476,6 +493,32 @@ enum L10n {
         .driverNetEarnings: [.english: "Net earnings", .arabic: "صافي الأرباح"],
         .owedToPlatformLabel: [.english: "Owed to platform", .arabic: "المستحق للمنصة"],
         .pendingBonusLabel: [.english: "Pending bonus", .arabic: "مكافأة معلّقة"],
-        .supportPreviousMessages: [.english: "Previous messages", .arabic: "الرسائل السابقة"]
+        .supportPreviousMessages: [.english: "Previous messages", .arabic: "الرسائل السابقة"],
+        .confirmPinLocation: [.english: "Confirm location", .arabic: "تأكيد الموقع"],
+        .pickOnMap: [.english: "Pick on map", .arabic: "اختر على الخريطة"],
+        .restoreProfileTitle: [.english: "Restore your profile", .arabic: "استعادة ملفك الشخصي"],
+        .restoreProfileMessage: [
+            .english: "Your account exists but profile data is missing. Enter your name to continue.",
+            .arabic: "حسابك موجود لكن بيانات الملف مفقودة. أدخل اسمك للمتابعة."
+        ],
+        .restoreProfileAction: [.english: "Restore profile", .arabic: "استعادة الملف"],
+        .useDifferentAccount: [.english: "Use a different account", .arabic: "استخدام حساب آخر"],
+        .customerProfileTitle: [.english: "Complete your profile", .arabic: "أكمل ملفك الشخصي"],
+        .customerProfileHint: [
+            .english: "Add your name and age before booking rides.",
+            .arabic: "أضف اسمك وعمرك قبل حجز المشاوير."
+        ],
+        .profileFieldsRequired: [
+            .english: "Name and age are required.",
+            .arabic: "الاسم والعمر مطلوبان."
+        ],
+        .gender: [.english: "Gender", .arabic: "الجنس"],
+        .genderOptional: [.english: "Prefer not to say", .arabic: "لا أرغب بالإفصاح"],
+        .genderMale: [.english: "Male", .arabic: "ذكر"],
+        .genderFemale: [.english: "Female", .arabic: "أنثى"],
+        .recordingVoice: [.english: "Recording", .arabic: "جاري التسجيل"],
+        .voiceMessagePreview: [.english: "Voice message", .arabic: "رسالة صوتية"],
+        .cancelledRidesCount: [.english: "Cancelled rides", .arabic: "الرحلات الملغاة"],
+        .cancel: [.english: "Cancel", .arabic: "إلغاء"]
     ]
 }

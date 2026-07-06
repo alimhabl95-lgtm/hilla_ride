@@ -358,26 +358,39 @@ final class RideRepository {
         }
     }
 
-    func watchRideHistoryForCustomer(customerId: String) -> AsyncStream<[Ride]> {
-        watchRideHistory(queryField: "customerId", id: customerId)
+    func watchRideHistoryForCustomer(customerId: String, statusFilter: RideStatus? = nil) -> AsyncStream<[Ride]> {
+        watchRideHistory(queryField: "customerId", id: customerId, statusFilter: statusFilter)
     }
 
-    func watchRideHistoryForDriver(driverId: String) -> AsyncStream<[Ride]> {
-        watchRideHistory(queryField: "driverId", id: driverId)
+    func watchRideHistoryForDriver(driverId: String, statusFilter: RideStatus? = nil) -> AsyncStream<[Ride]> {
+        watchRideHistory(queryField: "driverId", id: driverId, statusFilter: statusFilter)
     }
 
-    private func watchRideHistory(queryField: String, id: String) -> AsyncStream<[Ride]> {
+    private func watchRideHistory(
+        queryField: String,
+        id: String,
+        statusFilter: RideStatus?
+    ) -> AsyncStream<[Ride]> {
         AsyncStream { continuation in
-            let listener = firestore.collection("rides")
+            var query: Query = firestore.collection("rides")
                 .whereField(queryField, isEqualTo: id)
+            if let statusFilter {
+                query = query.whereField("status", isEqualTo: statusFilter.rawValue)
+            }
+            let listener = query
                 .order(by: "createdAt", descending: true)
                 .limit(to: 40)
                 .addSnapshotListener { snapshot, _ in
                     let rides = snapshot?.documents.compactMap { doc in
                         Ride(documentID: doc.documentID, data: doc.data())
                     } ?? []
-                    let history = rides.filter {
-                        $0.status == .completed || $0.status == .cancelled
+                    let history: [Ride]
+                    if statusFilter != nil {
+                        history = rides
+                    } else {
+                        history = rides.filter {
+                            $0.status == .completed || $0.status == .cancelled
+                        }
                     }
                     continuation.yield(history)
                 }

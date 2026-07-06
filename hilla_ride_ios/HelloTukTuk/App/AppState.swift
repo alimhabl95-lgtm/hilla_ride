@@ -17,6 +17,10 @@ final class AppState: ObservableObject {
     @Published private(set) var currentDriver: DriverProfile?
     @Published private(set) var isBootstrapping = true
 
+    var needsProfileRecovery: Bool {
+        Auth.auth().currentUser != nil && currentUser == nil && !isBootstrapping
+    }
+
     let authService = AuthService()
     private let driverRepository = DriverRepository()
     private var authListener: AuthStateDidChangeListenerHandle?

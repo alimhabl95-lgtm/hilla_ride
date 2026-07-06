@@ -5,6 +5,9 @@ struct EditProfileView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
+    @State private var ageText = ""
+    @State private var gender = ""
+    @State private var profilePhotoData: Data?
     @State private var isSaving = false
     @State private var message: String?
 
@@ -14,8 +17,33 @@ struct EditProfileView: View {
                 Text(L10n.string(.editProfileTitle, language: appState.language))
                     .font(.largeTitle.bold())
 
+                if let user = appState.currentUser {
+                    HStack(spacing: 16) {
+                        ProfileAvatarView(
+                            name: name.isEmpty ? user.name : name,
+                            photoURL: user.profilePhotoUrl.isEmpty ? nil : user.profilePhotoUrl,
+                            size: 72
+                        )
+                        PhotoUploadField(
+                            title: L10n.string(.profilePhotoLabel, language: appState.language),
+                            imageData: $profilePhotoData
+                        )
+                    }
+                }
+
                 TextField(L10n.string(.fullName, language: appState.language), text: $name)
                     .textFieldStyle(AppTextFieldStyle())
+
+                TextField(L10n.string(.age, language: appState.language), text: $ageText)
+                    .textFieldStyle(AppTextFieldStyle())
+                    .keyboardType(.numberPad)
+
+                Picker(L10n.string(.gender, language: appState.language), selection: $gender) {
+                    Text(L10n.string(.genderOptional, language: appState.language)).tag("")
+                    Text(L10n.string(.genderMale, language: appState.language)).tag("male")
+                    Text(L10n.string(.genderFemale, language: appState.language)).tag("female")
+                }
+                .pickerStyle(.menu)
 
                 if let user = appState.currentUser {
                     profileRow(
@@ -41,7 +69,12 @@ struct EditProfileView: View {
         .background(BrandColors.surface.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            name = appState.currentUser?.name ?? ""
+            guard let user = appState.currentUser else { return }
+            name = user.name
+            if user.age > 0 {
+                ageText = String(user.age)
+            }
+            gender = user.gender ?? ""
         }
     }
 
@@ -53,13 +86,29 @@ struct EditProfileView: View {
     }
 
     private func save() async {
-        guard let uid = appState.currentUser?.uid else { return }
+        guard let user = appState.currentUser else { return }
+        let age = Int(ageText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, age > 0 else {
+            message = L10n.string(.profileFieldsRequired, language: appState.language)
+            return
+        }
+
         isSaving = true
         defer { isSaving = false }
         do {
-            try await UserRepository().updateUserName(uid: uid, name: name)
-            if let user = try await UserRepository().fetchUser(uid: uid) {
-                appState.setCurrentUser(user)
+            var photoUrl: String? = user.profilePhotoUrl.isEmpty ? nil : user.profilePhotoUrl
+            if let profilePhotoData {
+                photoUrl = try await StorageService().uploadUserProfilePhoto(uid: user.uid, data: profilePhotoData)
+            }
+            try await UserRepository().updateUserProfile(
+                uid: user.uid,
+                name: name,
+                age: age,
+                gender: gender.isEmpty ? nil : gender,
+                profilePhotoUrl: photoUrl
+            )
+            if let updated = try await UserRepository().fetchUser(uid: user.uid) {
+                appState.setCurrentUser(updated)
             }
             message = L10n.string(.profileSaved, language: appState.language)
         } catch {

@@ -13,6 +13,8 @@ struct CustomerHomeMapView: View {
     @State private var showProfile = false
     @State private var showPickupSearch = false
     @State private var showDestinationSearch = false
+    @State private var showPickupPinPicker = false
+    @State private var showDestinationPinPicker = false
     @State private var showHistory = false
     @State private var showSupport = false
     @State private var showAnnouncements = false
@@ -112,6 +114,22 @@ struct CustomerHomeMapView: View {
                     }
                 )
             }
+            .navigationDestination(isPresented: $showPickupPinPicker) {
+                MapPinPickerView(
+                    title: L10n.string(.pickupLabel, language: appState.language),
+                    initialCenter: pickup?.coordinate ?? subDistrict.center
+                ) { place in
+                    pickup = place
+                }
+            }
+            .navigationDestination(isPresented: $showDestinationPinPicker) {
+                MapPinPickerView(
+                    title: L10n.string(.destinationLabel, language: appState.language),
+                    initialCenter: destination?.coordinate ?? pickup?.coordinate ?? subDistrict.center
+                ) { place in
+                    destination = place
+                }
+            }
             .task {
                 locationService.requestAuthorizationIfNeeded()
             }
@@ -159,6 +177,11 @@ struct CustomerHomeMapView: View {
                 )
             }
             .buttonStyle(.plain)
+            Button(L10n.string(.pickOnMap, language: appState.language)) {
+                showPickupPinPicker = true
+            }
+            .font(.caption)
+            .buttonStyle(.borderless)
 
             Button {
                 showDestinationSearch = true
@@ -171,6 +194,11 @@ struct CustomerHomeMapView: View {
                 )
             }
             .buttonStyle(.plain)
+            Button(L10n.string(.pickOnMap, language: appState.language)) {
+                showDestinationPinPicker = true
+            }
+            .font(.caption)
+            .buttonStyle(.borderless)
 
             if let errorMessage {
                 Text(errorMessage)

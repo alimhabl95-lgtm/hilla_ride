@@ -23,6 +23,8 @@ struct AppUser: Identifiable, Equatable {
     let name: String
     let age: Int
     let email: String?
+    let gender: String?
+    let profilePhotoUrl: String
     let isBlocked: Bool
     let promoCode: String
     let promoRidesUsed: Int
@@ -32,6 +34,9 @@ struct AppUser: Identifiable, Equatable {
     var hasPromoRemaining: Bool {
         !promoCode.isEmpty && promoRidesUsed < promoRidesLimit
     }
+    var isProfileComplete: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && age > 0
+    }
 
     init(
         uid: String,
@@ -40,6 +45,8 @@ struct AppUser: Identifiable, Equatable {
         name: String,
         age: Int = 18,
         email: String? = nil,
+        gender: String? = nil,
+        profilePhotoUrl: String = "",
         isBlocked: Bool = false,
         promoCode: String = "",
         promoRidesUsed: Int = 0,
@@ -51,6 +58,8 @@ struct AppUser: Identifiable, Equatable {
         self.name = name
         self.age = age
         self.email = email
+        self.gender = gender
+        self.profilePhotoUrl = profilePhotoUrl
         self.isBlocked = isBlocked
         self.promoCode = promoCode
         self.promoRidesUsed = promoRidesUsed
@@ -58,16 +67,15 @@ struct AppUser: Identifiable, Equatable {
     }
 
     init?(documentID: String, data: [String: Any]) {
-        guard let phone = data["phone"] as? String,
-              let name = data["name"] as? String else {
-            return nil
-        }
+        guard let phone = data["phone"] as? String else { return nil }
         uid = documentID
         self.phone = phone
-        self.name = name
+        name = data["name"] as? String ?? ""
         role = UserRole.fromFirestore(data["role"] as? String)
-        age = data["age"] as? Int ?? 18
+        age = (data["age"] as? NSNumber)?.intValue ?? 0
         email = data["email"] as? String
+        gender = data["gender"] as? String
+        profilePhotoUrl = data["profilePhotoUrl"] as? String ?? ""
         isBlocked = data["isBlocked"] as? Bool ?? false
         promoCode = data["promoCode"] as? String ?? ""
         promoRidesUsed = (data["promoRidesUsed"] as? NSNumber)?.intValue ?? 0

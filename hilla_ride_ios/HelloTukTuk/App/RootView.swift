@@ -13,6 +13,8 @@ struct RootView: View {
                 WelcomeSplashGate {
                     AppShellView()
                 }
+            } else if appState.needsProfileRecovery {
+                MissingProfileRecoveryView()
             } else {
                 ModeChooserView()
             }

@@ -79,6 +79,13 @@
 		A10000000000000000000076 /* RideAlertOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000076 /* RideAlertOverlay.swift */; };
 		A10000000000000000000077 /* AppToolbarActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000077 /* AppToolbarActions.swift */; };
 		A10000000000000000000078 /* WelcomeSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000078 /* WelcomeSplashView.swift */; };
+		A10000000000000000000079 /* GeocodingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000079 /* GeocodingService.swift */; };
+		A10000000000000000000080 /* VoiceRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000080 /* VoiceRecorder.swift */; };
+		A10000000000000000000081 /* MapPinPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000081 /* MapPinPickerView.swift */; };
+		A10000000000000000000082 /* CustomerProfileOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000082 /* CustomerProfileOnboardingView.swift */; };
+		A10000000000000000000083 /* MissingProfileRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000083 /* MissingProfileRecoveryView.swift */; };
+		A10000000000000000000084 /* ProfileAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000084 /* ProfileAvatarView.swift */; };
+		A10000000000000000000085 /* VoiceMessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000085 /* VoiceMessageBubble.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -150,6 +157,13 @@
 		A20000000000000000000076 /* RideAlertOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideAlertOverlay.swift; sourceTree = "<group>"; };
 		A20000000000000000000077 /* AppToolbarActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppToolbarActions.swift; sourceTree = "<group>"; };
 		A20000000000000000000078 /* WelcomeSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeSplashView.swift; sourceTree = "<group>"; };
+		A20000000000000000000079 /* GeocodingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeocodingService.swift; sourceTree = "<group>"; };
+		A20000000000000000000080 /* VoiceRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecorder.swift; sourceTree = "<group>"; };
+		A20000000000000000000081 /* MapPinPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPinPickerView.swift; sourceTree = "<group>"; };
+		A20000000000000000000082 /* CustomerProfileOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerProfileOnboardingView.swift; sourceTree = "<group>"; };
+		A20000000000000000000083 /* MissingProfileRecoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissingProfileRecoveryView.swift; sourceTree = "<group>"; };
+		A20000000000000000000084 /* ProfileAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAvatarView.swift; sourceTree = "<group>"; };
+		A20000000000000000000085 /* VoiceMessageBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceMessageBubble.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -301,6 +315,8 @@
 				A20000000000000000000070 /* RideAlertService.swift */,
 				A20000000000000000000072 /* SavedPlacesService.swift */,
 				A20000000000000000000074 /* AnnouncementService.swift */,
+				A20000000000000000000079 /* GeocodingService.swift */,
+				A20000000000000000000080 /* VoiceRecorder.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -332,6 +348,8 @@
 			children = (
 				A20000000000000000000032 /* ProfileView.swift */,
 				A20000000000000000000060 /* EditProfileView.swift */,
+				A20000000000000000000082 /* CustomerProfileOnboardingView.swift */,
+				A20000000000000000000083 /* MissingProfileRecoveryView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -370,6 +388,7 @@
 				A20000000000000000000050 /* TripCompletedView.swift */,
 				A20000000000000000000056 /* PlaceSearchView.swift */,
 				A20000000000000000000075 /* SavedPlacesBar.swift */,
+				A20000000000000000000081 /* MapPinPickerView.swift */,
 			);
 			path = Customer;
 			sourceTree = "<group>";
@@ -383,6 +402,8 @@
 				A20000000000000000000076 /* RideAlertOverlay.swift */,
 				A20000000000000000000077 /* AppToolbarActions.swift */,
 				A20000000000000000000078 /* WelcomeSplashView.swift */,
+				A20000000000000000000084 /* ProfileAvatarView.swift */,
+				A20000000000000000000085 /* VoiceMessageBubble.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -542,6 +563,14 @@
 				A10000000000000000000075 /* SavedPlacesBar.swift in Sources */,
 				A10000000000000000000076 /* RideAlertOverlay.swift in Sources */,
 				A10000000000000000000077 /* AppToolbarActions.swift in Sources */,
+				A10000000000000000000078 /* WelcomeSplashView.swift in Sources */,
+				A10000000000000000000079 /* GeocodingService.swift in Sources */,
+				A10000000000000000000080 /* VoiceRecorder.swift in Sources */,
+				A10000000000000000000081 /* MapPinPickerView.swift in Sources */,
+				A10000000000000000000082 /* CustomerProfileOnboardingView.swift in Sources */,
+				A10000000000000000000083 /* MissingProfileRecoveryView.swift in Sources */,
+				A10000000000000000000084 /* ProfileAvatarView.swift in Sources */,
+				A10000000000000000000085 /* VoiceMessageBubble.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -591,7 +620,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 68;
+				CURRENT_PROJECT_VERSION = 69;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -623,7 +652,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 68;
+				CURRENT_PROJECT_VERSION = 69;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
