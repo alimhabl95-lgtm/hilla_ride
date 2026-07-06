@@ -60,19 +60,28 @@ The workflow uses **certificates and profiles stored in Codemagic Team settings*
 2. Upload your **Apple Distribution** `.p12` + password
 3. Reference name: `hilla_ride_distribution`
 
-#### Provisioning profile (keep in sync with certificate)
+#### Provisioning profile (must match your certificate)
 
-The **distribution certificate** and **provisioning profile** must match. If you regenerate the certificate, delete the old App Store profile and fetch a new one.
+The **distribution certificate** and **App Store provisioning profile** must include the **same** Apple Distribution cert. If you see *"Provisioning profile doesn't include signing certificate"*, do this **once**:
 
-**Option A — automatic (recommended):** The Codemagic workflow refreshes the App Store profile on each build (`fetch-signing-files --create --delete-stale-profiles`). You only need the Team certificate `hilla_ride_distribution`.
+**Step 1 — Apple Developer (fix the profile on Apple’s side)**
 
-**Option B — manual refresh in Codemagic UI:**
+1. Open [Apple Developer → Profiles](https://developer.apple.com/account/resources/profiles/list)
+2. Find the **App Store** profile for **`com.hillaride.hillaRide`** (e.g. *Hello Tuk-Tuk ios_app_store*)
+3. Either **Edit** it and check the box for **Apple Distribution: Ali Al-Isawi (XAZ6V7UTYT)**, then **Save**  
+   **OR** delete the old profile and click **+** → **App Store Connect** → select app **`com.hillaride.hillaRide`** → select certificate **`Apple Distribution: Ali Al-Isawi`** → **Generate**
+4. Download the new `.mobileprovision` if Apple offers a download (optional)
 
-1. **iOS provisioning profiles** tab → delete the old `hilla_ride_appstore` profile if present
-2. **Fetch profiles** → select **App Store** profile for **`com.hillaride.hillaRide`**
-3. Reference name: `hilla_ride_appstore` → **Download selected**
+**Step 2 — Codemagic (download the updated profile)**
 
-If archive fails with *"Provisioning profile doesn't include signing certificate"*, the profile was created before your current distribution certificate — repeat Option B or re-run the build after commit that auto-refreshes profiles.
+1. **Team settings → Code signing identities → iOS provisioning profiles**
+2. **Delete** the old `hilla_ride_appstore` entry
+3. **Fetch profiles** → select the **App Store** profile for **`com.hillaride.hillaRide`**
+4. Reference name: `hilla_ride_appstore` → **Download selected**
+
+**Step 3 — Rebuild** on branch `master` (workflow **Hello Tuk-Tuk Native iOS**)
+
+Do **not** use `fetch-signing-files --create` in CI unless you also store `CERTIFICATE_PRIVATE_KEY` in Codemagic environment variables — it will fail with *"Cannot save Signing Certificates without certificate private key"*.
 
 ### Start a native Swift build
 

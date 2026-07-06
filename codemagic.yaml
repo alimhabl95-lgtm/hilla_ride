@@ -1,7 +1,7 @@
 # Hello Tuk-Tuk — Native Swift iOS (TestFlight)
 #
-# Signing: distribution cert in Codemagic Team settings; profile refreshed each build
-# so it always matches the active Apple Distribution certificate.
+# Signing: hilla_ride_distribution + hilla_ride_appstore in Codemagic Team settings.
+# Profile must include the same Apple Distribution certificate (see hilla_ride_ios/README.md).
 
 workflows:
   hello-tuk-tuk-native-ios:
@@ -12,10 +12,10 @@ workflows:
       app_store_connect: codemagic
     environment:
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.hillaride.hillaRide
         certificates:
           - hilla_ride_distribution
+        provisioning_profiles:
+          - hilla_ride_appstore
       vars:
         BUNDLE_ID: com.hillaride.hillaRide
         XCODE_PROJECT: hilla_ride_ios/HelloTukTuk.xcodeproj
@@ -48,16 +48,6 @@ workflows:
           set -euo pipefail
           keychain initialize
           keychain add-certificates
-      - name: Refresh App Store provisioning profile
-        script: |
-          set -euo pipefail
-          echo "Creating/fetching App Store profile for ${BUNDLE_ID} (matched to Team certificate)"
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create \
-            --delete-stale-profiles
-          echo "Profiles available:"
-          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" 2>/dev/null || true
       - name: Apply signing to native Xcode project only
         script: |
           set -euo pipefail
