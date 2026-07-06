@@ -17,7 +17,7 @@ final class AppState: ObservableObject {
     @Published private(set) var isBootstrapping = true
 
     let authService = AuthService()
-    private var authListener: AuthStateDidChangeListenerHandle?
+    nonisolated(unsafe) private var authListener: AuthStateDidChangeListenerHandle?
 
     init() {
         let savedLanguage = UserDefaults.standard.string(forKey: "app_language")

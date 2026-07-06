@@ -60,10 +60,20 @@ workflows:
           xcodebuild -resolvePackageDependencies \
             -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME"
+          set +e
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
-            --archive-flags="DEVELOPMENT_TEAM=XAZ6V7UTYT MARKETING_VERSION=$MARKETING_VERSION CURRENT_PROJECT_VERSION=$BUILD_NUMBER"
+            --archive-flags="DEVELOPMENT_TEAM=XAZ6V7UTYT MARKETING_VERSION=$MARKETING_VERSION CURRENT_PROJECT_VERSION=$BUILD_NUMBER" \
+            2>&1 | tee /tmp/xcodebuild_release.log
+          BUILD_STATUS=${PIPESTATUS[0]}
+          if [ "$BUILD_STATUS" -ne 0 ]; then
+            echo "========== BUILD ERRORS =========="
+            grep -E " error: | fatal error: |❌" /tmp/xcodebuild_release.log || true
+            echo "=================================="
+            exit "$BUILD_STATUS"
+          fi
+          set -e
           IPA="$(ls "$CM_BUILD_DIR"/build/ios/ipa/*.ipa | head -1)"
           echo "Built IPA: $IPA"
           TMP="$(mktemp -d)"

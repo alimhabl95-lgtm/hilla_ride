@@ -32,6 +32,7 @@
 		A10000000000000000000023 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000002 /* FirebaseFirestore */; };
 		A10000000000000000000024 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000003 /* FirebaseMessaging */; };
 		A10000000000000000000025 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000004 /* FirebaseFunctions */; };
+		A10000000000000000000026 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = A50000000000000000000005 /* FirebaseCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -70,6 +71,7 @@
 				A10000000000000000000023 /* FirebaseFirestore in Frameworks */,
 				A10000000000000000000024 /* FirebaseMessaging in Frameworks */,
 				A10000000000000000000025 /* FirebaseFunctions in Frameworks */,
+				A10000000000000000000026 /* FirebaseCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -465,6 +467,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFunctions;
+		};
+		A50000000000000000000005 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

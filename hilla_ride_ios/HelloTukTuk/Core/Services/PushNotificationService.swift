@@ -1,6 +1,7 @@
 import FirebaseFirestore
 import FirebaseMessaging
 import Foundation
+import UIKit
 import UserNotifications
 
 @MainActor
