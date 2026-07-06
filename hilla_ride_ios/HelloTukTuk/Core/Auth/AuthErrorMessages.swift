@@ -4,7 +4,7 @@ import Foundation
 enum AuthErrorMessages {
     static func message(for error: Error) -> String {
         if let authError = error as NSError?, authError.domain == AuthErrorDomain {
-        guard let errorCode = AuthErrorCode(rawValue: authError.code) else {
+            guard let errorCode = AuthErrorCode(rawValue: authError.code) else {
                 return authError.localizedDescription
             }
             switch errorCode {

@@ -54,6 +54,8 @@ workflows:
           xcode-project use-profiles \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --code-signing-setup-verbose-logging
+          echo "Signing settings applied to project:"
+          grep -E "CODE_SIGN|PROVISIONING" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj" | head -20 || true
       - name: Build Release IPA (Swift)
         script: |
           set -euo pipefail
@@ -77,14 +79,14 @@ workflows:
           set -e
           if [ "$ARCHIVE_STATUS" -ne 0 ]; then
             echo "========== ARCHIVE / EXPORT ERRORS =========="
-            grep -iE '(error:|fatal error:|ARCHIVE FAILED|EXPORT FAILED|BUILD FAILED|Unable to find a destination|command failed|❌|The following build commands failed)' \
+            grep -iE '(error:|fatal error:|ARCHIVE FAILED|EXPORT FAILED|BUILD FAILED|Unable to find a destination|provisioning profile|Signing for|command failed|❌|The following build commands failed|\.swift:[0-9]+:[0-9]+:)' \
               "$LOG_DIR/archive_export.log" "$LOG_DIR/resolve_packages.log" || true
             if [ -d /tmp/xcodebuild_logs ]; then
               echo "----- xcodebuild log files -----"
               find /tmp/xcodebuild_logs -type f -name '*.log' -print
-              find /tmp/xcodebuild_logs -type f -name '*.log' -exec grep -iE '(error:|fatal error:)' {} + || true
+              find /tmp/xcodebuild_logs -type f -name '*.log' -exec grep -iE '(error:|fatal error:|Signing for|provisioning profile)' {} + || true
             fi
-            tail -n 150 "$LOG_DIR/archive_export.log"
+            tail -n 200 "$LOG_DIR/archive_export.log"
             echo "============================================="
             exit "$ARCHIVE_STATUS"
           fi
