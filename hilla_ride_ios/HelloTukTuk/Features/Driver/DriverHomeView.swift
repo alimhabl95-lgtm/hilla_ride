@@ -107,7 +107,7 @@ struct DriverHomeView: View {
         }
         .onAppear { startWatching() }
         .onDisappear { stopWatching() }
-        .onChange(of: activeRide?.customerId) { _, customerId in
+       .onChange(of: activeRide?.customerId) { customerId in
             startWatchingCustomer(customerId)
         }
     }
