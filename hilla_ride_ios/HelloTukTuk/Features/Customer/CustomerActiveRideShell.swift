@@ -239,7 +239,7 @@ struct ActiveRideMapView: View {
             driverTask?.cancel()
             driverTask = nil
         }
-        .onChange(of: ride.driverId) { _, _ in
+          .onChange(of: ride.driverId) { _ in
             startWatchingDriver()
         }
     }
