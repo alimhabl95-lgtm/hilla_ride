@@ -60,16 +60,19 @@ The workflow uses **certificates and profiles stored in Codemagic Team settings*
 2. Upload your **Apple Distribution** `.p12` + password
 3. Reference name: `hilla_ride_distribution`
 
-#### Provisioning profile (both options)
+#### Provisioning profile (keep in sync with certificate)
 
-1. **iOS provisioning profiles** tab → **Fetch profiles**
-2. Select **App Store** profile for **`com.hillaride.hillaRide`**
-3. Reference name: `hilla_ride_appstore`
-4. Click **Download selected**
+The **distribution certificate** and **provisioning profile** must match. If you regenerate the certificate, delete the old App Store profile and fetch a new one.
 
-The build applies signing **only** to `HelloTukTuk.xcodeproj` (not the old Flutter `ios/` project).
+**Option A — automatic (recommended):** The Codemagic workflow refreshes the App Store profile on each build (`fetch-signing-files --create --delete-stale-profiles`). You only need the Team certificate `hilla_ride_distribution`.
 
-If the build log shows empty certificates/profiles, complete the steps above and rebuild.
+**Option B — manual refresh in Codemagic UI:**
+
+1. **iOS provisioning profiles** tab → delete the old `hilla_ride_appstore` profile if present
+2. **Fetch profiles** → select **App Store** profile for **`com.hillaride.hillaRide`**
+3. Reference name: `hilla_ride_appstore` → **Download selected**
+
+If archive fails with *"Provisioning profile doesn't include signing certificate"*, the profile was created before your current distribution certificate — repeat Option B or re-run the build after commit that auto-refreshes profiles.
 
 ### Start a native Swift build
 
