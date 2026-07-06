@@ -99,7 +99,7 @@ workflows:
           PLIST="$(find "$TMP/Payload" -name Info.plist | head -1)"
           VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")"
           BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
-         DISPLAY="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST")"
+          DISPLAY="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST")"
           echo "Bundle version: $VERSION ($BUILD)"
           echo "Display name: $DISPLAY"
           rm -rf "$TMP"
