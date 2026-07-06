@@ -1,9 +1,10 @@
 # Hello Tuk-Tuk — Native Swift iOS (TestFlight)
 #
-# Signing: uses certificates + profiles uploaded/fetched in Codemagic
-# Team settings → Code signing identities (same bundle ID as Flutter builds).
+# Signing: App Store Connect integration creates/fetches cert + profile during the build.
+# No manual .p12 upload required if the integration "codemagic" is connected.
 #
-# Codemagic app settings → Build configuration → codemagic.yaml
+# After the first successful build, copy CERTIFICATE_PRIVATE_KEY from the build log into
+# Codemagic → Application → Environment variables (secure) so future builds reuse the same cert.
 
 workflows:
   hello-tuk-tuk-native-ios:
@@ -13,9 +14,6 @@ workflows:
     integrations:
       app_store_connect: codemagic
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.hillaride.hillaRide
       vars:
         BUNDLE_ID: com.hillaride.hillaRide
         XCODE_PROJECT: hilla_ride_ios/HelloTukTuk.xcodeproj
@@ -43,13 +41,32 @@ workflows:
           echo "=========================================="
           test -f "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           test -f "$CM_BUILD_DIR/hilla_ride_ios/HelloTukTuk/HelloTukTukApp.swift"
-      - name: Show available signing files
+      - name: Prepare distribution certificate private key
         script: |
           set -euo pipefail
-          echo "Certificates on build machine:"
-          ls -la "$HOME/Library/MobileDevice/Certificates" 2>/dev/null || echo "(none yet — Codemagic injects these from Team settings)"
-          echo "Provisioning profiles on build machine:"
-          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" 2>/dev/null || echo "(none yet)"
+          KEY_FILE="/tmp/ios_distribution_key.pem"
+          if [ -n "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+            echo "Using stored CERTIFICATE_PRIVATE_KEY from Codemagic environment"
+            printf '%s\n' "$CERTIFICATE_PRIVATE_KEY" > "$KEY_FILE"
+          else
+            echo "Generating a new distribution certificate private key for this build"
+            openssl genrsa -out "$KEY_FILE" 2048
+            echo ""
+            echo "============================================================"
+            echo " SAVE THIS KEY IN CODEMAGIC (one time, after build succeeds):"
+            echo " Application → Environment variables → CERTIFICATE_PRIVATE_KEY"
+            echo " Mark as Secure. Paste the full PEM below on future builds."
+            echo "============================================================"
+            cat "$KEY_FILE"
+            echo "============================================================"
+          fi
+      - name: Fetch signing files from Apple
+        script: |
+          set -euo pipefail
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create \
+            --certificate-key=@file:/tmp/ios_distribution_key.pem
       - name: Set up keychain
         script: |
           set -euo pipefail
