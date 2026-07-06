@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 
 enum DriverApprovalStatus: String, Codable {
@@ -23,9 +24,22 @@ struct DriverProfile: Identifiable, Equatable {
     let approvalStatus: DriverApprovalStatus
     let isBlocked: Bool
     let isOnline: Bool
+    let latitude: Double?
+    let longitude: Double?
+    let hasActiveRide: Bool
+    let isFakeDriver: Bool
+    let autoAcceptRides: Bool
+    let assignedDistrictId: String
+    let assignedSubDistrictId: String
+    let completedRidesCount: Int
 
     var id: String { uid }
     var isApproved: Bool { approvalStatus == .approved }
+
+    var sortCoordinate: CLLocationCoordinate2D? {
+        guard let latitude, let longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
 
     init?(documentID: String, data: [String: Any]) {
         guard let phone = data["phone"] as? String,
@@ -41,5 +55,13 @@ struct DriverProfile: Identifiable, Equatable {
         approvalStatus = DriverApprovalStatus.fromFirestore(data["approvalStatus"] as? String)
         isBlocked = data["isBlocked"] as? Bool ?? false
         isOnline = data["isOnline"] as? Bool ?? false
+        latitude = (data["latitude"] as? NSNumber)?.doubleValue
+        longitude = (data["longitude"] as? NSNumber)?.doubleValue
+        hasActiveRide = data["hasActiveRide"] as? Bool ?? false
+        isFakeDriver = data["isFakeDriver"] as? Bool ?? false
+        autoAcceptRides = data["autoAcceptRides"] as? Bool ?? false
+        assignedDistrictId = data["assignedDistrictId"] as? String ?? ""
+        assignedSubDistrictId = data["assignedSubDistrictId"] as? String ?? ""
+        completedRidesCount = (data["completedRidesCount"] as? NSNumber)?.intValue ?? 0
     }
 }

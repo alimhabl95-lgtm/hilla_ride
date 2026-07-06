@@ -10,61 +10,12 @@ struct AppShellView: View {
                 case .driver:
                     DriverShellView()
                 default:
-                    CustomerHomeView()
+                    CustomerAppEntryView()
                 }
             }
         }
         .task(id: appState.currentUser?.uid) {
             await appState.refreshDriverProfileIfNeeded()
-        }
-    }
-}
-
-struct CustomerHomeView: View {
-    @EnvironmentObject private var appState: AppState
-    @State private var showProfile = false
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                Image(systemName: "map.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(BrandColors.teal)
-
-                Text(L10n.string(.customerHomeTitle, language: appState.language))
-                    .font(.title2.bold())
-                    .multilineTextAlignment(.center)
-
-                if let user = appState.currentUser {
-                    Text(user.name)
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-
-                Text(L10n.string(.mapsComingSoon, language: appState.language))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(BrandColors.surface.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    LanguageToggle()
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showProfile = true
-                    } label: {
-                        Image(systemName: "person.circle")
-                    }
-                }
-            }
-            .navigationDestination(isPresented: $showProfile) {
-                ProfileView()
-            }
         }
     }
 }

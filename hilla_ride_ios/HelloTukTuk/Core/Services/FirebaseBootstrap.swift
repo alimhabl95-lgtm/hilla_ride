@@ -1,5 +1,6 @@
 import FirebaseCore
 import FirebaseMessaging
+import GoogleMaps
 import UIKit
 import UserNotifications
 
@@ -15,6 +16,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        if MapsConfig.isConfigured {
+            GMSServices.provideAPIKey(MapsConfig.apiKey)
+        }
         UNUserNotificationCenter.current().delegate = PushNotificationService.shared
         application.registerForRemoteNotifications()
         return true

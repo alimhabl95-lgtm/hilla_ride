@@ -17,7 +17,16 @@ open HelloTukTuk.xcodeproj
 
 Select the **HelloTukTuk** scheme, choose a device or simulator, and run.
 
-## Phase 2A Week 1 (current)
+## Phase 2A Week 2 (current)
+
+- Google Maps SDK on customer home
+- Sub-district picker (Al-Hashimiya)
+- Pickup via GPS, destination via long-press on map
+- Fare quote from Firestore pricing config
+- Book ride → Firestore `rides/{id}` + driver matching
+- Active ride shell (finding driver, waiting, live map)
+
+## Phase 2A Week 1 (complete)
 
 - Forgot password (reset via `resetPasswordByPhone` Cloud Function)
 - Profile screen with change password and logout

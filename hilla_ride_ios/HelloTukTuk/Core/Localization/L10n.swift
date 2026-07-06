@@ -93,6 +93,34 @@ enum L10nKey {
     case vehiclePlateRequired
     case vehicleColorRequired
     case registrationPhotosRequired
+    case pickupLabel
+    case destinationLabel
+    case bookRide
+    case bookRideTitle
+    case selectPickup
+    case selectDestination
+    case useMyLocation
+    case subDistrict
+    case estimatedFare
+    case distance
+    case confirmBooking
+    case findingDriver
+    case findingDriverHint
+    case retryDriverSearch
+    case waitingForDriver
+    case waitingForDriverHint
+    case driverOnTheWay
+    case rideInProgress
+    case awaitingCashPayment
+    case cancelRide
+    case outOfService
+    case pickupDestinationSame
+    case activeRideExists
+    case noDriversAvailable
+    case mapsUnavailable
+    case myLocation
+    case mapPinDestination
+    case locationUnavailable
 }
 
 enum L10n {
@@ -192,10 +220,10 @@ enum L10n {
         .savePasswordButton: [.english: "Save password", .arabic: "حفظ كلمة المرور"],
         .accountType: [.english: "Account type", .arabic: "نوع الحساب"],
         .driverStatus: [.english: "Driver status", .arabic: "حالة السائق"],
-        .customerHomeTitle: [.english: "Ready to ride", .arabic: "جاهز للمشوار"],
+        .customerHomeTitle: [.english: "Book a ride", .arabic: "احجز مشوار"],
         .mapsComingSoon: [
-            .english: "Google Maps and ride booking arrive in the next TestFlight build.",
-            .arabic: "خرائط Google وحجز المشاوير في الإصدار القادم على TestFlight."
+            .english: "More map features arrive in upcoming TestFlight builds.",
+            .arabic: "المزيد من ميزات الخريطة في إصدارات TestFlight القادمة."
         ],
         .driverHomeTitle: [.english: "Driver dashboard", .arabic: "لوحة السائق"],
         .driverTripsComingSoon: [
@@ -243,6 +271,58 @@ enum L10n {
         .registrationPhotosRequired: [
             .english: "ID photo and profile photo are required.",
             .arabic: "صورة الهوية والصورة الشخصية مطلوبتان."
+        ],
+        .pickupLabel: [.english: "Pickup", .arabic: "نقطة الانطلاق"],
+        .destinationLabel: [.english: "Destination", .arabic: "الوجهة"],
+        .bookRide: [.english: "Book ride", .arabic: "احجز مشوار"],
+        .bookRideTitle: [.english: "Confirm your ride", .arabic: "تأكيد المشوار"],
+        .selectPickup: [.english: "Set pickup first", .arabic: "حدد نقطة الانطلاق"],
+        .selectDestination: [.english: "Long-press map to set destination", .arabic: "اضغط مطولاً على الخريطة لتحديد الوجهة"],
+        .useMyLocation: [.english: "Use my location", .arabic: "استخدم موقعي"],
+        .subDistrict: [.english: "Area", .arabic: "المنطقة"],
+        .estimatedFare: [.english: "Estimated fare", .arabic: "الأجرة التقديرية"],
+        .distance: [.english: "Distance", .arabic: "المسافة"],
+        .confirmBooking: [.english: "Confirm booking", .arabic: "تأكيد الحجز"],
+        .findingDriver: [.english: "Finding a driver", .arabic: "جاري البحث عن سائق"],
+        .findingDriverHint: [
+            .english: "We are matching you with nearby drivers in your area.",
+            .arabic: "نبحث عن سائق قريب في منطقتك."
+        ],
+        .retryDriverSearch: [.english: "Search again", .arabic: "إعادة البحث"],
+        .waitingForDriver: [.english: "Waiting for driver", .arabic: "بانتظار السائق"],
+        .waitingForDriverHint: [
+            .english: "A driver has been notified. Waiting for acceptance.",
+            .arabic: "تم إشعار السائق. بانتظار القبول."
+        ],
+        .driverOnTheWay: [.english: "Driver on the way", .arabic: "السائق في الطريق"],
+        .rideInProgress: [.english: "Ride in progress", .arabic: "المشوار جاري"],
+        .awaitingCashPayment: [.english: "Pay cash to driver", .arabic: "ادفع نقداً للسائق"],
+        .cancelRide: [.english: "Cancel ride", .arabic: "إلغاء المشوار"],
+        .outOfService: [
+            .english: "This trip is outside the service area or max distance.",
+            .arabic: "هذا المشوار خارج نطاق الخدمة أو أقصى مسافة."
+        ],
+        .pickupDestinationSame: [
+            .english: "Pickup and destination must be at least 100 m apart.",
+            .arabic: "يجب أن تبعد نقطة الانطلاق عن الوجهة 100 متر على الأقل."
+        ],
+        .activeRideExists: [
+            .english: "You already have an active ride.",
+            .arabic: "لديك مشوار نشط بالفعل."
+        ],
+        .noDriversAvailable: [
+            .english: "No drivers are online in this area right now.",
+            .arabic: "لا يوجد سائقون متصلون في هذه المنطقة حالياً."
+        ],
+        .mapsUnavailable: [
+            .english: "Google Maps is not configured for this build.",
+            .arabic: "خرائط Google غير مهيأة في هذا الإصدار."
+        ],
+        .myLocation: [.english: "My location", .arabic: "موقعي الحالي"],
+        .mapPinDestination: [.english: "Map destination", .arabic: "وجهة على الخريطة"],
+        .locationUnavailable: [
+            .english: "Could not get your location. Allow location access or pick on the map.",
+            .arabic: "تعذر الحصول على موقعك. اسمح بالوصول للموقع أو اختر على الخريطة."
         ]
     ]
 }
