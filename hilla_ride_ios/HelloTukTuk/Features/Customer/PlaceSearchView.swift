@@ -21,7 +21,7 @@ struct PlaceSearchView: View {
             TextField(L10n.string(.searchPlacesHint, language: appState.language), text: $query)
                 .textFieldStyle(AppTextFieldStyle())
                 .padding()
-                .onChange(of: query) { _, newValue in
+                  .onChange(of: query) { newValue in
                     scheduleSearch(query: newValue)
                 }
 
