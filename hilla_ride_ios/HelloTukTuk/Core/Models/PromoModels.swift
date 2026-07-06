@@ -177,3 +177,4 @@ final class MonthlyPrizeService {
         )
     }
 }
+typealias PromoService = MonthlyPrizeService
