@@ -26,7 +26,7 @@ struct CustomerAppEntryView: View {
             rideTask?.cancel()
             rideTask = nil
         }
-        .onChange(of: appState.currentUser?.uid) { _, _ in
+           .onChange(of: appState.currentUser?.uid) { _ in
             startWatchingActiveRide()
         }
         .onChange(of: activeRide?.id) { _, newId in
