@@ -1,6 +1,6 @@
 import CoreLocation
 import Foundation
-struct BabilSubDistrict: Identifiable, Hashable, Equatable {
+struct BabilSubDistrict: Identifiable, Hashable {
     let id: String
     let nameEn: String
     let nameAr: String
@@ -10,9 +10,18 @@ struct BabilSubDistrict: Identifiable, Hashable, Equatable {
     func displayName(language: AppLanguage) -> String {
         language == .arabic ? nameAr : nameEn
     }
+
+    // CLLocationCoordinate2D is not Hashable/Equatable, so conform by unique id.
+    static func == (lhs: BabilSubDistrict, rhs: BabilSubDistrict) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
-struct BabilDistrict: Identifiable {
+struct BabilDistrict: Identifiable, Hashable {
     let id: String
     let nameEn: String
     let nameAr: String
@@ -20,6 +29,14 @@ struct BabilDistrict: Identifiable {
 
     func displayName(language: AppLanguage) -> String {
         language == .arabic ? nameAr : nameEn
+    }
+
+    static func == (lhs: BabilDistrict, rhs: BabilDistrict) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
