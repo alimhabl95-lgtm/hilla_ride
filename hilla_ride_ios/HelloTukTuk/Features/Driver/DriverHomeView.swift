@@ -63,7 +63,7 @@ struct DriverHomeView: View {
                         Button {
                             showSupport = true
                         } label: {
-                            Image(systemName: "lifepreserver")
+                            Image(systemName: "headphones")
                         }
                         onlineToggle
                         Button {

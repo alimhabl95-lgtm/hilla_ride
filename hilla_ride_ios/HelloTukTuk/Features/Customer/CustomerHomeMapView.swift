@@ -56,12 +56,12 @@ struct CustomerHomeMapView: View {
                         Button {
                             showHistory = true
                         } label: {
-                            Image(systemName: "clock.arrow.circlepath")
+                            Image(systemName: "list.bullet.rectangle")
                         }
                         Button {
                             showSupport = true
                         } label: {
-                            Image(systemName: "lifepreserver")
+                            Image(systemName: "headphones")
                         }
                         Button {
                             showProfile = true

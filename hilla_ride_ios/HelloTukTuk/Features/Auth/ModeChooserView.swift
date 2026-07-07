@@ -9,11 +9,11 @@ struct ModeChooserView: View {
             VStack(spacing: 24) {
                 Spacer(minLength: 16)
 
-                Image(systemName: "car.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(BrandColors.gold)
+                Image("AppLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
                     .frame(width: 120, height: 120)
-                    .background(BrandColors.teal.opacity(0.12), in: RoundedRectangle(cornerRadius: 28))
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
 
                 Text(L10n.string(.appTitle, language: appState.language))
                     .font(.largeTitle.bold())

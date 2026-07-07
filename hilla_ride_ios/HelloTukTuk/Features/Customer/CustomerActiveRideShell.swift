@@ -157,19 +157,52 @@ struct DriverAssignedView: View {
     let ride: Ride
     var onSessionEnded: (() -> Void)?
 
+    @State private var driver: DriverProfile?
+    @State private var driverTask: Task<Void, Never>?
+
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "clock.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(BrandColors.gold)
-            Text(L10n.string(.waitingForDriver, language: appState.language))
+            Text(L10n.string(.driverAssignedTitle, language: appState.language))
                 .font(.title2.bold())
-                .multilineTextAlignment(.center)
-            Text(L10n.string(.waitingForDriverHint, language: appState.language))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+                .foregroundStyle(BrandColors.navy)
+
+            if ride.driverId == nil {
+                Spacer()
+                ProgressView()
+                    .scaleEffect(1.4)
+                Text(L10n.string(.waitingDriverAccept, language: appState.language))
+                    .font(.title3)
+                    .multilineTextAlignment(.center)
+                Spacer()
+            } else {
+                Spacer()
+
+                ProfileAvatarView(
+                    name: driver?.name ?? "",
+                    photoURL: driver?.profilePhotoUrl,
+                    size: 96
+                )
+
+                Text(driver?.name ?? L10n.string(.findingDriver, language: appState.language))
+                    .font(.title3.bold())
+                    .foregroundStyle(BrandColors.navy)
+
+                HStack(spacing: 4) {
+                    ForEach(0..<5, id: \.self) { index in
+                        Image(systemName: index < Int((driver?.rating ?? 5.0).rounded()) ? "star.fill" : "star")
+                            .foregroundStyle(.yellow)
+                    }
+                }
+
+                vehicleCard
+
+                Spacer()
+
+                Text(L10n.string(.waitingDriverAccept, language: appState.language))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
 
             Button(L10n.string(.cancelRide, language: appState.language)) {
                 Task {
@@ -184,6 +217,71 @@ struct DriverAssignedView: View {
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
+        .onAppear { startWatchingDriver() }
+        .onDisappear {
+            driverTask?.cancel()
+            driverTask = nil
+        }
+        .onChange(of: ride.driverId) { _ in startWatchingDriver() }
+    }
+
+    private var vehicleCard: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "car.fill")
+                    .foregroundStyle(BrandColors.tealDark)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(driver?.vehicleType ?? "—")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(BrandColors.navy)
+                    if let color = driver?.vehicleColor, !color.isEmpty {
+                        Text(color)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+            }
+
+            Divider()
+
+            HStack(spacing: 12) {
+                Image(systemName: "number")
+                    .foregroundStyle(BrandColors.tealDark)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.string(.vehiclePlate, language: appState.language))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text(driver?.vehiclePlate.isEmpty == false ? (driver?.vehiclePlate ?? "—") : "—")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(BrandColors.navy)
+                }
+                Spacer()
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(BrandColors.teal.opacity(0.15), lineWidth: 1)
+        }
+    }
+
+    private func startWatchingDriver() {
+        driverTask?.cancel()
+        guard let driverId = ride.driverId else {
+            driver = nil
+            return
+        }
+        driverTask = Task {
+            for await updated in DriverRepository().watchDriver(uid: driverId) {
+                guard !Task.isCancelled else { break }
+                await MainActor.run { driver = updated }
+            }
+        }
     }
 }
 

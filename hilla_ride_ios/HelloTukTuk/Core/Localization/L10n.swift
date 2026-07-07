@@ -51,6 +51,7 @@ enum L10nKey {
     case privacyPolicy
     case termsOfService
     case welcomeSignedIn
+    case welcomeMessage
     case loading
     case forgotPasswordTitle
     case forgotPasswordHint
@@ -109,6 +110,8 @@ enum L10nKey {
     case retryDriverSearch
     case waitingForDriver
     case waitingForDriverHint
+    case driverAssignedTitle
+    case waitingDriverAccept
     case driverOnTheWay
     case rideInProgress
     case awaitingCashPayment
@@ -289,6 +292,7 @@ enum L10n {
         .privacyPolicy: [.english: "Privacy policy", .arabic: "سياسة الخصوصية"],
         .termsOfService: [.english: "Terms of service", .arabic: "شروط الاستخدام"],
         .welcomeSignedIn: [.english: "Signed in successfully", .arabic: "تم تسجيل الدخول بنجاح"],
+        .welcomeMessage: [.english: "Welcome!", .arabic: "أهلاً بكم!"],
         .loading: [.english: "Loading...", .arabic: "جاري التحميل..."],
         .forgotPasswordTitle: [.english: "Reset password", .arabic: "إعادة تعيين كلمة المرور"],
         .forgotPasswordHint: [
@@ -394,6 +398,11 @@ enum L10n {
         .waitingForDriverHint: [
             .english: "A driver has been notified. Waiting for acceptance.",
             .arabic: "تم إشعار السائق. بانتظار القبول."
+        ],
+        .driverAssignedTitle: [.english: "Driver assigned", .arabic: "تم تعيين السائق"],
+        .waitingDriverAccept: [
+            .english: "Waiting for driver to accept…",
+            .arabic: "بانتظار قبول السائق للرحلة…"
         ],
         .driverOnTheWay: [.english: "Driver on the way", .arabic: "السائق في الطريق"],
         .rideInProgress: [.english: "Ride in progress", .arabic: "المشوار جاري"],

@@ -21,6 +21,8 @@ struct DriverProfile: Identifiable, Equatable {
     let vehicleType: String
     let vehiclePlate: String
     let vehicleColor: String
+    let profilePhotoUrl: String
+    let rating: Double
     let approvalStatus: DriverApprovalStatus
     let isBlocked: Bool
     let isOnline: Bool
@@ -60,6 +62,8 @@ struct DriverProfile: Identifiable, Equatable {
         vehicleType = data["vehicleType"] as? String ?? "Tuk-Tuk"
         vehiclePlate = data["vehiclePlate"] as? String ?? ""
         vehicleColor = data["vehicleColor"] as? String ?? ""
+        profilePhotoUrl = data["profilePhotoUrl"] as? String ?? ""
+        rating = (data["rating"] as? NSNumber)?.doubleValue ?? 5.0
         approvalStatus = DriverApprovalStatus.fromFirestore(data["approvalStatus"] as? String)
         isBlocked = data["isBlocked"] as? Bool ?? false
         isOnline = data["isOnline"] as? Bool ?? false
