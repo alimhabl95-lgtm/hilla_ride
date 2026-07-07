@@ -1178,7 +1178,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get assistantFormInvalid =>
-      'أدخل الاسم ورقم الهاتف العراقي وكلمة مرور (6 أحرف على الأقل).';
+      'أدخل الاسم وبريدًا إلكترونيًا صحيحًا وكلمة مرور (6 أحرف على الأقل).';
 
   @override
   String get assistantCreated => 'تم إنشاء حساب المساعد.';
@@ -1197,7 +1197,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get assistantLoginHint =>
-      'استخدم رقم الهاتف وكلمة المرور التي أعطاك إياها الإدارة.';
+      'استخدم البريد الإلكتروني وكلمة المرور التي أعطاك إياها الإدارة.';
 
   @override
   String get assistantNoPermissions =>
@@ -1205,6 +1205,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get emailLabel => 'البريد الإلكتروني';
+
+  @override
+  String get assistantEmailHint => 'assistant@example.com';
+
+  @override
+  String get assistantActive => 'مُفعّل';
+
+  @override
+  String get assistantDisabled => 'مُعطّل';
+
+  @override
+  String get enableAssistant => 'تفعيل';
+
+  @override
+  String get disableAssistant => 'تعطيل';
 
   @override
   String get permPendingDrivers => 'الموافقة على السائقين المعلقين';

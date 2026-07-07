@@ -1193,7 +1193,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantFormInvalid =>
-      'Enter name, Iraqi phone number, and password (6+ characters).';
+      'Enter name, a valid email, and password (6+ characters).';
 
   @override
   String get assistantCreated => 'Assistant account created.';
@@ -1212,7 +1212,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantLoginHint =>
-      'Use the phone number and password your manager gave you.';
+      'Use the email and password your manager gave you.';
 
   @override
   String get assistantNoPermissions =>
@@ -1220,6 +1220,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get emailLabel => 'Email';
+
+  @override
+  String get assistantEmailHint => 'assistant@example.com';
+
+  @override
+  String get assistantActive => 'Active';
+
+  @override
+  String get assistantDisabled => 'Disabled';
+
+  @override
+  String get enableAssistant => 'Enable';
+
+  @override
+  String get disableAssistant => 'Disable';
 
   @override
   String get permPendingDrivers => 'Approve pending drivers';

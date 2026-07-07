@@ -32,14 +32,14 @@ class AssistantService {
 
   Future<String> createAssistant({
     required String name,
-    required String phone,
+    required String email,
     required String password,
     required List<String> permissions,
   }) async {
     final callable = _functions.httpsCallable('createAssistant');
     final result = await callable.call<Map<String, dynamic>>({
       'name': name.trim(),
-      'phone': phone.trim(),
+      'email': email.trim(),
       'password': password,
       'permissions': permissions,
     });
@@ -57,10 +57,23 @@ class AssistantService {
   }
 
   Future<void> deactivateAssistant(String assistantId) async {
-    await _firestore.collection('users').doc(assistantId).update({
-      'isBlocked': true,
-      'blockedAt': FieldValue.serverTimestamp(),
-    });
+    await setAssistantEnabled(assistantId: assistantId, enabled: false);
+  }
+
+  /// Enables or disables an assistant account. A disabled assistant is blocked
+  /// from signing in to the dashboard until re-enabled.
+  Future<void> setAssistantEnabled({
+    required String assistantId,
+    required bool enabled,
+  }) async {
+    final data = <String, dynamic>{
+      'isBlocked': !enabled,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (!enabled) {
+      data['blockedAt'] = FieldValue.serverTimestamp();
+    }
+    await _firestore.collection('users').doc(assistantId).update(data);
   }
 
   List<String> sanitizePermissions(List<String> permissions) {

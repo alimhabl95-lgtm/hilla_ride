@@ -2267,7 +2267,7 @@ abstract class AppLocalizations {
   /// No description provided for @assistantFormInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Enter name, Iraqi phone number, and password (6+ characters).'**
+  /// **'Enter name, a valid email, and password (6+ characters).'**
   String get assistantFormInvalid;
 
   /// No description provided for @assistantCreated.
@@ -2303,7 +2303,7 @@ abstract class AppLocalizations {
   /// No description provided for @assistantLoginHint.
   ///
   /// In en, this message translates to:
-  /// **'Use the phone number and password your manager gave you.'**
+  /// **'Use the email and password your manager gave you.'**
   String get assistantLoginHint;
 
   /// No description provided for @assistantNoPermissions.
@@ -2317,6 +2317,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Email'**
   String get emailLabel;
+
+  /// No description provided for @assistantEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'assistant@example.com'**
+  String get assistantEmailHint;
+
+  /// No description provided for @assistantActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get assistantActive;
+
+  /// No description provided for @assistantDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get assistantDisabled;
+
+  /// No description provided for @enableAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get enableAssistant;
+
+  /// No description provided for @disableAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get disableAssistant;
 
   /// No description provided for @permPendingDrivers.
   ///

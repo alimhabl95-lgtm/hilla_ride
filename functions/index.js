@@ -303,32 +303,31 @@ exports.createAssistant = authAdminCallable(async (data, context) => {
 
     const payload = parseCallableData(data);
     const name = String(payload.name || "").trim();
-    const phone = normalizePhone(String(payload.phone || payload.email || "").trim());
+    const email = String(payload.email || "").trim().toLowerCase();
     const password = String(payload.password || "");
     const permissions = Array.isArray(payload.permissions) ? payload.permissions : [];
 
-    if (!name || !phone || phone === "+964" || password.length < 6) {
+    const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!name || !emailIsValid || password.length < 6) {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        "Enter a valid name, Iraqi phone number, and password (6+ characters).",
+        "Enter a valid name, email, and password (6+ characters).",
       );
     }
 
     const sanitizedPermissions = permissions.filter((permission) =>
       allowedAssistantPermissions.has(permission),
     );
-    const phoneKey = phoneKeyFromPhone(phone);
-    const authEmail = authEmailFromPhoneKey(phoneKey);
 
     try {
-      const existing = await admin.auth().getUserByEmail(authEmail);
+      const existing = await admin.auth().getUserByEmail(email);
       functions.logger.warn("createAssistant blocked duplicate auth user", {
-        phoneKey,
+        email,
         uid: existing.uid,
       });
       throw new functions.https.HttpsError(
         "already-exists",
-        "This phone number is already registered.",
+        "This email is already registered.",
       );
     } catch (error) {
       if (error instanceof functions.https.HttpsError) {
@@ -336,13 +335,13 @@ exports.createAssistant = authAdminCallable(async (data, context) => {
       }
       if (error.code !== "auth/user-not-found") {
         functions.logger.error("createAssistant auth lookup failed", {
-          phoneKey,
+          email,
           code: error.code,
           message: error.message,
         });
         throw new functions.https.HttpsError(
           "failed-precondition",
-          "Could not verify phone number. Try again.",
+          "Could not verify email. Try again.",
         );
       }
     }
@@ -350,7 +349,7 @@ exports.createAssistant = authAdminCallable(async (data, context) => {
     let userRecord;
     try {
       userRecord = await admin.auth().createUser({
-        email: authEmail,
+        email,
         password,
         displayName: name,
       });
@@ -358,11 +357,11 @@ exports.createAssistant = authAdminCallable(async (data, context) => {
       if (error.code === "auth/email-already-exists") {
         throw new functions.https.HttpsError(
           "already-exists",
-          "This phone number is already registered.",
+          "This email is already registered.",
         );
       }
       functions.logger.error("createAssistant createUser failed", {
-        phoneKey,
+        email,
         code: error.code,
         message: error.message,
       });
@@ -375,8 +374,8 @@ exports.createAssistant = authAdminCallable(async (data, context) => {
     try {
       await admin.firestore().collection("users").doc(userRecord.uid).set({
         name,
-        phone,
-        email: "",
+        phone: "",
+        email,
         role: "assistant",
         age: 18,
         permissions: sanitizedPermissions,
@@ -408,10 +407,10 @@ exports.createAssistant = authAdminCallable(async (data, context) => {
 
     functions.logger.info("createAssistant completed", {
       assistantUid: userRecord.uid,
-      phoneKey,
+      email,
       createdBy: context.auth.uid,
     });
-    return { uid: userRecord.uid, phone };
+    return { uid: userRecord.uid, email };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) {
       throw error;
@@ -959,6 +958,54 @@ async function deleteDriverFirestoreData(driverId) {
   await driverRef.delete();
 }
 
+// Deletes every ride that references this user (as customer or driver) plus each
+// ride's chat messages subcollection, so no account data is left behind.
+async function deleteRidesForUser(userId) {
+  const db = admin.firestore();
+  for (const field of ["customerId", "driverId"]) {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const snapshot = await db
+        .collection("rides")
+        .where(field, "==", userId)
+        .limit(50)
+        .get();
+      if (snapshot.empty) {
+        break;
+      }
+      for (const doc of snapshot.docs) {
+        try {
+          await deleteCollection(doc.ref.collection("messages"));
+        } catch (error) {
+          functions.logger.warn("deleteRidesForUser messages skipped", {
+            rideId: doc.id,
+            message: error.message,
+          });
+        }
+        await doc.ref.delete();
+      }
+    }
+  }
+}
+
+async function deleteSupportMessagesForUser(userId) {
+  const db = admin.firestore();
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const snapshot = await db
+      .collection("support_messages")
+      .where("userId", "==", userId)
+      .limit(100)
+      .get();
+    if (snapshot.empty) {
+      break;
+    }
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+  }
+}
+
 async function deleteUserFirestoreData(userId, role) {
   const db = admin.firestore();
   const userRef = db.collection("users").doc(userId);
@@ -977,6 +1024,24 @@ async function deleteUserFirestoreData(userId, role) {
     if (driverDoc.exists) {
       await deleteDriverFirestoreData(userId);
     }
+  }
+
+  try {
+    await deleteRidesForUser(userId);
+  } catch (error) {
+    functions.logger.warn("deleteUserFirestoreData rides skipped", {
+      userId,
+      message: error.message,
+    });
+  }
+
+  try {
+    await deleteSupportMessagesForUser(userId);
+  } catch (error) {
+    functions.logger.warn("deleteUserFirestoreData support skipped", {
+      userId,
+      message: error.message,
+    });
   }
 
   try {

@@ -265,10 +265,10 @@ enum L10n {
             .english: "Password must be at least 6 characters",
             .arabic: "كلمة المرور يجب أن تكون 6 أحرف على الأقل"
         ],
-        .signupSuccessTitle: [.english: "Account created", .arabic: "تم إنشاء الحساب"],
+        .signupSuccessTitle: [.english: "Account created successfully", .arabic: "تم إنشاء الحساب بنجاح"],
         .signupSuccessMessage: [
-            .english: "Your account was created. Please log in to continue.",
-            .arabic: "تم إنشاء حسابك. يرجى تسجيل الدخول للمتابعة."
+            .english: "Your account is ready. Log in with your phone number and password.",
+            .arabic: "حسابك جاهز. سجّل الدخول برقم هاتفك وكلمة المرور."
         ],
         .goToLogin: [.english: "Go to login", .arabic: "الذهاب لتسجيل الدخول"],
         .logout: [.english: "Log out", .arabic: "تسجيل الخروج"],
@@ -366,10 +366,10 @@ enum L10n {
         .profilePhotoLabel: [.english: "Profile photo", .arabic: "الصورة الشخصية"],
         .tapToUploadPhoto: [.english: "Tap to upload photo", .arabic: "اضغط لرفع الصورة"],
         .submitDriverApplication: [.english: "Submit application", .arabic: "إرسال الطلب"],
-        .driverSignupSuccessTitle: [.english: "Application submitted", .arabic: "تم إرسال الطلب"],
+        .driverSignupSuccessTitle: [.english: "Thank you!", .arabic: "شكراً لك!"],
         .driverSignupSuccessMessage: [
-            .english: "Your driver application was submitted. Please log in after approval.",
-            .arabic: "تم إرسال طلب السائق. يرجى تسجيل الدخول بعد الموافقة."
+            .english: "Your registration is complete. Please wait for the manager to approve your account before you can start working.",
+            .arabic: "تم إكمال التسجيل بنجاح. يرجى انتظار موافقة المدير قبل البدء بالعمل."
         ],
         .driverMinAge: [
             .english: "Drivers must be at least 18 years old.",

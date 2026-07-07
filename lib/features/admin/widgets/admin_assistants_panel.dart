@@ -1,7 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
-import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/manager_permissions.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
@@ -18,15 +17,17 @@ class AdminAssistantsPanel extends StatefulWidget {
 
 class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _selectedPermissions = {...AdminPermissions.defaultAssistant};
   var _isSaving = false;
 
+  static final _emailRegExp = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+
   @override
   void dispose() {
     _nameController.dispose();
-    _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -52,11 +53,11 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
   Future<void> _createAssistant() async {
     final l10n = AppLocalizations.of(context)!;
     final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
+    final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (name.isEmpty ||
-        !PhoneAuthCredentials.isValidIraqiPhone(phone) ||
+        !_emailRegExp.hasMatch(email) ||
         password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.assistantFormInvalid)),
@@ -69,7 +70,7 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
       final assistantService = context.read<AppState>().assistantService;
       await assistantService.createAssistant(
         name: name,
-        phone: phone,
+        email: email,
         password: password,
         permissions: assistantService.sanitizePermissions(
           _selectedPermissions.toList(),
@@ -77,7 +78,7 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
       );
       if (!mounted) return;
       _nameController.clear();
-      _phoneController.clear();
+      _emailController.clear();
       _passwordController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.assistantCreated)),
@@ -200,11 +201,12 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
                       decoration: InputDecoration(
-                        labelText: l10n.phoneHint,
-                        hintText: '7701234567',
+                        labelText: l10n.emailLabel,
+                        hintText: l10n.assistantEmailHint,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -267,7 +269,8 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
                   child: ListTile(
                     title: Text(assistant.name),
                     subtitle: Text(
-                      '${assistant.phone}\n'
+                      '${assistant.email}\n'
+                      '${assistant.isBlocked ? l10n.assistantDisabled : l10n.assistantActive} • '
                       '${assistant.permissions.map((p) => _permissionLabel(l10n, p)).join(', ')}',
                     ),
                     isThreeLine: true,
@@ -275,8 +278,11 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
                       onSelected: (value) async {
                         if (value == 'edit') {
                           await _editPermissions(assistant);
-                        } else if (value == 'block') {
-                          await assistantService.deactivateAssistant(assistant.uid);
+                        } else if (value == 'toggle') {
+                          await assistantService.setAssistantEnabled(
+                            assistantId: assistant.uid,
+                            enabled: assistant.isBlocked,
+                          );
                         }
                       },
                       itemBuilder: (context) => [
@@ -285,8 +291,12 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
                           child: Text(l10n.editAssistantPermissions),
                         ),
                         PopupMenuItem(
-                          value: 'block',
-                          child: Text(l10n.blockUser),
+                          value: 'toggle',
+                          child: Text(
+                            assistant.isBlocked
+                                ? l10n.enableAssistant
+                                : l10n.disableAssistant,
+                          ),
                         ),
                       ],
                     ),
