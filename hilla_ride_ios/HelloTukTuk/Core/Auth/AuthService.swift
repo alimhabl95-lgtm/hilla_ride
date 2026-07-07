@@ -86,7 +86,7 @@ final class AuthService: ObservableObject {
 
         let credential = EmailAuthProvider.credential(withEmail: email, password: currentPassword)
         try await user.reauthenticate(with: credential)
-        try await user.updatePassword(newPassword)
+          try await user.updatePassword(to: newPassword)
     }
 
     @discardableResult
