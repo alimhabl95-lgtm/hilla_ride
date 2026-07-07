@@ -1,7 +1,6 @@
 import CoreLocation
 import Foundation
-
-   struct BabilSubDistrict: Identifiable {
+struct BabilSubDistrict: Identifiable, Hashable, Equatable {
     let id: String
     let nameEn: String
     let nameAr: String
