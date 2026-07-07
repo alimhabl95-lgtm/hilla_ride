@@ -13,7 +13,7 @@ import Foundation
     }
 }
 
-struct BabilDistrict: Identifiable, Hashable {
+struct BabilDistrict: Identifiable {
     let id: String
     let nameEn: String
     let nameAr: String
