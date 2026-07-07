@@ -73,27 +73,4 @@ extension PushNotificationService: MessagingDelegate {
             self.fcmToken = fcmToken
         }
     }
-
-      @available(iOS 17.0, *)
-        let data = remoteMessage.appData
-        let type = data["type"] as? String
-        Task { @MainActor in
-            switch type {
-            case "ride_matched":
-                RideAlertService.shared.trigger(RideAlertEvent(
-                    type: .driverRideRequest,
-                    title: data["title"] as? String ?? L10n.string(.newRideOffer),
-                    body: data["body"] as? String ?? ""
-                ))
-            case "ride_accepted":
-                RideAlertService.shared.trigger(RideAlertEvent(
-                    type: .customerRideAccepted,
-                    title: data["title"] as? String ?? L10n.string(.driverAcceptedAlertTitle),
-                    body: data["body"] as? String ?? L10n.string(.driverAcceptedAlertBody)
-                ))
-            default:
-                break
-            }
-        }
-    }
 }
