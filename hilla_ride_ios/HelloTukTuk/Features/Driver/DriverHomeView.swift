@@ -121,9 +121,11 @@ struct DriverHomeView: View {
     private var idleDriverPanel: some View {
         ScrollView {
             VStack(spacing: 16) {
-                Image(systemName: "car.side.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(BrandColors.gold)
+                Image("AppLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
 
                 Text(currentDriver.name)
                     .font(.title2.bold())
