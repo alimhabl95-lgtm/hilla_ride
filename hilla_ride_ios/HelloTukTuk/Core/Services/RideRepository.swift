@@ -300,7 +300,7 @@ final class RideRepository {
         let commissionService = CommissionService()
         let platformPercent = await commissionService.getConfig()
 
-        try await firestore.runTransaction { transaction, errorPointer in
+        _ = try await firestore.runTransaction { transaction, errorPointer in
             let snapshot: DocumentSnapshot
             do {
                 snapshot = try transaction.getDocument(rideRef)
