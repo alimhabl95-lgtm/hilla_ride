@@ -347,7 +347,7 @@ final class RideRepository {
             if let customerId, !customerId.isEmpty, !promoCode.isEmpty, promoDiscount > 0 {
                 let userRef = self.firestore.collection("users").document(customerId)
                 transaction.updateData([
-                    "promoRidesUsed": FieldValue.increment(1)
+                    "promoRidesUsed": FieldValue.increment(Int64(1))
                 ], forDocument: userRef)
             }
             return nil
