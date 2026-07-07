@@ -75,7 +75,6 @@ extension PushNotificationService: MessagingDelegate {
     }
 
       @available(iOS 17.0, *)
-   nonisolated func messaging(_ messaging: Messaging, didReceive remoteMessage: MessagingRemoteMessage) {
         let data = remoteMessage.appData
         let type = data["type"] as? String
         Task { @MainActor in
