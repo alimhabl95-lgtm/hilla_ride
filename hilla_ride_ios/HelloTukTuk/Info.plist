@@ -30,8 +30,6 @@
 	<string>Hello Tuk-Tuk uses your location to show nearby drivers and set your pickup point.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Hello Tuk-Tuk uses your location to show nearby drivers and set your pickup point.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Hello Tuk-Tuk uses the microphone so you can send voice messages during a ride.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hello Tuk-Tuk uses your photo library so drivers can upload ID and profile photos during registration.</string>
 	<key>UIBackgroundModes</key>

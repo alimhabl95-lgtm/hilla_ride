@@ -1,25 +1,13 @@
 import FirebaseFirestore
 import Foundation
 
-enum RideMessageType: String {
-    case text
-    case voice
-}
-
 struct RideMessage: Identifiable, Equatable {
     let id: String
     let senderId: String
     let senderRole: UserRole
     let senderName: String
     let text: String
-    let type: RideMessageType
-    let voiceUrl: String
-    let voiceDurationMs: Int
     let createdAt: Date?
-
-    var isVoice: Bool {
-        type == .voice || !voiceUrl.isEmpty
-    }
 
     init?(documentID: String, data: [String: Any]) {
         id = documentID
@@ -27,14 +15,6 @@ struct RideMessage: Identifiable, Equatable {
         senderName = data["senderName"] as? String ?? ""
         text = data["text"] as? String ?? ""
         senderRole = UserRole.fromFirestore(data["senderRole"] as? String)
-        voiceUrl = data["voiceUrl"] as? String ?? ""
-        voiceDurationMs = (data["voiceDurationMs"] as? NSNumber)?.intValue ?? 0
-        let rawType = data["type"] as? String ?? "text"
-        if !voiceUrl.isEmpty && rawType == RideMessageType.text.rawValue {
-            type = .voice
-        } else {
-            type = RideMessageType(rawValue: rawType) ?? .text
-        }
         if let timestamp = data["createdAt"] as? Timestamp {
             createdAt = timestamp.dateValue()
         } else {
@@ -79,31 +59,7 @@ final class ChatService {
                 "senderRole": senderRole.rawValue,
                 "senderName": senderName,
                 "text": trimmed,
-                "type": RideMessageType.text.rawValue,
-                "createdAt": FieldValue.serverTimestamp()
-            ])
-    }
-
-    func sendRideVoiceMessage(
-        rideId: String,
-        senderId: String,
-        senderRole: UserRole,
-        senderName: String,
-        voiceUrl: String,
-        voiceDurationMs: Int
-    ) async throws {
-        guard !voiceUrl.isEmpty else { return }
-        try await firestore.collection("rides").document(rideId)
-            .collection("messages")
-            .document(UUID().uuidString)
-            .setData([
-                "senderId": senderId,
-                "senderRole": senderRole.rawValue,
-                "senderName": senderName,
-                "text": "",
-                "type": RideMessageType.voice.rawValue,
-                "voiceUrl": voiceUrl,
-                "voiceDurationMs": voiceDurationMs,
+                "type": "text",
                 "createdAt": FieldValue.serverTimestamp()
             ])
     }

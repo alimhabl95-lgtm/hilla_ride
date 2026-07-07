@@ -199,12 +199,7 @@ final class RideAlertService: ObservableObject {
         guard let last = messages.last else { return }
         guard last.senderId != uid, last.senderRole != role else { return }
 
-        let preview: String
-        if last.isVoice {
-            preview = "\(last.senderName): \(L10n.string(.voiceMessagePreview, language: appLanguage))"
-        } else {
-            preview = last.text.isEmpty ? last.senderName : "\(last.senderName): \(last.text)"
-        }
+        let preview = last.text.isEmpty ? last.senderName : "\(last.senderName): \(last.text)"
         let title = role == .customer
             ? L10n.string(.chatWithDriver, language: appLanguage)
             : L10n.string(.chatWithCustomer, language: appLanguage)

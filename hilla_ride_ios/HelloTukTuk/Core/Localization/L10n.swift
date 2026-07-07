@@ -188,8 +188,6 @@ enum L10nKey {
     case genderOptional
     case genderMale
     case genderFemale
-    case recordingVoice
-    case voiceMessagePreview
     case cancelledRidesCount
     case cancel
 }
@@ -516,8 +514,6 @@ enum L10n {
         .genderOptional: [.english: "Prefer not to say", .arabic: "لا أرغب بالإفصاح"],
         .genderMale: [.english: "Male", .arabic: "ذكر"],
         .genderFemale: [.english: "Female", .arabic: "أنثى"],
-        .recordingVoice: [.english: "Recording", .arabic: "جاري التسجيل"],
-        .voiceMessagePreview: [.english: "Voice message", .arabic: "رسالة صوتية"],
         .cancelledRidesCount: [.english: "Cancelled rides", .arabic: "الرحلات الملغاة"],
         .cancel: [.english: "Cancel", .arabic: "إلغاء"]
     ]

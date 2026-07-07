@@ -72,20 +72,4 @@ final class StorageService {
         return try await ref.downloadURL().absoluteString
     }
 
-    func uploadRideVoiceMessage(rideId: String, messageId: String, data: Data) async throws -> String {
-        guard auth.currentUser != nil else { throw StorageServiceError.unauthorized }
-        guard !data.isEmpty else { throw StorageServiceError.emptyFile }
-        let ref = storage.reference().child("ride_chat/\(rideId)/\(messageId).m4a")
-        _ = try await ref.putDataAsync(data, metadata: StorageMetadata(dictionary: ["contentType": "audio/mp4"]))
-        return try await ref.downloadURL().absoluteString
-    }
-
-    func downloadData(from urlString: String, maxBytes: Int = 5 * 1024 * 1024) async throws -> Data {
-        let ref = storage.reference(forURL: urlString)
-        let data = try await ref.data(maxSize: Int64(maxBytes))
-        guard !data.isEmpty else {
-            throw StorageServiceError.uploadFailed
-        }
-        return data
-    }
 }
