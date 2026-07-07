@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct WelcomeSplashView: View {
@@ -17,12 +18,13 @@ struct WelcomeSplashView: View {
                 let elapsed = timeline.date.timeIntervalSince(startDate)
                 let frac = min(max(elapsed / totalDuration, 0), 1)
 
-                let drive = easeInOutCubic(progress(frac, from: 0.05, to: 0.82))
-                let textReveal = easeOutCubic(progress(frac, from: 0.45, to: 0.78))
-                let fadeOut = 1 - easeOut(progress(frac, from: 0.86, to: 1))
+                let drive = easeInOutCubic(progress(frac, from: 0.05, to: 0.9))
+                let textReveal = easeOutCubic(progress(frac, from: 0.4, to: 0.72))
+                let fadeOut = 1 - easeOut(progress(frac, from: 0.9, to: 1))
+                let waveAngle = sin(elapsed * 7) * 18 * textReveal
 
                 let startX = -vehicleWidth * 1.1
-                let endX = size.width * 0.5 - vehicleWidth * 0.5
+                let endX = size.width - vehicleWidth
                 let vehicleX = startX + (endX - startX) * drive
 
                 ZStack {
@@ -40,24 +42,25 @@ struct WelcomeSplashView: View {
                         .frame(width: vehicleWidth, height: vehicleWidth)
                         .position(x: vehicleX + vehicleWidth / 2, y: size.height * 0.77 - vehicleWidth / 2)
 
-                    VStack(spacing: 8) {
-                        Text(L10n.string(.welcomeMessage, language: appState.language))
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(BrandColors.navy)
+                    HStack(spacing: 12) {
+                        Image(systemName: "hand.wave.fill")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundStyle(BrandColors.gold)
+                            .rotationEffect(.degrees(waveAngle), anchor: .bottomLeading)
                         Text(L10n.string(.appTitle, language: appState.language))
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(BrandColors.tealDark)
+                            .font(.title.weight(.bold))
+                            .foregroundStyle(BrandColors.navy)
                     }
-                    .multilineTextAlignment(.center)
                     .opacity(textReveal)
                     .offset(y: (1 - textReveal) * 18)
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 24)
                     .frame(maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, size.height * 0.08)
+                    .padding(.bottom, size.height * 0.1)
                 }
                 .opacity(fadeOut)
                 .ignoresSafeArea()
+                .environment(\.layoutDirection, .leftToRight)
             }
         }
         .ignoresSafeArea()
@@ -141,17 +144,3 @@ struct WelcomeSplashView: View {
     }
 }
 
-struct WelcomeSplashGate<Content: View>: View {
-    @AppStorage("welcome_splash_seen") private var welcomeSplashSeen = false
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        if welcomeSplashSeen {
-            content()
-        } else {
-            WelcomeSplashView {
-                welcomeSplashSeen = true
-            }
-        }
-    }
-}

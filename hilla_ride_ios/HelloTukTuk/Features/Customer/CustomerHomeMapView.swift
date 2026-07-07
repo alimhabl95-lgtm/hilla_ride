@@ -6,7 +6,7 @@ struct CustomerHomeMapView: View {
     let user: AppUser
 
     @StateObject private var locationService = LocationService()
-    @State private var selectedSubDistrictId = BabilRegions.customerDistrict.subDistricts[0].id
+    @State private var selectedSubDistrictId = ""
     @State private var pickup: MapPlace?
     @State private var destination: MapPlace?
     @State private var showBookRide = false
@@ -20,8 +20,23 @@ struct CustomerHomeMapView: View {
     @State private var showAnnouncements = false
     @State private var errorMessage: String?
 
+    private var hasSubDistrict: Bool {
+        !selectedSubDistrictId.isEmpty
+    }
+
     private var subDistrict: BabilSubDistrict {
         BabilRegions.subDistrict(byId: selectedSubDistrictId)
+    }
+
+    private var regionLabel: String {
+        hasSubDistrict ? subDistrict.displayName(language: appState.language) : ""
+    }
+
+    @discardableResult
+    private func requireSubDistrict() -> Bool {
+        if hasSubDistrict { return true }
+        errorMessage = L10n.string(.selectSubDistrictFirst, language: appState.language)
+        return false
     }
 
     var body: some View {
@@ -98,7 +113,9 @@ struct CustomerHomeMapView: View {
                 PlaceSearchView(
                     title: L10n.string(.pickupLabel, language: appState.language),
                     center: subDistrict.center,
-                    radiusKm: 12,
+                    radiusKm: subDistrict.searchRadiusKm,
+                    subDistrictId: selectedSubDistrictId,
+                    regionLabel: regionLabel,
                     onSelect: { place in
                         pickup = place
                     }
@@ -107,8 +124,10 @@ struct CustomerHomeMapView: View {
             .navigationDestination(isPresented: $showDestinationSearch) {
                 PlaceSearchView(
                     title: L10n.string(.destinationLabel, language: appState.language),
-                    center: destination?.coordinate ?? pickup?.coordinate ?? subDistrict.center,
-                    radiusKm: 12,
+                    center: subDistrict.center,
+                    radiusKm: subDistrict.searchRadiusKm,
+                    subDistrictId: selectedSubDistrictId,
+                    regionLabel: regionLabel,
                     onSelect: { place in
                         destination = place
                     }
@@ -156,18 +175,20 @@ struct CustomerHomeMapView: View {
                 .font(.headline)
 
             Picker(L10n.string(.subDistrict, language: appState.language), selection: $selectedSubDistrictId) {
+                Text(L10n.string(.selectSubDistrictHint, language: appState.language)).tag("")
                 ForEach(BabilRegions.customerDistrict.subDistricts) { sub in
                     Text(sub.displayName(language: appState.language)).tag(sub.id)
                 }
             }
             .pickerStyle(.menu)
+            .onChange(of: selectedSubDistrictId) { _ in errorMessage = nil }
 
             SavedPlacesBar { place in
-                destination = place
+                if requireSubDistrict() { destination = place }
             }
 
             Button {
-                showPickupSearch = true
+                if requireSubDistrict() { showPickupSearch = true }
             } label: {
                 locationRow(
                     icon: "circle.fill",
@@ -178,13 +199,13 @@ struct CustomerHomeMapView: View {
             }
             .buttonStyle(.plain)
             Button(L10n.string(.pickOnMap, language: appState.language)) {
-                showPickupPinPicker = true
+                if requireSubDistrict() { showPickupPinPicker = true }
             }
             .font(.caption)
             .buttonStyle(.borderless)
 
             Button {
-                showDestinationSearch = true
+                if requireSubDistrict() { showDestinationSearch = true }
             } label: {
                 locationRow(
                     icon: "mappin.circle.fill",
@@ -195,7 +216,7 @@ struct CustomerHomeMapView: View {
             }
             .buttonStyle(.plain)
             Button(L10n.string(.pickOnMap, language: appState.language)) {
-                showDestinationPinPicker = true
+                if requireSubDistrict() { showDestinationPinPicker = true }
             }
             .font(.caption)
             .buttonStyle(.borderless)
@@ -244,6 +265,7 @@ struct CustomerHomeMapView: View {
     }
 
     private func useMyLocation() {
+        guard requireSubDistrict() else { return }
         errorMessage = nil
         if let coordinate = locationService.currentCoordinate {
             pickup = MapPlace(
@@ -264,6 +286,7 @@ struct CustomerHomeMapView: View {
     }
 
     private func setDestination(at coordinate: CLLocationCoordinate2D) {
+        guard requireSubDistrict() else { return }
         errorMessage = nil
         destination = MapPlace(
             label: L10n.string(.mapPinDestination, language: appState.language),
@@ -272,6 +295,7 @@ struct CustomerHomeMapView: View {
     }
 
     private func attemptBookRide() {
+        guard requireSubDistrict() else { return }
         errorMessage = nil
         guard pickup != nil else {
             errorMessage = L10n.string(.selectPickup, language: appState.language)

@@ -102,6 +102,8 @@ enum L10nKey {
     case selectDestination
     case useMyLocation
     case subDistrict
+    case selectSubDistrictFirst
+    case selectSubDistrictHint
     case estimatedFare
     case distance
     case confirmBooking
@@ -387,6 +389,8 @@ enum L10n {
         .selectDestination: [.english: "Tap to search or long-press map", .arabic: "اضغط للبحث أو اضغط مطولاً على الخريطة"],
         .useMyLocation: [.english: "Use my location", .arabic: "استخدم موقعي"],
         .subDistrict: [.english: "Area", .arabic: "المنطقة"],
+        .selectSubDistrictFirst: [.english: "Please select your area first", .arabic: "الرجاء اختيار المنطقة أولاً"],
+        .selectSubDistrictHint: [.english: "Select area", .arabic: "اختر المنطقة"],
         .estimatedFare: [.english: "Estimated fare", .arabic: "الأجرة التقديرية"],
         .distance: [.english: "Distance", .arabic: "المسافة"],
         .confirmBooking: [.english: "Confirm booking", .arabic: "تأكيد الحجز"],

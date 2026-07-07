@@ -8,6 +8,8 @@ struct PlaceSearchView: View {
     let title: String
     let center: CLLocationCoordinate2D
     let radiusKm: Double
+    var subDistrictId: String = ""
+    var regionLabel: String = ""
     let onSelect: (MapPlace) -> Void
 
     @State private var query = ""
@@ -80,11 +82,15 @@ struct PlaceSearchView: View {
                 query: trimmed,
                 center: center,
                 radiusKm: radiusKm,
-                languageCode: appState.language.rawValue
+                languageCode: appState.language.rawValue,
+                regionLabel: regionLabel
             )
             guard !Task.isCancelled else { return }
+            let scoped = subDistrictId.isEmpty
+                ? places
+                : places.filter { BabilRegions.isWithin(subDistrictId: subDistrictId, point: $0.coordinate) }
             await MainActor.run {
-                results = places
+                results = scoped
                 isSearching = false
             }
         }

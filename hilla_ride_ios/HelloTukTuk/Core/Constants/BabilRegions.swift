@@ -96,4 +96,12 @@ enum BabilRegions {
     static func subDistrict(byId id: String) -> BabilSubDistrict {
         customerDistrict.subDistricts.first { $0.id == id } ?? customerDistrict.subDistricts[0]
     }
+
+    /// True when [point] falls inside the selected sub-district's search radius.
+    /// Used to keep search results scoped to the chosen area only.
+    static func isWithin(subDistrictId: String, point: CLLocationCoordinate2D) -> Bool {
+        guard !subDistrictId.isEmpty else { return false }
+        let sub = subDistrict(byId: subDistrictId)
+        return GeoMath.distanceKm(from: sub.center, to: point) <= sub.searchRadiusKm
+    }
 }

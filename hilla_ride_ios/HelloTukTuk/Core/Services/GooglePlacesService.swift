@@ -28,22 +28,38 @@ final class GooglePlacesService {
         query: String,
         center: CLLocationCoordinate2D,
         radiusKm: Double,
-        languageCode: String
+        languageCode: String,
+        regionLabel: String? = nil
     ) async -> [PlacesSearchResult] {
         guard MapsConfig.useGooglePlacesHTTP, !apiDenied, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return []
         }
 
-        let enriched = "\(query.trimmingCharacters(in: .whitespacesAndNewlines)) Babil Iraq"
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let label = regionLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let enriched = label.isEmpty
+            ? "\(trimmedQuery) Babil Iraq"
+            : "\(trimmedQuery) \(label) Babil Iraq"
+
+        // Restrict (not just bias) results to a rectangle around the selected
+        // area so places from other cities never appear in the list.
+        let latDelta = radiusKm / 111.0
+        let lngDelta = radiusKm / (111.0 * max(0.1, cos(center.latitude * .pi / 180)))
         let body: [String: Any] = [
             "textQuery": enriched,
             "languageCode": languageCode,
             "regionCode": "iq",
             "maxResultCount": 20,
-            "locationBias": [
-                "circle": [
-                    "center": ["latitude": center.latitude, "longitude": center.longitude],
-                    "radius": radiusKm * 1000
+            "locationRestriction": [
+                "rectangle": [
+                    "low": [
+                        "latitude": center.latitude - latDelta,
+                        "longitude": center.longitude - lngDelta
+                    ],
+                    "high": [
+                        "latitude": center.latitude + latDelta,
+                        "longitude": center.longitude + lngDelta
+                    ]
                 ]
             ]
         ]
