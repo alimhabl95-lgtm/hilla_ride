@@ -10,6 +10,8 @@ struct EditProfileView: View {
     @State private var profilePhotoData: Data?
     @State private var isSaving = false
     @State private var message: String?
+    @State private var showAlert = false
+    @State private var saveSucceeded = false
 
     var body: some View {
         ScrollView {
@@ -68,6 +70,13 @@ struct EditProfileView: View {
         }
         .background(BrandColors.surface.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .alert(L10n.string(.editProfileTitle, language: appState.language), isPresented: $showAlert) {
+            Button(L10n.string(.ok, language: appState.language)) {
+                if saveSucceeded { dismiss() }
+            }
+        } message: {
+            Text(message ?? "")
+        }
         .onAppear {
             guard let user = appState.currentUser else { return }
             name = user.name
@@ -90,6 +99,8 @@ struct EditProfileView: View {
         let age = Int(ageText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, age > 0 else {
             message = L10n.string(.profileFieldsRequired, language: appState.language)
+            saveSucceeded = false
+            showAlert = true
             return
         }
 
@@ -111,8 +122,12 @@ struct EditProfileView: View {
                 appState.setCurrentUser(updated)
             }
             message = L10n.string(.profileSaved, language: appState.language)
+            saveSucceeded = true
+            showAlert = true
         } catch {
             message = error.localizedDescription
+            saveSucceeded = false
+            showAlert = true
         }
     }
 }

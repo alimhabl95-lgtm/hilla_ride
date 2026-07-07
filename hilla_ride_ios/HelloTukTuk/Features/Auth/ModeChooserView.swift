@@ -41,7 +41,7 @@ struct ModeChooserView: View {
                     title: L10n.string(.driveAndEarn, language: appState.language),
                     subtitle: L10n.string(.driveAndEarnDesc, language: appState.language),
                     color: BrandColors.tealDark,
-                    icon: "car.side.fill"
+                    icon: "AppLogo"
                 ) {
                     appState.selectMode(.driver)
                     navigateToAuth = true
@@ -71,9 +71,7 @@ struct ModeChooserView: View {
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 20) {
-                Image(systemName: icon)
-                    .font(.system(size: 28))
-                    .foregroundStyle(color)
+                tileIcon(icon, color: color)
                     .frame(width: 64, height: 64)
                     .background(color.opacity(0.12), in: Circle())
 
@@ -99,5 +97,20 @@ struct ModeChooserView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func tileIcon(_ icon: String, color: Color) -> some View {
+        if icon == "AppLogo" {
+            Image("AppLogo")
+                .resizable()
+                .scaledToFit()
+                .padding(8)
+                .clipShape(Circle())
+        } else {
+            Image(systemName: icon)
+                .font(.system(size: 28))
+                .foregroundStyle(color)
+        }
     }
 }

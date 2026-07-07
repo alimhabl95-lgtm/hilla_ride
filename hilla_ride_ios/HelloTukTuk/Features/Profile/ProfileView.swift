@@ -10,6 +10,7 @@ struct ProfileView: View {
     @State private var isSaving = false
     @State private var message: String?
     @State private var isError = false
+    @State private var showAlert = false
 
     var body: some View {
         ScrollView {
@@ -85,6 +86,11 @@ struct ProfileView: View {
         .background(BrandColors.surface.ignoresSafeArea())
         .navigationTitle(L10n.string(.profileTitle, language: appState.language))
         .navigationBarTitleDisplayMode(.inline)
+        .alert(L10n.string(.changePasswordTitle, language: appState.language), isPresented: $showAlert) {
+            Button(L10n.string(.ok, language: appState.language), role: .cancel) {}
+        } message: {
+            Text(message ?? "")
+        }
     }
 
     private func profileRow(title: String, value: String) -> some View {
@@ -103,16 +109,19 @@ struct ProfileView: View {
         guard !currentPassword.isEmpty, !newPassword.isEmpty, !confirmPassword.isEmpty else {
             message = L10n.string(.passwordFieldsRequired, language: appState.language)
             isError = true
+            showAlert = true
             return
         }
         guard newPassword == confirmPassword else {
             message = L10n.string(.passwordsDoNotMatch, language: appState.language)
             isError = true
+            showAlert = true
             return
         }
         guard PhoneAuthCredentials.isValidPassword(newPassword) else {
             message = L10n.string(.passwordMinLength, language: appState.language)
             isError = true
+            showAlert = true
             return
         }
 
@@ -129,9 +138,11 @@ struct ProfileView: View {
             confirmPassword = ""
             message = L10n.string(.passwordChangedMessage, language: appState.language)
             isError = false
+            showAlert = true
         } catch {
             message = AuthErrorMessages.message(for: error)
             isError = true
+            showAlert = true
         }
     }
 }
