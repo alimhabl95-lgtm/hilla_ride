@@ -20,7 +20,7 @@ workflows:
         XCODE_PROJECT: hilla_ride_ios/HelloTukTuk.xcodeproj
         XCODE_SCHEME: HelloTukTuk
         MARKETING_VERSION: "2.1.0"
-        BUILD_NUMBER: "69"
+        BUILD_NUMBER: "70"
       xcode: latest
     triggering:
       events:
