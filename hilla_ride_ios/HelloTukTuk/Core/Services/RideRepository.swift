@@ -9,7 +9,6 @@ enum RideServiceError: LocalizedError {
     case noDrivers
     case rideNotFound
     case rideUnavailable
-
     var errorDescription: String? {
         switch self {
         case .pickupDestinationSame: return L10n.string(.pickupDestinationSame)
