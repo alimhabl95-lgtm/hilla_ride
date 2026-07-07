@@ -37,7 +37,7 @@ struct PhotoUploadField: View {
                     }
                 }
             }
-            .onChange(of: selectedItem) { _, newItem in
+              .onChange(of: selectedItem) { newItem in
                 guard let newItem else { return }
                 Task {
                     if let data = try? await newItem.loadTransferable(type: Data.self) {
