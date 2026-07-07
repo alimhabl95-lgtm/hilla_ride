@@ -147,6 +147,8 @@ enum L10nKey {
     case rideChatTitle
     case chatHint
     case send
+    case messageSendFailed
+    case ok
     case supportTitle
     case supportMessageHint
     case supportMessageSent
@@ -515,6 +517,8 @@ enum L10n {
         .genderMale: [.english: "Male", .arabic: "ذكر"],
         .genderFemale: [.english: "Female", .arabic: "أنثى"],
         .cancelledRidesCount: [.english: "Cancelled rides", .arabic: "الرحلات الملغاة"],
-        .cancel: [.english: "Cancel", .arabic: "إلغاء"]
+        .cancel: [.english: "Cancel", .arabic: "إلغاء"],
+        .messageSendFailed: [.english: "Couldn't send message", .arabic: "تعذّر إرسال الرسالة"],
+        .ok: [.english: "OK", .arabic: "حسناً"]
     ]
 }
