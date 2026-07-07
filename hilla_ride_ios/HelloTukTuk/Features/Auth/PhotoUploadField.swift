@@ -37,16 +37,16 @@ struct PhotoUploadField: View {
                     }
                 }
             }
-              .onChange(of: selectedItem) { newItem in
-                guard let newItem else { return }
-                Task {
-                    if let data = try? await newItem.loadTransferable(type: Data.self) {
-                        await MainActor.run {
-                            imageData = data
-                        }
-                    }
-                }
+              .onChange(of: selectedItem) { _, newItem in
+    guard let newItem else { return }
+    Task {
+        if let data = try? await newItem.loadTransferable(type: Data.self) {
+            await MainActor.run {
+                imageData = data
             }
+        }
+    }
+}
         }
     }
 }
