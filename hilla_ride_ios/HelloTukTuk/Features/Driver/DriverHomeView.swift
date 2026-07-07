@@ -170,7 +170,7 @@ struct DriverHomeView: View {
 
                     Text(availabilityHint)
                         .font(.footnote)
-                        .foregroundStyle(currentDriver.hasAssignedWorkArea ? .secondary : .red)
+                        .foregroundStyle(currentDriver.hasAssignedWorkArea ? Color.secondary : Color.red)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
