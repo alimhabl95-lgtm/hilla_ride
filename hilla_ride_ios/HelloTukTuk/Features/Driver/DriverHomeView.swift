@@ -20,6 +20,8 @@ struct DriverHomeView: View {
     @State private var statsTask: Task<Void, Never>?
     @State private var activeCustomer: AppUser?
     @State private var customerTask: Task<Void, Never>?
+    @State private var cancelledCount = 0
+    @State private var cancelledTask: Task<Void, Never>?
 
     private var currentDriver: DriverProfile {
         liveDriver ?? driver
@@ -34,44 +36,14 @@ struct DriverHomeView: View {
                     idleDriverPanel
                 }
             }
+            .navigationTitle(L10n.string(.driverHomeTitle, language: appState.language))
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     LanguageToggle()
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 8) {
-                        if activeRide != nil {
-                            Button {
-                                showChat = true
-                            } label: {
-                                Image(systemName: "message.fill")
-                            }
-                        }
-                        CurrentRideIconButton(role: .driver)
-                        AnnouncementIconButton(showAnnouncements: $showAnnouncements)
-                        LegalDocumentsMenu()
-                        Button {
-                            showCompletedHistory = true
-                        } label: {
-                            Image(systemName: "checkmark.circle")
-                        }
-                        Button {
-                            showCancelledHistory = true
-                        } label: {
-                            Image(systemName: "xmark.circle")
-                        }
-                        Button {
-                            showSupport = true
-                        } label: {
-                            Image(systemName: "headphones")
-                        }
-                        onlineToggle
-                        Button {
-                            showProfile = true
-                        } label: {
-                            Image(systemName: "person.circle")
-                        }
-                    }
+                    overflowMenu
                 }
             }
             .navigationDestination(isPresented: $showProfile) {
@@ -107,27 +79,43 @@ struct DriverHomeView: View {
         }
         .onAppear { startWatching() }
         .onDisappear { stopWatching() }
-       .onChange(of: activeRide?.customerId) { customerId in
+        .onChange(of: activeRide?.customerId) { customerId in
             startWatchingCustomer(customerId)
         }
     }
 
-    private var onlineToggle: some View {
-        Toggle(
-            isOn: Binding(
-                get: { currentDriver.isOnline },
-                set: { value in Task { await setOnline(value) } }
-            )
-        ) {
-            Text(
-                currentDriver.isOnline
-                    ? L10n.string(.goOnline, language: appState.language)
-                    : L10n.string(.goOffline, language: appState.language)
-            )
-            .font(.caption)
+    private var overflowMenu: some View {
+        Menu {
+            Button {
+                showProfile = true
+            } label: {
+                Label(L10n.string(.profileTitle, language: appState.language), systemImage: "person.circle")
+            }
+            Button {
+                showAnnouncements = true
+            } label: {
+                Label(L10n.string(.announcementsTitle, language: appState.language), systemImage: "megaphone")
+            }
+            Button {
+                showSupport = true
+            } label: {
+                Label(L10n.string(.supportTitle, language: appState.language), systemImage: "headphones")
+            }
+            Link(destination: LegalConfig.privacyPolicyURL(languageCode: appState.language.rawValue)) {
+                Label(L10n.string(.privacyPolicy, language: appState.language), systemImage: "lock.doc")
+            }
+            Link(destination: LegalConfig.termsOfServiceURL(languageCode: appState.language.rawValue)) {
+                Label(L10n.string(.termsOfService, language: appState.language), systemImage: "doc.text")
+            }
+            Divider()
+            Button(role: .destructive) {
+                Task { try? await appState.signOut() }
+            } label: {
+                Label(L10n.string(.logout, language: appState.language), systemImage: "rectangle.portrait.and.arrow.right")
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal")
         }
-        .labelsHidden()
-        .disabled(isUpdatingOnline || !currentDriver.hasAssignedWorkArea)
     }
 
     private var idleDriverPanel: some View {
@@ -137,11 +125,13 @@ struct DriverHomeView: View {
                     .font(.system(size: 56))
                     .foregroundStyle(BrandColors.gold)
 
-                Text(L10n.string(.driverHomeTitle, language: appState.language))
-                    .font(.title2.bold())
-
                 Text(currentDriver.name)
-                    .font(.title3)
+                    .font(.title2.bold())
+                    .foregroundStyle(BrandColors.navy)
+
+                availabilityCard
+
+                tripsStatsRow
 
                 if let monthlyStats {
                     monthlyPrizeCard(stats: monthlyStats)
@@ -149,36 +139,121 @@ struct DriverHomeView: View {
 
                 earningsCard(driver: currentDriver)
 
-                if !currentDriver.hasAssignedWorkArea {
-                    Text(L10n.string(.driverWorkAreaRequired, language: appState.language))
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                } else if !currentDriver.isOnline {
-                    Text(L10n.string(.driverGoOnlineHint, language: appState.language))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                } else {
-                    Text(L10n.string(.driverWaitingForRequests, language: appState.language))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-
                 if let errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
                         .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
                 }
             }
             .padding(24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
+    }
+
+    private var availabilityCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L10n.string(.driverAvailabilityTitle, language: appState.language))
+                .font(.headline)
+                .foregroundStyle(BrandColors.navy)
+
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        currentDriver.isOnline
+                            ? L10n.string(.goOnline, language: appState.language)
+                            : L10n.string(.goOffline, language: appState.language)
+                    )
+                    .font(.title3.bold())
+                    .foregroundStyle(currentDriver.isOnline ? BrandColors.tealDark : .secondary)
+
+                    Text(availabilityHint)
+                        .font(.footnote)
+                        .foregroundStyle(currentDriver.hasAssignedWorkArea ? .secondary : .red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { currentDriver.isOnline },
+                        set: { value in Task { await setOnline(value) } }
+                    )
+                )
+                .labelsHidden()
+                .tint(BrandColors.teal)
+                .disabled(isUpdatingOnline || !currentDriver.hasAssignedWorkArea)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var availabilityHint: String {
+        if !currentDriver.hasAssignedWorkArea {
+            return L10n.string(.driverWorkAreaRequired, language: appState.language)
+        }
+        return currentDriver.isOnline
+            ? L10n.string(.driverWaitingForRequests, language: appState.language)
+            : L10n.string(.driverGoOnlineHint, language: appState.language)
+    }
+
+    private var tripsStatsRow: some View {
+        HStack(spacing: 12) {
+            statCard(
+                title: L10n.string(.completedRidesCount, language: appState.language),
+                value: currentDriver.completedRidesCount,
+                icon: "checkmark.circle.fill",
+                color: BrandColors.tealDark
+            ) {
+                showCompletedHistory = true
+            }
+
+            statCard(
+                title: L10n.string(.cancelledRidesCount, language: appState.language),
+                value: cancelledCount,
+                icon: "xmark.circle.fill",
+                color: .red
+            ) {
+                showCancelledHistory = true
+            }
+        }
+    }
+
+    private func statCard(
+        title: String,
+        value: Int,
+        icon: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundStyle(color)
+                Text("\(value)")
+                    .font(.title.bold())
+                    .foregroundStyle(BrandColors.navy)
+                Text(title)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(color.opacity(0.2), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func monthlyPrizeCard(stats: DriverMonthlyStats) -> some View {
@@ -217,58 +292,67 @@ struct DriverHomeView: View {
 
     @ViewBuilder
     private func driverRidePanel(ride: Ride) -> some View {
-        VStack(spacing: 16) {
-            if MapsConfig.isConfigured {
-                GoogleMapView(
-                    cameraTarget: ride.pickupCoordinate,
-                    zoom: 14,
-                    pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
-                    destination: MapPlace(label: ride.destinationLabel, coordinate: ride.destinationCoordinate)
-                )
-                .frame(height: 260)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .padding(.horizontal)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) {
-                    ProfileAvatarView(
-                        name: activeCustomer?.name ?? "",
-                        photoURL: activeCustomer?.profilePhotoUrl,
-                        size: 56
+        ScrollView {
+            VStack(spacing: 16) {
+                if MapsConfig.isConfigured {
+                    GoogleMapView(
+                        cameraTarget: ride.pickupCoordinate,
+                        zoom: 14,
+                        pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
+                        destination: MapPlace(label: ride.destinationLabel, coordinate: ride.destinationCoordinate)
                     )
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(rideStatusTitle(ride.status))
-                            .font(.headline)
-                        if let name = activeCustomer?.name, !name.isEmpty {
-                            Text(name)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    .frame(height: 240)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal)
                 }
-                Text("\(ride.pickupLabel) → \(ride.destinationLabel)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(formatIqd(ride.fareAmountIqd))
-                    .font(.title2.bold())
-                    .foregroundStyle(BrandColors.tealDark)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 24)
 
-            rideActions(for: ride)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        ProfileAvatarView(
+                            name: activeCustomer?.name ?? "",
+                            photoURL: activeCustomer?.profilePhotoUrl,
+                            size: 56
+                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(rideStatusTitle(ride.status))
+                                .font(.headline)
+                            if let name = activeCustomer?.name, !name.isEmpty {
+                                Text(name)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                    }
+                    Text("\(ride.pickupLabel) → \(ride.destinationLabel)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(formatIqd(ride.fareAmountIqd))
+                        .font(.title2.bold())
+                        .foregroundStyle(BrandColors.tealDark)
+
+                    Button {
+                        showChat = true
+                    } label: {
+                        Label(L10n.string(.messageCustomer, language: appState.language), systemImage: "message.fill")
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
                 .padding(.horizontal, 24)
 
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .padding(.horizontal)
-            }
+                rideActions(for: ride)
+                    .padding(.horizontal, 24)
 
-            Spacer()
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal)
+                }
+            }
+            .padding(.vertical, 16)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
     }
 
@@ -342,6 +426,12 @@ struct DriverHomeView: View {
                 await MainActor.run { monthlyStats = stats }
             }
         }
+        cancelledTask = Task {
+            for await rides in RideRepository().watchRideHistoryForDriver(driverId: driverId, statusFilter: .cancelled) {
+                guard !Task.isCancelled else { break }
+                await MainActor.run { cancelledCount = rides.count }
+            }
+        }
     }
 
     private func stopWatching() {
@@ -349,6 +439,7 @@ struct DriverHomeView: View {
         rideTask?.cancel()
         statsTask?.cancel()
         customerTask?.cancel()
+        cancelledTask?.cancel()
     }
 
     private func startWatchingCustomer(_ customerId: String?) {

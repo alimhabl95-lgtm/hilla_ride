@@ -195,6 +195,8 @@ enum L10nKey {
     case genderFemale
     case cancelledRidesCount
     case cancel
+    case driverAvailabilityTitle
+    case messageCustomer
 }
 
 enum L10n {
@@ -527,6 +529,8 @@ enum L10n {
         .genderFemale: [.english: "Female", .arabic: "أنثى"],
         .cancelledRidesCount: [.english: "Cancelled rides", .arabic: "الرحلات الملغاة"],
         .cancel: [.english: "Cancel", .arabic: "إلغاء"],
+        .driverAvailabilityTitle: [.english: "Availability", .arabic: "الحالة"],
+        .messageCustomer: [.english: "Message customer", .arabic: "مراسلة الزبون"],
         .messageSendFailed: [.english: "Couldn't send message", .arabic: "تعذّر إرسال الرسالة"],
         .ok: [.english: "OK", .arabic: "حسناً"]
     ]
