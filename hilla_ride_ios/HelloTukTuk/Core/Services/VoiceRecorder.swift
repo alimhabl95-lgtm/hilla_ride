@@ -40,14 +40,18 @@ final class VoiceRecorder: ObservableObject {
         timer = nil
         recorder?.stop()
         isRecording = false
+        let capturedURL = fileURL
+        fileURL = nil
         defer {
             recorder = nil
         }
-        guard let fileURL, elapsedMs >= 800 else {
-            try? FileManager.default.removeItem(at: fileURL!)
+        guard let url = capturedURL, elapsedMs >= 800 else {
+            if let capturedURL {
+                try? FileManager.default.removeItem(at: capturedURL)
+            }
             return nil
         }
-        return (fileURL, elapsedMs)
+        return (url, elapsedMs)
     }
 
     func cancelRecording() {
