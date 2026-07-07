@@ -82,7 +82,8 @@ final class StorageService {
 
     func downloadData(from urlString: String, maxBytes: Int = 5 * 1024 * 1024) async throws -> Data {
         let ref = storage.reference(forURL: urlString)
-        guard let data = try await ref.data(maxSize: Int64(maxBytes)), !data.isEmpty else {
+          let data = try await ref.data(maxSize: Int64(maxBytes))
+   guard !data.isEmpty else {
             throw StorageServiceError.uploadFailed
         }
         return data
