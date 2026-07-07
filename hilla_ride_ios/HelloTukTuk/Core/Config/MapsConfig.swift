@@ -1,10 +1,11 @@
 import Foundation
 
 enum MapsConfig {
-    /// Key 1 — the map-rendering key used by the Google Maps SDK (matches the
-    /// Android map widget and the Flutter iOS `Runner/Info.plist`). This must NOT
-    /// be the HTTP Places key, otherwise map tiles come back blank on iOS.
-    static let mapRenderKey = "AIzaSyBke5bjy0cHxAnYJ8x89WlvjECLOTcAbGE"
+    /// iOS map-rendering key (auto-created by Firebase) in the `hello-tiktok-57dc5`
+    /// project — the same project where "Maps SDK for iOS" is enabled. It is
+    /// restricted to the iOS app bundle, which is required for tiles to render on
+    /// iOS. Must NOT be the Android map key or the HTTP Places key.
+    static let mapRenderKey = "AIzaSyDD4PxDlgfhdKj-_Z7sCkWHZ0hrVRtD2aA"
 
     static var apiKey: String {
         if let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String,
