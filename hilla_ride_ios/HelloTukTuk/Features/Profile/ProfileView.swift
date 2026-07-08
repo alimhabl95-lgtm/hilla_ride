@@ -11,6 +11,8 @@ struct ProfileView: View {
     @State private var message: String?
     @State private var isError = false
     @State private var showAlert = false
+    @State private var showDeleteConfirm = false
+    @State private var isDeleting = false
 
     var body: some View {
         ScrollView {
@@ -80,6 +82,17 @@ struct ProfileView: View {
                     }
                 }
                 .buttonStyle(SecondaryButtonStyle())
+
+                Button(role: .destructive) {
+                    showDeleteConfirm = true
+                } label: {
+                    if isDeleting {
+                        ProgressView()
+                    } else {
+                        Text(L10n.string(.deleteAccount, language: appState.language))
+                    }
+                }
+                .disabled(isDeleting)
             }
             .padding(24)
         }
@@ -90,6 +103,14 @@ struct ProfileView: View {
             Button(L10n.string(.ok, language: appState.language), role: .cancel) {}
         } message: {
             Text(message ?? "")
+        }
+        .alert(L10n.string(.deleteAccount, language: appState.language), isPresented: $showDeleteConfirm) {
+            Button(L10n.string(.cancel, language: appState.language), role: .cancel) {}
+            Button(L10n.string(.deleteAccountConfirm, language: appState.language), role: .destructive) {
+                Task { await deleteAccount() }
+            }
+        } message: {
+            Text(L10n.string(.deleteAccountMessage, language: appState.language))
         }
     }
 
@@ -141,6 +162,19 @@ struct ProfileView: View {
             showAlert = true
         } catch {
             message = AuthErrorMessages.message(for: error)
+            isError = true
+            showAlert = true
+        }
+    }
+
+    private func deleteAccount() async {
+        isDeleting = true
+        defer { isDeleting = false }
+        do {
+            try await appState.authService.deleteMyAccount()
+            dismiss()
+        } catch {
+            message = L10n.string(.deleteAccountFailed, language: appState.language)
             isError = true
             showAlert = true
         }

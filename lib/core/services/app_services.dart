@@ -52,6 +52,18 @@ class AuthService {
     await _auth.signOut();
   }
 
+  /// Permanently deletes the signed-in customer or driver account and all data.
+  Future<void> deleteMyAccount() async {
+    if (_auth.currentUser == null) {
+      throw FirebaseAuthException(
+        code: 'user-not-found',
+        message: 'Not signed in.',
+      );
+    }
+    await _functions.httpsCallable('deleteMyAccount').call();
+    await signOut();
+  }
+
   Future<UserCredential> signUpWithPhonePassword({
     required String phoneRaw,
     required String password,

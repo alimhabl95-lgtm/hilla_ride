@@ -167,6 +167,19 @@ final class AuthService: ObservableObject {
         try auth.signOut()
     }
 
+    /// Permanently deletes the signed-in customer's or driver's account and data.
+    func deleteMyAccount() async throws {
+        guard auth.currentUser != nil else {
+            throw AuthError(code: "internal", message: "Not signed in.")
+        }
+        do {
+            _ = try await functions.httpsCallable("deleteMyAccount").call([:])
+        } catch let error as NSError {
+            throw mapFunctionsError(error)
+        }
+        try await signOut()
+    }
+
     var currentUID: String? {
         auth.currentUser?.uid
     }

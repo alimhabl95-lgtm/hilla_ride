@@ -154,6 +154,11 @@ enum L10nKey {
     case send
     case messageSendFailed
     case ok
+    case deleteAccount
+    case deleteAccountMessage
+    case deleteAccountConfirm
+    case deleteAccountSuccess
+    case deleteAccountFailed
     case supportTitle
     case supportMessageHint
     case supportMessageSent
@@ -556,6 +561,14 @@ enum L10n {
         .driverAvailabilityTitle: [.english: "Availability", .arabic: "الحالة"],
         .messageCustomer: [.english: "Message customer", .arabic: "مراسلة الزبون"],
         .messageSendFailed: [.english: "Couldn't send message", .arabic: "تعذّر إرسال الرسالة"],
-        .ok: [.english: "OK", .arabic: "حسناً"]
+        .ok: [.english: "OK", .arabic: "حسناً"],
+        .deleteAccount: [.english: "Delete account", .arabic: "حذف الحساب"],
+        .deleteAccountMessage: [
+            .english: "This permanently deletes your account, profile, and ride history. You can register again later with the same phone number.",
+            .arabic: "سيؤدي هذا إلى حذف حسابك وملفك الشخصي وسجل رحلاتك نهائياً. يمكنك التسجيل مرة أخرى لاحقاً بنفس رقم الهاتف."
+        ],
+        .deleteAccountConfirm: [.english: "Delete permanently", .arabic: "حذف نهائي"],
+        .deleteAccountSuccess: [.english: "Your account was deleted.", .arabic: "تم حذف حسابك."],
+        .deleteAccountFailed: [.english: "Could not delete account. Try again.", .arabic: "تعذر حذف الحساب. حاول مرة أخرى."]
     ]
 }

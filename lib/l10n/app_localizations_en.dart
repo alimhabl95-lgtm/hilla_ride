@@ -27,6 +27,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logout => 'Log out';
 
   @override
+  String get deleteAccount => 'Delete account';
+
+  @override
+  String get deleteAccountMessage =>
+      'This permanently deletes your account, profile, and ride history. You can register again later with the same phone number.';
+
+  @override
+  String get deleteAccountConfirm => 'Delete permanently';
+
+  @override
+  String get deleteAccountSuccess => 'Your account was deleted.';
+
+  @override
+  String get deleteAccountFailed => 'Could not delete account. Try again.';
+
+  @override
   String get language => 'Language';
 
   @override

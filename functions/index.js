@@ -1660,6 +1660,109 @@ exports.deleteUserAccount = authAdminCallable(async (data, context) => {
   return { ok: true, deletedAuth, deletedFirestore };
 });
 
+exports.deleteMyAccount = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const targetUserId = context.auth.uid;
+  const userDoc = await admin.firestore().collection("users").doc(targetUserId).get();
+  const driverDoc = await admin.firestore().collection("drivers").doc(targetUserId).get();
+
+  if (!userDoc.exists && !driverDoc.exists) {
+    throw new functions.https.HttpsError("not-found", "Account not found.");
+  }
+
+  let role = userDoc.exists && userDoc.data()
+    ? String(userDoc.data().role || "")
+    : "";
+  let phone = userDoc.exists && userDoc.data()
+    ? normalizePhone(String(userDoc.data().phone || ""))
+    : "";
+
+  if (driverDoc.exists && driverDoc.data()) {
+    if (!role) {
+      role = "driver";
+    }
+    if (!phone || phone === "+964") {
+      phone = normalizePhone(String(driverDoc.data().phone || ""));
+    }
+  }
+
+  if (role === "manager" || role === "assistant") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Manager and assistant accounts cannot be deleted from the mobile app.",
+    );
+  }
+
+  if (role !== "customer" && role !== "driver") {
+    throw new functions.https.HttpsError("failed-precondition", "Unsupported account type.");
+  }
+
+  let deletedAuth = false;
+  let deletedFirestore = false;
+
+  try {
+    await deleteAccountStorageFiles(targetUserId);
+  } catch (error) {
+    functions.logger.warn("deleteMyAccount storage cleanup skipped", {
+      targetUserId,
+      message: error.message,
+    });
+  }
+
+  try {
+    await deleteUserFirestoreData(targetUserId, role);
+    deletedFirestore = true;
+  } catch (error) {
+    functions.logger.error("deleteMyAccount firestore delete failed", {
+      targetUserId,
+      code: error.code,
+      message: error.message,
+    });
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      `Could not delete profile data: ${error.message || error.code || "unknown error"}`,
+    );
+  }
+
+  try {
+    deletedAuth = await deleteAuthCredentialsForAccount(targetUserId, phone);
+    if (!deletedAuth) {
+      deletedAuth = true;
+    }
+  } catch (error) {
+    functions.logger.error("deleteMyAccount auth delete failed", {
+      targetUserId,
+      code: error.code,
+      message: error.message,
+    });
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      `Could not delete login credentials: ${error.message || error.code || "unknown error"}`,
+    );
+  }
+
+  try {
+    await markReleasedPhone(phone, targetUserId);
+  } catch (error) {
+    functions.logger.warn("deleteMyAccount released phone mark skipped", {
+      targetUserId,
+      message: error.message,
+    });
+  }
+
+  functions.logger.info("deleteMyAccount completed", {
+    targetUserId,
+    role,
+    deletedAuth,
+    deletedFirestore,
+  });
+
+  return { ok: true, deletedAuth, deletedFirestore };
+});
+
 exports.cleanupReleasedPhoneAuth = authAdminCallable(async (data) => {
   const payload = parseCallableData(data);
   const phone = normalizePhone(String(payload.phone || "").trim());
