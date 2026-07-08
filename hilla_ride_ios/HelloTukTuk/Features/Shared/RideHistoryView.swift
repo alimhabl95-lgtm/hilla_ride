@@ -13,8 +13,18 @@ struct RideHistoryView: View {
     var body: some View {
         List(rides) { ride in
             VStack(alignment: .leading, spacing: 6) {
+                if !ride.rideNumber.isEmpty {
+                    Text(L10n.rideNumberLabel(ride.rideNumber, language: appState.language))
+                        .font(.caption.bold())
+                        .foregroundStyle(BrandColors.tealDark)
+                }
                 Text("\(ride.pickupLabel) → \(ride.destinationLabel)")
                     .font(.subheadline.bold())
+                if let when = ride.completedAt ?? ride.createdAt {
+                    Text("\(L10n.string(.tripDateTime, language: appState.language)): \(formattedDate(when))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text(ride.status.rawValue.capitalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -39,6 +49,14 @@ struct RideHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { startWatching() }
         .onDisappear { historyTask?.cancel() }
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: appState.language == .arabic ? "ar" : "en")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 
     private func formatIqd(_ amount: Int) -> String {

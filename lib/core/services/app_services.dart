@@ -15,6 +15,7 @@ import 'package:hilla_ride/core/services/monthly_prize_service.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
 import 'package:hilla_ride/core/services/pricing_service.dart';
 import 'package:hilla_ride/core/services/promo_service.dart';
+import 'package:hilla_ride/core/services/ride_number_service.dart';
 import 'package:hilla_ride/core/services/session_service.dart';
 import 'package:hilla_ride/core/utils/geohash.dart';
 import 'package:latlong2/latlong.dart';
@@ -1151,6 +1152,8 @@ class RideService {
 
     final rideId = _uuid.v4();
     final rideRef = _firestore.collection('rides').doc(rideId);
+    final rideNumber = await RideNumberService(firestore: _firestore)
+        .allocateRideNumber();
 
     final ride = Ride(
       id: rideId,
@@ -1177,6 +1180,7 @@ class RideService {
 
     await rideRef.set({
       ...ride.toMap(),
+      'rideNumber': rideNumber,
       'districtId': resolvedDistrictId,
       'subDistrictId': resolvedSubDistrictId,
       'distanceKm': distanceKm,

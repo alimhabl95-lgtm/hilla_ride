@@ -1109,6 +1109,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String get tripDateTime => 'التاريخ والوقت';
 
   @override
+  String get searchRideByNumber => 'البحث برقم الرحلة';
+
+  @override
+  String rideNumberLabel(String number) {
+    return 'رحلة #$number';
+  }
+
+  @override
+  String get editMonthlyPrize => 'تعديل الجائزة';
+
+  @override
+  String get monthlyPrizeSaved => 'تم تحديث الجائزة الشهرية.';
+
+  @override
+  String customerPromoBanner(String code, int remaining) {
+    return 'كود $code: $remaining رحلات مخفّضة متبقية';
+  }
+
+  @override
   String get tripHistoryHint => 'رحلاتك المكتملة والملغاة مع التاريخ والوقت.';
 
   @override

@@ -137,6 +137,17 @@ struct DriverHomeView: View {
 
                 if let monthlyStats {
                     monthlyPrizeCard(stats: monthlyStats)
+                } else {
+                    monthlyPrizeCard(
+                        stats: DriverMonthlyStats(
+                            rideCount: 0,
+                            rank: 1,
+                            totalDrivers: 0,
+                            prizeAmountIqd: MonthlyPrizeConfig.defaultPrizeIqd,
+                            monthKey: MonthlyPrizeConfig.currentMonthKey()
+                        )
+                    )
+                    .redacted(reason: .placeholder)
                 }
 
                 earningsCard(driver: currentDriver)

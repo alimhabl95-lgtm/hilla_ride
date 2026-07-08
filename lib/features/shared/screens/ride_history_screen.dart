@@ -209,7 +209,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                                 : Theme.of(context).colorScheme.error,
                           ),
                           title: Text(
-                            '${ride.pickupLabel} → ${ride.destinationLabel}',
+                            ride.rideNumber.isNotEmpty
+                                ? '${l10n.rideNumberLabel(ride.rideNumber)} • ${ride.pickupLabel} → ${ride.destinationLabel}'
+                                : '${ride.pickupLabel} → ${ride.destinationLabel}',
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

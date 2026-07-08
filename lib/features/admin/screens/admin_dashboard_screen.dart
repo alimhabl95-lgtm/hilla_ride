@@ -22,6 +22,7 @@ import 'package:hilla_ride/features/admin/screens/admin_ride_detail_screen.dart'
 import 'package:hilla_ride/features/admin/screens/admin_ride_status_screen.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_ride_promo_summary.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -755,6 +756,13 @@ class _RideHistoryPanel extends StatefulWidget {
 class _RideHistoryPanelState extends State<_RideHistoryPanel> {
   String? _cityFilterId;
   String? _subDistrictFilterId;
+  final _rideNumberQueryController = TextEditingController();
+
+  @override
+  void dispose() {
+    _rideNumberQueryController.dispose();
+    super.dispose();
+  }
 
   String _districtLabel(BabilDistrict district, String localeName) {
     return localeName.startsWith('ar') ? district.nameAr : district.nameEn;
@@ -790,6 +798,13 @@ class _RideHistoryPanelState extends State<_RideHistoryPanel> {
               ride.subDistrictId != _subDistrictFilterId) {
             return false;
           }
+          final rideNumberQuery = _rideNumberQueryController.text.trim();
+          if (rideNumberQuery.isNotEmpty) {
+            final haystack = '${ride.rideNumber} ${ride.id}'.toLowerCase();
+            if (!haystack.contains(rideNumberQuery.toLowerCase())) {
+              return false;
+            }
+          }
           return true;
         }).toList();
 
@@ -800,6 +815,15 @@ class _RideHistoryPanelState extends State<_RideHistoryPanel> {
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
               child: Column(
                 children: [
+                  TextField(
+                    controller: _rideNumberQueryController,
+                    decoration: InputDecoration(
+                      labelText: l10n.searchRideByNumber,
+                      prefixIcon: const Icon(Icons.search),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String?>(
                     value: _cityFilterId,
                     decoration: InputDecoration(
@@ -865,6 +889,12 @@ class _RideHistoryPanelState extends State<_RideHistoryPanel> {
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final ride = filtered[index];
+                        final when = ride.completedAt ?? ride.createdAt;
+                        final dateLabel = when == null
+                            ? '—'
+                            : DateFormat.yMMMd(l10n.localeName)
+                                .add_jm()
+                                .format(when);
                         final district = ride.districtId.isEmpty
                             ? null
                             : BabilRegions.districtById(ride.districtId);
@@ -882,11 +912,14 @@ class _RideHistoryPanelState extends State<_RideHistoryPanel> {
 
                         return ListTile(
                           title: Text(
-                            '${ride.pickupLabel} → ${ride.destinationLabel}',
+                            ride.rideNumber.isNotEmpty
+                                ? '${l10n.rideNumberLabel(ride.rideNumber)} • ${ride.pickupLabel} → ${ride.destinationLabel}'
+                                : '${ride.pickupLabel} → ${ride.destinationLabel}',
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Text('${l10n.tripDateTime}: $dateLabel'),
                               Text(
                                 [
                                   if (cityLabel.isNotEmpty) cityLabel,
@@ -901,7 +934,7 @@ class _RideHistoryPanelState extends State<_RideHistoryPanel> {
                               AdminRidePromoSummary(ride: ride, compact: true),
                             ],
                           ),
-                          isThreeLine: ride.usedPromo,
+                          isThreeLine: true,
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
@@ -950,10 +983,18 @@ class _RideCard extends StatelessWidget {
 
     return Card(
       child: ListTile(
-        title: Text('${ride.pickupLabel} → ${ride.destinationLabel}'),
+        title: Text(
+          ride.rideNumber.isNotEmpty
+              ? '${l10n.rideNumberLabel(ride.rideNumber)} • ${ride.pickupLabel} → ${ride.destinationLabel}'
+              : '${ride.pickupLabel} → ${ride.destinationLabel}',
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (ride.createdAt != null)
+              Text(
+                '${l10n.tripDateTime}: ${DateFormat.yMMMd(l10n.localeName).add_jm().format(ride.createdAt!)}',
+              ),
             if (cityLabel.isNotEmpty || subLabel.isNotEmpty)
               Text(
                 [

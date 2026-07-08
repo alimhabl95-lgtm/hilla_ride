@@ -282,7 +282,7 @@ async function assertAdminPermissionAny(context, permissions) {
   return userDoc;
 }
 
-exports.createAssistant = authAdminCallable(async (data, context) => {
+exports.createAssistant = functions.https.onCall(async (data, context) => {
   functions.logger.info("createAssistant started", {
     callerUid: context.auth?.uid || null,
   });
@@ -1708,3 +1708,84 @@ exports.cleanupReleasedPhoneAuth = authAdminCallable(async (data) => {
   await clearReleasedPhone(phone);
   return { ok: true };
 });
+
+const SUPPORT_AUTO_REPLY_AR =
+  "شكراً لتواصلك معنا. سنرد على رسالتك خلال 24 ساعة.";
+
+const ACTIVE_RIDE_STATUSES = [
+  "searching",
+  "matched",
+  "accepted",
+  "inProgress",
+  "awaitingCashPayment",
+];
+
+exports.onSupportMessageCreated = functions.firestore
+  .document("support_messages/{messageId}")
+  .onCreate(async (snap) => {
+    const data = snap.data() || {};
+    if (data.isFromManager || data.isAutoReply) {
+      return null;
+    }
+
+    const userId = String(data.userId || "").trim();
+    if (!userId) {
+      return null;
+    }
+
+    await admin.firestore().collection("support_messages").add({
+      userId,
+      userRole: "manager",
+      userName: "Support",
+      phone: "",
+      message: SUPPORT_AUTO_REPLY_AR,
+      isFromManager: true,
+      isAutoReply: true,
+      status: "open",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return null;
+  });
+
+exports.expireStaleActiveRides = functions.pubsub
+  .schedule("every 60 minutes")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const cutoff = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() - 24 * 60 * 60 * 1000),
+    );
+    let expiredCount = 0;
+
+    for (const status of ACTIVE_RIDE_STATUSES) {
+      const snapshot = await db
+        .collection("rides")
+        .where("status", "==", status)
+        .where("createdAt", "<", cutoff)
+        .get();
+
+      for (const doc of snapshot.docs) {
+        const ride = doc.data() || {};
+        const driverId = String(ride.driverId || "").trim();
+        const batch = db.batch();
+        batch.update(doc.ref, {
+          status: "cancelled",
+          cancelReason: "expired_after_24h",
+          cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        if (driverId) {
+          batch.update(db.collection("drivers").doc(driverId), {
+            hasActiveRide: false,
+          });
+        }
+        await batch.commit();
+        expiredCount += 1;
+      }
+    }
+
+    if (expiredCount > 0) {
+      functions.logger.info("expireStaleActiveRides completed", { expiredCount });
+    }
+    return null;
+  });

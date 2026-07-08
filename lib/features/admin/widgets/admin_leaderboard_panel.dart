@@ -15,6 +15,67 @@ class AdminLeaderboardPanel extends StatefulWidget {
 class _AdminLeaderboardPanelState extends State<AdminLeaderboardPanel> {
   var _isResetting = false;
   var _actionDriverId = '';
+  var _isSavingPrize = false;
+  final _prizeAmountController = TextEditingController();
+
+  @override
+  void dispose() {
+    _prizeAmountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _editPrize(MonthlyPrizeConfig config) async {
+    final l10n = AppLocalizations.of(context)!;
+    _prizeAmountController.text = config.prizeAmountIqd.toString();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.editMonthlyPrize),
+        content: TextField(
+          controller: _prizeAmountController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: l10n.monthlyPrizeAmount(
+              FareService().formatIqd(
+                config.prizeAmountIqd,
+                locale: l10n.localeName,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final amount = int.tryParse(_prizeAmountController.text.trim());
+    if (amount == null || amount <= 0) return;
+
+    setState(() => _isSavingPrize = true);
+    try {
+      await context.read<AppState>().monthlyPrizeService.savePrizeAmount(amount);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.monthlyPrizeSaved)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingPrize = false);
+    }
+  }
 
   Future<void> _markWinner(String driverId) async {
     final l10n = AppLocalizations.of(context)!;
@@ -138,6 +199,11 @@ class _AdminLeaderboardPanelState extends State<AdminLeaderboardPanel> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
+                    OutlinedButton.icon(
+                      onPressed: _isSavingPrize ? null : () => _editPrize(config),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: Text(l10n.editMonthlyPrize),
+                    ),
                     if (hasWinner && !config.winnerPaid)
                       FilledButton.icon(
                         onPressed: _isResetting ? null : _markPaid,

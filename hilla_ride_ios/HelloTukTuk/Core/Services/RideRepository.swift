@@ -86,6 +86,7 @@ final class RideRepository {
 
         let rideId = UUID().uuidString
         let rideRef = firestore.collection("rides").document(rideId)
+        let rideNumber = try await allocateRideNumber()
         var payload: [String: Any] = [
             "customerId": customerId,
             "pickupLabel": pickup.label,
@@ -100,6 +101,7 @@ final class RideRepository {
             "districtId": districtId,
             "subDistrictId": subDistrictId,
             "distanceKm": distanceKm,
+            "rideNumber": rideNumber,
             "createdAt": FieldValue.serverTimestamp()
         ]
         if originalFareIqd > 0 {
@@ -495,5 +497,34 @@ final class RideRepository {
         try await firestore.collection("drivers").document(driverId).updateData([
             "hasActiveRide": active
         ])
+    }
+
+    private func allocateRideNumber() async throws -> String {
+        let ref = firestore.collection("config").document("ride_counter")
+        let result = try await firestore.runTransaction { transaction, errorPointer -> Any? in
+            do {
+                let snapshot = try transaction.getDocument(ref)
+                let next = (snapshot.data()?["nextNumber"] as? NSNumber)?.intValue ?? 100_001
+                transaction.setData(
+                    [
+                        "nextNumber": next + 1,
+                        "updatedAt": FieldValue.serverTimestamp()
+                    ],
+                    forDocument: ref,
+                    merge: true
+                )
+                return next
+            } catch {
+                errorPointer?.pointee = error as NSError
+                return nil
+            }
+        }
+        if let number = result as? Int {
+            return String(number)
+        }
+        if let number = (result as? NSNumber)?.intValue {
+            return String(number)
+        }
+        return "100001"
     }
 }

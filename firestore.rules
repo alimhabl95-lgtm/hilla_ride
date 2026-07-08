@@ -302,6 +302,14 @@ service cloud.firestore {
 
     }
 
+    match /config/ride_counter {
+
+      allow read: if signedIn();
+
+      allow create, update: if signedIn();
+
+    }
+
 
 
     match /config/pricing/cities/{districtId} {

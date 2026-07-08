@@ -1122,6 +1122,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tripDateTime => 'Date & time';
 
   @override
+  String get searchRideByNumber => 'Search by ride number';
+
+  @override
+  String rideNumberLabel(String number) {
+    return 'Ride #$number';
+  }
+
+  @override
+  String get editMonthlyPrize => 'Edit prize';
+
+  @override
+  String get monthlyPrizeSaved => 'Monthly prize updated.';
+
+  @override
+  String customerPromoBanner(String code, int remaining) {
+    return 'Promo $code: $remaining discounted rides left';
+  }
+
+  @override
   String get tripHistoryHint =>
       'Your completed and cancelled trips with date and time.';
 

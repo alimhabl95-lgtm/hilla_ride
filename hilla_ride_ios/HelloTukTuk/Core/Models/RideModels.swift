@@ -1,4 +1,5 @@
 import CoreLocation
+import FirebaseFirestore
 import Foundation
 
 enum RideStatus: String, Codable, CaseIterable {
@@ -66,6 +67,9 @@ struct Ride: Identifiable, Equatable {
     let driverRating: Int?
     let driverEarningsIqd: Int
     let promoDiscountIqd: Int
+    let rideNumber: String
+    let createdAt: Date?
+    let completedAt: Date?
 
     var pickupCoordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: pickupLat, longitude: pickupLng)
@@ -98,5 +102,16 @@ struct Ride: Identifiable, Equatable {
         driverRating = (data["driverRating"] as? NSNumber)?.intValue
         driverEarningsIqd = (data["driverEarningsIqd"] as? NSNumber)?.intValue ?? 0
         promoDiscountIqd = (data["promoDiscountIqd"] as? NSNumber)?.intValue ?? 0
+        rideNumber = data["rideNumber"] as? String ?? ""
+        if let timestamp = data["createdAt"] as? Timestamp {
+            createdAt = timestamp.dateValue()
+        } else {
+            createdAt = nil
+        }
+        if let timestamp = data["completedAt"] as? Timestamp {
+            completedAt = timestamp.dateValue()
+        } else {
+            completedAt = nil
+        }
     }
 }

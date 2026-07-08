@@ -48,7 +48,11 @@ class AdminRideStatusScreen extends StatelessWidget {
               return Card(
                 child: ListTile(
                   leading: CircleAvatar(child: Text('${index + 1}')),
-                  title: Text('${ride.pickupLabel} → ${ride.destinationLabel}'),
+                  title: Text(
+                    ride.rideNumber.isNotEmpty
+                        ? '${l10n.rideNumberLabel(ride.rideNumber)} • ${ride.pickupLabel} → ${ride.destinationLabel}'
+                        : '${ride.pickupLabel} → ${ride.destinationLabel}',
+                  ),
                   subtitle: Text(
                     '${l10n.tripDateTime}: $dateLabel\n'
                     '${l10n.statusLabel}: ${ride.status.name} • '

@@ -171,6 +171,22 @@ struct CustomerHomeMapView: View {
 
     private var rideSearchPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if user.hasPromoRemaining {
+                HStack(spacing: 8) {
+                    Image(systemName: "tag.fill")
+                        .foregroundStyle(BrandColors.gold)
+                    Text(L10n.customerPromoBanner(
+                        code: user.promoCode,
+                        remaining: user.promoRidesLimit - user.promoRidesUsed,
+                        language: appState.language
+                    ))
+                    .font(.footnote)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(BrandColors.teal.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+            }
+
             Text(L10n.string(.customerHomeTitle, language: appState.language))
                 .font(.headline)
 

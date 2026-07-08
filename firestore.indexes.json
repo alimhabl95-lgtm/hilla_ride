@@ -89,14 +89,11 @@
       ]
     },
     {
-      "collectionGroup": "drivers",
+      "collectionGroup": "rides",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "approvalStatus", "order": "ASCENDING" },
-        { "fieldPath": "isOnline", "order": "ASCENDING" },
-        { "fieldPath": "hasActiveRide", "order": "ASCENDING" },
-        { "fieldPath": "assignedDistrictId", "order": "ASCENDING" },
-        { "fieldPath": "assignedSubDistrictId", "order": "ASCENDING" }
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
     }
   ],

@@ -397,6 +397,22 @@
   "accountTypeLabel": "Account type",
   "registeredAt": "Registered",
   "tripDateTime": "Date & time",
+  "searchRideByNumber": "Search by ride number",
+  "rideNumberLabel": "Ride #{number}",
+  "@rideNumberLabel": {
+    "placeholders": {
+      "number": { "type": "String" }
+    }
+  },
+  "editMonthlyPrize": "Edit prize",
+  "monthlyPrizeSaved": "Monthly prize updated.",
+  "customerPromoBanner": "Promo {code}: {remaining} discounted rides left",
+  "@customerPromoBanner": {
+    "placeholders": {
+      "code": { "type": "String" },
+      "remaining": { "type": "int" }
+    }
+  },
   "tripHistoryHint": "Your completed and cancelled trips with date and time.",
   "totalTripsCount": "{count} completed trips",
   "@totalTripsCount": {

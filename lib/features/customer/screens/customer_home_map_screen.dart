@@ -501,7 +501,37 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
               clipBehavior: Clip.antiAlias,
               child: SafeArea(
                 top: false,
-                child: RideSearchPanel(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.user.hasActivePromo)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        color: const Color(0xFF0F766E).withValues(alpha: 0.12),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.local_offer_outlined,
+                              color: Color(0xFFD97706),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                l10n.customerPromoBanner(
+                                  widget.user.promoCode,
+                                  widget.user.promoRidesLimit -
+                                      widget.user.promoRidesUsed,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    RideSearchPanel(
                   bottomSheetStyle: true,
                   customerOnly: true,
                   regionExpanded: true,
@@ -524,6 +554,8 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
                   onPinDestination: () => _openPinPicker(forPickup: false),
                   onSavedPlaceSelected: _applyDestination,
                   onBookRide: _openBookRide,
+                    ),
+                  ],
                 ),
               ),
             ),

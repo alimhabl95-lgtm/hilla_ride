@@ -415,6 +415,7 @@ class Ride {
     this.promoDiscountIqd = 0,
     this.promoCode = '',
     this.offeredDriverIds = const [],
+    this.rideNumber = '',
   });
 
   final String id;
@@ -445,6 +446,7 @@ class Ride {
   final int originalFareIqd;
   final int promoDiscountIqd;
   final String promoCode;
+  final String rideNumber;
 
   bool get isCashPaymentComplete => cashCollectedByDriver;
 
@@ -484,6 +486,7 @@ class Ride {
               .where((value) => value.isNotEmpty)
               .toList() ??
           const [],
+      rideNumber: data['rideNumber'] as String? ?? '',
     );
   }
 
@@ -516,6 +519,7 @@ class Ride {
       if (originalFareIqd > 0) 'originalFareIqd': originalFareIqd,
       if (promoDiscountIqd > 0) 'promoDiscountIqd': promoDiscountIqd,
       if (promoCode.isNotEmpty) 'promoCode': promoCode,
+      if (rideNumber.isNotEmpty) 'rideNumber': rideNumber,
     };
   }
 }

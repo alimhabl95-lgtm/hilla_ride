@@ -397,6 +397,11 @@
   "accountTypeLabel": "نوع الحساب",
   "registeredAt": "تاريخ التسجيل",
   "tripDateTime": "التاريخ والوقت",
+  "searchRideByNumber": "البحث برقم الرحلة",
+  "rideNumberLabel": "رحلة #{number}",
+  "editMonthlyPrize": "تعديل الجائزة",
+  "monthlyPrizeSaved": "تم تحديث الجائزة الشهرية.",
+  "customerPromoBanner": "كود {code}: {remaining} رحلات مخفّضة متبقية",
   "tripHistoryHint": "رحلاتك المكتملة والملغاة مع التاريخ والوقت.",
   "totalTripsCount": "{count} رحلة مكتملة",
   "@totalTripsCount": {

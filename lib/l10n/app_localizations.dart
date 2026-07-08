@@ -2132,6 +2132,36 @@ abstract class AppLocalizations {
   /// **'Date & time'**
   String get tripDateTime;
 
+  /// No description provided for @searchRideByNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by ride number'**
+  String get searchRideByNumber;
+
+  /// No description provided for @rideNumberLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Ride #{number}'**
+  String rideNumberLabel(String number);
+
+  /// No description provided for @editMonthlyPrize.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit prize'**
+  String get editMonthlyPrize;
+
+  /// No description provided for @monthlyPrizeSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly prize updated.'**
+  String get monthlyPrizeSaved;
+
+  /// No description provided for @customerPromoBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo {code}: {remaining} discounted rides left'**
+  String customerPromoBanner(String code, int remaining);
+
   /// No description provided for @tripHistoryHint.
   ///
   /// In en, this message translates to:

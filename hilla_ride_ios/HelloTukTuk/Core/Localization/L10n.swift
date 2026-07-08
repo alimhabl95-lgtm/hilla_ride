@@ -176,6 +176,8 @@ enum L10nKey {
     case announcementsEmpty
     case legalDocumentsTitle
     case driverMonthlyPrizeTitle
+    case tripDateTime
+    case customerPromoBanner
     case yourEarningsTitle
     case completedRidesCount
     case driverNetEarnings
@@ -233,6 +235,20 @@ enum L10n {
         switch language {
         case .english: return "Monthly prize: \(amount)"
         case .arabic: return "جائزة الشهر: \(amount)"
+        }
+    }
+
+    static func rideNumberLabel(_ number: String, language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Ride #\(number)"
+        case .arabic: return "رحلة #\(number)"
+        }
+    }
+
+    static func customerPromoBanner(code: String, remaining: Int, language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Promo \(code): \(remaining) discounted rides left"
+        case .arabic: return "كود \(code): \(remaining) رحلات مخفّضة متبقية"
         }
     }
 
@@ -503,6 +519,8 @@ enum L10n {
         .announcementsEmpty: [.english: "No announcements yet", .arabic: "لا توجد إعلانات بعد"],
         .legalDocumentsTitle: [.english: "Legal documents", .arabic: "المستندات القانونية"],
         .driverMonthlyPrizeTitle: [.english: "Monthly prize", .arabic: "جائزة الشهر"],
+        .tripDateTime: [.english: "Date & time", .arabic: "التاريخ والوقت"],
+        .customerPromoBanner: [.english: "Promo code active", .arabic: "كود الخصم مفعّل"],
         .yourEarningsTitle: [.english: "Your earnings", .arabic: "أرباحك"],
         .completedRidesCount: [.english: "Completed rides", .arabic: "المشاوير المكتملة"],
         .driverNetEarnings: [.english: "Net earnings", .arabic: "صافي الأرباح"],
