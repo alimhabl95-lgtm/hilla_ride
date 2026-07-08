@@ -131,7 +131,11 @@ struct DriverSignupView: View {
         }
 
         isLoading = true
-        defer { isLoading = false }
+        appState.beginSignupFlow()
+        defer {
+            isLoading = false
+            appState.endSignupFlow()
+        }
 
         do {
             let uid = try await appState.authService.signUpDriverAccount(
@@ -168,6 +172,7 @@ struct DriverSignupView: View {
             try await appState.authService.signOut()
             showSuccess = true
         } catch {
+            try? await appState.authService.signOut()
             errorMessage = AuthErrorMessages.message(for: error)
         }
     }

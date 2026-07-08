@@ -16,9 +16,18 @@ final class AppState: ObservableObject {
     @Published private(set) var currentUser: AppUser?
     @Published private(set) var currentDriver: DriverProfile?
     @Published private(set) var isBootstrapping = true
+    @Published private(set) var isPerformingSignup = false
 
     var needsProfileRecovery: Bool {
-        Auth.auth().currentUser != nil && currentUser == nil && !isBootstrapping
+        Auth.auth().currentUser != nil && currentUser == nil && !isBootstrapping && !isPerformingSignup
+    }
+
+    func beginSignupFlow() {
+        isPerformingSignup = true
+    }
+
+    func endSignupFlow() {
+        isPerformingSignup = false
     }
 
     let authService = AuthService()
@@ -74,6 +83,10 @@ final class AppState: ObservableObject {
     }
 
     private func refreshCurrentUser(firebaseUser: User?) async {
+        if isPerformingSignup {
+            return
+        }
+
         guard let firebaseUser else {
             currentUser = nil
             currentDriver = nil

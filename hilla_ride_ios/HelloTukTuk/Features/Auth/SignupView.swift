@@ -108,7 +108,11 @@ struct SignupView: View {
         }
 
         isLoading = true
-        defer { isLoading = false }
+        appState.beginSignupFlow()
+        defer {
+            isLoading = false
+            appState.endSignupFlow()
+        }
 
         do {
             try await appState.authService.signUpCustomer(
@@ -120,6 +124,7 @@ struct SignupView: View {
             try await appState.authService.signOut()
             showSuccess = true
         } catch {
+            try? await appState.authService.signOut()
             errorMessage = AuthErrorMessages.message(for: error)
         }
     }
