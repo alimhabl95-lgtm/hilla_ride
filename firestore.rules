@@ -84,7 +84,29 @@ service cloud.firestore {
 
       allow create: if isSelf(userId)
 
-        && request.resource.data.role in ['customer', 'driver', 'manager'];
+        && (
+
+          request.resource.data.role in ['customer', 'driver', 'manager']
+
+          || (
+
+            request.resource.data.role == 'assistant'
+
+            && request.resource.data.isBlocked == true
+
+            && request.resource.data.approvalStatus == 'pending'
+
+            && (
+
+              !('permissions' in request.resource.data)
+
+              || request.resource.data.permissions.size() == 0
+
+            )
+
+          )
+
+        );
 
       allow update: if isManager()
 
@@ -116,7 +138,7 @@ service cloud.firestore {
 
           && request.resource.data.diff(resource.data).affectedKeys()
 
-            .hasOnly(['permissions', 'updatedAt', 'isBlocked', 'blockedAt'])
+            .hasOnly(['permissions', 'updatedAt', 'isBlocked', 'blockedAt', 'approvalStatus', 'approvedAt'])
 
         )
 

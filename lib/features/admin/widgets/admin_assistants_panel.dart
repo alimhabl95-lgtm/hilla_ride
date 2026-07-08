@@ -102,6 +102,79 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
     }
   }
 
+  Future<void> _approveAssistant(AppUser assistant) async {
+    final l10n = AppLocalizations.of(context)!;
+    final assistantService = context.read<AppState>().assistantService;
+    final selected = {...AdminPermissions.defaultAssistant};
+
+    final approved = await showDialog<Set<String>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(l10n.approveAssistantTitle),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: AdminPermissions.all
+                        .where((p) => p != AdminPermissions.manageAssistants)
+                        .map(
+                          (permission) => CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: selected.contains(permission),
+                            onChanged: (value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  selected.add(permission);
+                                } else {
+                                  selected.remove(permission);
+                                }
+                              });
+                            },
+                            title: Text(_permissionLabel(l10n, permission)),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l10n.cancel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(selected),
+                  child: Text(l10n.approveAssistantButton),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (approved == null) return;
+
+    try {
+      await assistantService.approveAssistant(
+        assistantId: assistant.uid,
+        permissions: approved.toList(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.assistantApprovedMessage)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$error')),
+      );
+    }
+  }
+
   Future<void> _editPermissions(AppUser assistant) async {
     final l10n = AppLocalizations.of(context)!;
     final assistantService = context.read<AppState>().assistantService;
@@ -173,6 +246,12 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
       stream: assistantService.watchAssistants(),
       builder: (context, snapshot) {
         final assistants = snapshot.data ?? const [];
+        final pendingAssistants = assistants
+            .where((a) => a.approvalStatus == 'pending')
+            .toList();
+        final activeAssistants = assistants
+            .where((a) => a.approvalStatus != 'pending')
+            .toList();
 
         return ListView(
           padding: const EdgeInsets.all(24),
@@ -256,15 +335,41 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
               ),
             ),
             const SizedBox(height: 24),
+            if (pendingAssistants.isNotEmpty) ...[
+              Text(
+                l10n.pendingAssistantsTitle,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              ...pendingAssistants.map(
+                (assistant) => Card(
+                  color: Theme.of(context).colorScheme.tertiaryContainer,
+                  child: ListTile(
+                    leading: const Icon(Icons.hourglass_top),
+                    title: Text(assistant.name),
+                    subtitle: Text(
+                      '${assistant.email}\n${l10n.assistantPendingLabel}',
+                    ),
+                    isThreeLine: true,
+                    trailing: FilledButton.icon(
+                      onPressed: () => _approveAssistant(assistant),
+                      icon: const Icon(Icons.check),
+                      label: Text(l10n.approveAssistantButton),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
             Text(
               l10n.existingAssistantsTitle,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            if (assistants.isEmpty)
+            if (activeAssistants.isEmpty)
               Text(l10n.noAssistantsYet)
             else
-              ...assistants.map(
+              ...activeAssistants.map(
                 (assistant) => Card(
                   child: ListTile(
                     title: Text(assistant.name),

@@ -920,6 +920,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get completedRidesCount => 'الرحلات المكتملة';
 
   @override
+  String get monthlyRidesCount => 'رحلات هذا الشهر';
+
+  @override
   String get yourEarningsTitle => 'أرباحك';
 
   @override
@@ -1239,6 +1242,35 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get disableAssistant => 'تعطيل';
+
+  @override
+  String get assistantRegisterButton => 'التسجيل كمساعد';
+
+  @override
+  String get assistantRegisterHint =>
+      'أنشئ حساب المساعد باسمك وبريدك الإلكتروني وكلمة المرور. سيقوم المدير بمراجعته والموافقة عليه قبل أن تتمكن من تسجيل الدخول.';
+
+  @override
+  String get assistantPendingApprovalMessage =>
+      'حسابك بانتظار موافقة المدير. ستتمكن من تسجيل الدخول بمجرد موافقة المدير عليه.';
+
+  @override
+  String get pendingAssistantsTitle => 'طلبات بانتظار الموافقة';
+
+  @override
+  String get assistantPendingLabel => 'بانتظار الموافقة';
+
+  @override
+  String get approveAssistantTitle => 'الموافقة على المساعد';
+
+  @override
+  String get approveAssistantButton => 'موافقة';
+
+  @override
+  String get assistantApprovedMessage => 'تمت الموافقة على المساعد.';
+
+  @override
+  String get ok => 'حسناً';
 
   @override
   String get permPendingDrivers => 'الموافقة على السائقين المعلقين';

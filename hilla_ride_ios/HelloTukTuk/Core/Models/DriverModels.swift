@@ -35,6 +35,7 @@ struct DriverProfile: Identifiable, Equatable {
     let assignedSubDistrictId: String
     let completedRidesCount: Int
     let totalDriverEarningsIqd: Int
+    let outstandingDriverEarningsIqd: Int
     let outstandingPlatformCommissionIqd: Int
     let pendingBonusIqd: Int
     let monthlyRideCount: Int
@@ -76,6 +77,11 @@ struct DriverProfile: Identifiable, Equatable {
         assignedSubDistrictId = data["assignedSubDistrictId"] as? String ?? ""
         completedRidesCount = (data["completedRidesCount"] as? NSNumber)?.intValue ?? 0
         totalDriverEarningsIqd = (data["totalDriverEarningsIqd"] as? NSNumber)?.intValue ?? 0
+        if let outstandingDriver = data["outstandingDriverEarningsIqd"] as? NSNumber {
+            outstandingDriverEarningsIqd = outstandingDriver.intValue
+        } else {
+            outstandingDriverEarningsIqd = (data["totalDriverEarningsIqd"] as? NSNumber)?.intValue ?? 0
+        }
         outstandingPlatformCommissionIqd = (data["outstandingPlatformCommissionIqd"] as? NSNumber)?.intValue ?? 0
         pendingBonusIqd = (data["pendingBonusIqd"] as? NSNumber)?.intValue ?? 0
         monthlyRideCount = (data["monthlyRideCount"] as? NSNumber)?.intValue ?? 0

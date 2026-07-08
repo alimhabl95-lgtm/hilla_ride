@@ -1865,6 +1865,8 @@ class RideService {
               FieldValue.increment(split.platformCommissionIqd),
           'totalDriverEarningsIqd':
               FieldValue.increment(split.driverEarningsIqd),
+          'outstandingDriverEarningsIqd':
+              FieldValue.increment(split.driverEarningsIqd),
           'completedRidesCount': FieldValue.increment(1),
           'hasActiveRide': false,
         });
@@ -2009,6 +2011,8 @@ class RideService {
         'outstandingPlatformCommissionIqd':
             FieldValue.increment(split.platformCommissionIqd),
         'totalDriverEarningsIqd': FieldValue.increment(split.driverEarningsIqd),
+        'outstandingDriverEarningsIqd':
+            FieldValue.increment(split.driverEarningsIqd),
         'completedRidesCount': FieldValue.increment(1),
         'hasActiveRide': false,
       });

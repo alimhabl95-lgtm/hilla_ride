@@ -337,6 +337,7 @@ final class RideRepository {
                     "totalPlatformCommissionIqd": FieldValue.increment(Int64(split.platformCommissionIqd)),
                     "outstandingPlatformCommissionIqd": FieldValue.increment(Int64(split.platformCommissionIqd)),
                     "totalDriverEarningsIqd": FieldValue.increment(Int64(split.driverEarningsIqd)),
+                    "outstandingDriverEarningsIqd": FieldValue.increment(Int64(split.driverEarningsIqd)),
                       "completedRidesCount": FieldValue.increment(Int64(1)),
                     "hasActiveRide": false
                 ], forDocument: driverRef)

@@ -80,14 +80,22 @@ final class SupportService {
 
     func watchUserMessages(userId: String) -> AsyncStream<[SupportMessage]> {
         AsyncStream { continuation in
+            // Filter only by userId and sort client-side. Combining a
+            // whereField filter with order(by:) would require a composite
+            // Firestore index; if it is missing the listener fails silently
+            // and no messages appear. Sorting locally matches the Android
+            // client and avoids that dependency entirely.
             let listener = firestore.collection("support_messages")
                 .whereField("userId", isEqualTo: userId)
-                .order(by: "createdAt", descending: false)
-                .limit(to: 50)
                 .addSnapshotListener { snapshot, _ in
-                    let messages = snapshot?.documents.compactMap { doc in
+                    let messages = (snapshot?.documents.compactMap { doc in
                         SupportMessage(documentID: doc.documentID, data: doc.data())
-                    } ?? []
+                    } ?? [])
+                    .sorted { lhs, rhs in
+                        let lhsDate = lhs.createdAt ?? Date(timeIntervalSince1970: 0)
+                        let rhsDate = rhs.createdAt ?? Date(timeIntervalSince1970: 0)
+                        return lhsDate < rhsDate
+                    }
                     continuation.yield(messages)
                 }
             continuation.onTermination = { _ in listener.remove() }

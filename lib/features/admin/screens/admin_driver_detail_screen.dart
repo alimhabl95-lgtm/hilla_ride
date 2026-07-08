@@ -158,6 +158,11 @@ class _AdminDriverDetailScreenState extends State<AdminDriverDetailScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
+                                    '${l10n.monthlyRidesCount}: ${driver.monthlyRideCount}',
+                                    style:
+                                        Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                  Text(
                                     '${l10n.completedRidesCount}: ${driver.completedRidesCount}',
                                   ),
                                   Text(
@@ -169,7 +174,7 @@ class _AdminDriverDetailScreenState extends State<AdminDriverDetailScreen> {
                                     '${l10n.lifetimeProfitLabel}: ${fareService.formatIqd(driver.totalPlatformCommissionIqd, locale: l10n.localeName)}',
                                   ),
                                   Text(
-                                    '${l10n.driverNetEarnings}: ${fareService.formatIqd(driver.totalDriverEarningsIqd, locale: l10n.localeName)}',
+                                    '${l10n.driverNetEarnings}: ${fareService.formatIqd(driver.outstandingDriverEarningsIqd, locale: l10n.localeName)}',
                                   ),
                                   if (driver.pendingBonusIqd > 0)
                                     Text(

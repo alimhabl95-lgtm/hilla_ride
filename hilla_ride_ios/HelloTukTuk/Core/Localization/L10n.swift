@@ -180,6 +180,7 @@ enum L10nKey {
     case customerPromoBanner
     case yourEarningsTitle
     case completedRidesCount
+    case monthlyRidesCount
     case driverNetEarnings
     case owedToPlatformLabel
     case pendingBonusLabel
@@ -523,6 +524,7 @@ enum L10n {
         .customerPromoBanner: [.english: "Promo code active", .arabic: "كود الخصم مفعّل"],
         .yourEarningsTitle: [.english: "Your earnings", .arabic: "أرباحك"],
         .completedRidesCount: [.english: "Completed rides", .arabic: "المشاوير المكتملة"],
+        .monthlyRidesCount: [.english: "Rides this month", .arabic: "رحلات هذا الشهر"],
         .driverNetEarnings: [.english: "Net earnings", .arabic: "صافي الأرباح"],
         .owedToPlatformLabel: [.english: "Owed to platform", .arabic: "المستحق للمنصة"],
         .pendingBonusLabel: [.english: "Pending bonus", .arabic: "مكافأة معلّقة"],

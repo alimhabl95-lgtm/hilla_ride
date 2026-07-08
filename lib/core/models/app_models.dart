@@ -76,6 +76,7 @@ class AppUser {
     this.promoRidesUsed = 0,
     this.promoRidesLimit = 0,
     this.profilePhotoUrl = '',
+    this.approvalStatus = '',
   });
 
   final String uid;
@@ -94,9 +95,13 @@ class AppUser {
   final int promoRidesUsed;
   final int promoRidesLimit;
   final String profilePhotoUrl;
+  final String approvalStatus;
 
   bool get hasActivePromo =>
       promoCode.isNotEmpty && promoRidesUsed < promoRidesLimit;
+
+  bool get isPendingAssistant =>
+      role == UserRole.assistant && approvalStatus == 'pending';
 
   bool get isProfileComplete => name.trim().isNotEmpty && age > 0;
 
@@ -132,6 +137,7 @@ class AppUser {
       promoRidesUsed: (data['promoRidesUsed'] as num?)?.toInt() ?? 0,
       promoRidesLimit: (data['promoRidesLimit'] as num?)?.toInt() ?? 0,
       profilePhotoUrl: data['profilePhotoUrl'] as String? ?? '',
+      approvalStatus: data['approvalStatus'] as String? ?? '',
     );
   }
 
@@ -152,6 +158,7 @@ class AppUser {
       'promoRidesUsed': promoRidesUsed,
       if (promoRidesLimit > 0) 'promoRidesLimit': promoRidesLimit,
       if (profilePhotoUrl.isNotEmpty) 'profilePhotoUrl': profilePhotoUrl,
+      if (approvalStatus.isNotEmpty) 'approvalStatus': approvalStatus,
     };
   }
 }
@@ -177,6 +184,7 @@ class DriverProfile {
     this.totalPlatformCommissionIqd = 0,
     this.outstandingPlatformCommissionIqd = 0,
     this.totalDriverEarningsIqd = 0,
+    this.outstandingDriverEarningsIqd = 0,
     this.pendingBonusIqd = 0,
     this.totalBonusGrantedIqd = 0,
     this.lastProfitReceivedAt,
@@ -216,6 +224,7 @@ class DriverProfile {
   final int totalPlatformCommissionIqd;
   final int outstandingPlatformCommissionIqd;
   final int totalDriverEarningsIqd;
+  final int outstandingDriverEarningsIqd;
   final int pendingBonusIqd;
   final int totalBonusGrantedIqd;
   final DateTime? lastProfitReceivedAt;
@@ -278,6 +287,10 @@ class DriverProfile {
           : (data['totalPlatformCommissionIqd'] as num?)?.toInt() ?? 0,
       totalDriverEarningsIqd:
           (data['totalDriverEarningsIqd'] as num?)?.toInt() ?? 0,
+      outstandingDriverEarningsIqd:
+          data.containsKey('outstandingDriverEarningsIqd')
+              ? (data['outstandingDriverEarningsIqd'] as num?)?.toInt() ?? 0
+              : (data['totalDriverEarningsIqd'] as num?)?.toInt() ?? 0,
       pendingBonusIqd: (data['pendingBonusIqd'] as num?)?.toInt() ?? 0,
       totalBonusGrantedIqd:
           (data['totalBonusGrantedIqd'] as num?)?.toInt() ?? 0,
@@ -327,6 +340,7 @@ class DriverProfile {
       'totalPlatformCommissionIqd': totalPlatformCommissionIqd,
       'outstandingPlatformCommissionIqd': outstandingPlatformCommissionIqd,
       'totalDriverEarningsIqd': totalDriverEarningsIqd,
+      'outstandingDriverEarningsIqd': outstandingDriverEarningsIqd,
       'pendingBonusIqd': pendingBonusIqd,
       'totalBonusGrantedIqd': totalBonusGrantedIqd,
       if (lastProfitReceivedAt != null)

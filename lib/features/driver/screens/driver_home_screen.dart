@@ -280,10 +280,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
+                                        '${l10n.monthlyRidesCount}: ${driver.monthlyRideCount}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall,
+                                      ),
+                                      Text(
                                         '${l10n.completedRidesCount}: ${driver.completedRidesCount}',
                                       ),
                                       Text(
-                                        '${l10n.driverNetEarnings}: ${fareService.formatIqd(driver.totalDriverEarningsIqd, locale: l10n.localeName)}',
+                                        '${l10n.driverNetEarnings}: ${fareService.formatIqd(driver.outstandingDriverEarningsIqd, locale: l10n.localeName)}',
                                       ),
                                       Text(
                                         '${l10n.owedToPlatformLabel}: ${fareService.formatIqd(driver.owedPlatformCommissionIqd, locale: l10n.localeName)}',

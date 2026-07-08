@@ -291,8 +291,10 @@ struct DriverHomeView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L10n.string(.yourEarningsTitle, language: appState.language))
                 .font(.headline)
+            Text("\(L10n.string(.monthlyRidesCount, language: appState.language)): \(driver.monthlyRideCount)")
+                .font(.subheadline.bold())
             Text("\(L10n.string(.completedRidesCount, language: appState.language)): \(driver.completedRidesCount)")
-            Text("\(L10n.string(.driverNetEarnings, language: appState.language)): \(formatIqd(driver.totalDriverEarningsIqd))")
+            Text("\(L10n.string(.driverNetEarnings, language: appState.language)): \(formatIqd(driver.outstandingDriverEarningsIqd))")
             Text("\(L10n.string(.owedToPlatformLabel, language: appState.language)): \(formatIqd(driver.outstandingPlatformCommissionIqd))")
             if driver.pendingBonusIqd > 0 {
                 Text("\(L10n.string(.pendingBonusLabel, language: appState.language)): \(formatIqd(driver.pendingBonusIqd))")

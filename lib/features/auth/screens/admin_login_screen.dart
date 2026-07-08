@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/features/auth/screens/assistant_register_screen.dart';
 import 'package:hilla_ride/features/auth/widgets/password_text_field.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -143,6 +144,18 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                   l10n.assistantLoginHint,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _isLoading
+                      ? null
+                      : () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AssistantRegisterScreen(),
+                            ),
+                          ),
+                  icon: const Icon(Icons.person_add_alt_1_outlined),
+                  label: Text(l10n.assistantRegisterButton),
                 ),
               ],
             ],

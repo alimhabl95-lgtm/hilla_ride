@@ -174,6 +174,9 @@ class _AdminShell extends StatelessWidget {
               }
               return const MissingProfileRecoveryScreen();
             }
+            if (profile.isPendingAssistant) {
+              return const _AssistantPendingApproval();
+            }
             if (profile.isBlocked) {
               return const _ManagerAccessDenied();
             }
@@ -187,6 +190,40 @@ class _AdminShell extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _AssistantPendingApproval extends StatelessWidget {
+  const _AssistantPendingApproval();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.hourglass_top, size: 64),
+              const SizedBox(height: 16),
+              Text(
+                l10n.assistantPendingApprovalMessage,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => context.read<AppState>().authService.signOut(),
+                child: Text(l10n.logout),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

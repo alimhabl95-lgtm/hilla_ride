@@ -353,10 +353,11 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
                                         ),
                                         subtitle: Text(
                                           '${l10n.driverWorkDistrictLabel}: ${_driverCityLabel(driver, l10n.localeName)}\n'
+                                          '${l10n.monthlyRidesCount}: ${driver.monthlyRideCount}\n'
                                           '${l10n.completedRidesCount}: ${driver.completedRidesCount}\n'
                                           '${l10n.outstandingProfitLabel}: ${fareService.formatIqd(driver.owedPlatformCommissionIqd, locale: l10n.localeName)}\n'
                                           '${l10n.lifetimeProfitLabel}: ${fareService.formatIqd(driver.totalPlatformCommissionIqd, locale: l10n.localeName)}\n'
-                                          '${l10n.driverNetEarnings}: ${fareService.formatIqd(driver.totalDriverEarningsIqd, locale: l10n.localeName)}',
+                                          '${l10n.driverNetEarnings}: ${fareService.formatIqd(driver.outstandingDriverEarningsIqd, locale: l10n.localeName)}',
                                         ),
                                         isThreeLine: true,
                                         trailing:

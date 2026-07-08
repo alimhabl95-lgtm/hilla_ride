@@ -164,14 +164,21 @@ class AdminService {
           : (data['totalPlatformCommissionIqd'] as num?)?.toInt() ?? 0;
       if (outstanding <= 0) return;
 
+      final outstandingDriverEarnings =
+          data.containsKey('outstandingDriverEarningsIqd')
+              ? (data['outstandingDriverEarningsIqd'] as num?)?.toInt() ?? 0
+              : (data['totalDriverEarningsIqd'] as num?)?.toInt() ?? 0;
+
       final settlementRef = ref.collection('profit_settlements').doc();
       transaction.set(settlementRef, {
         'amountIqd': outstanding,
+        'driverEarningsIqd': outstandingDriverEarnings,
         'receivedAt': FieldValue.serverTimestamp(),
         'receivedBy': receivedByUid,
       });
       transaction.update(ref, {
         'outstandingPlatformCommissionIqd': 0,
+        'outstandingDriverEarningsIqd': 0,
         'lastProfitReceivedAt': FieldValue.serverTimestamp(),
       });
     });

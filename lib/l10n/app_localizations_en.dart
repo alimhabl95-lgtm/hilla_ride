@@ -930,6 +930,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get completedRidesCount => 'Completed rides';
 
   @override
+  String get monthlyRidesCount => 'Rides this month';
+
+  @override
   String get yourEarningsTitle => 'Your earnings';
 
   @override
@@ -1254,6 +1257,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get disableAssistant => 'Disable';
+
+  @override
+  String get assistantRegisterButton => 'Register as assistant';
+
+  @override
+  String get assistantRegisterHint =>
+      'Create your assistant account with your name, email, and password. A manager will review and approve it before you can sign in.';
+
+  @override
+  String get assistantPendingApprovalMessage =>
+      'Your account is waiting for manager approval. You will be able to sign in once a manager approves it.';
+
+  @override
+  String get pendingAssistantsTitle => 'Pending approvals';
+
+  @override
+  String get assistantPendingLabel => 'Waiting for approval';
+
+  @override
+  String get approveAssistantTitle => 'Approve assistant';
+
+  @override
+  String get approveAssistantButton => 'Approve';
+
+  @override
+  String get assistantApprovedMessage => 'Assistant approved.';
+
+  @override
+  String get ok => 'OK';
 
   @override
   String get permPendingDrivers => 'Approve pending drivers';

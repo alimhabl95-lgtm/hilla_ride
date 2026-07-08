@@ -1784,6 +1784,12 @@ abstract class AppLocalizations {
   /// **'Completed rides'**
   String get completedRidesCount;
 
+  /// No description provided for @monthlyRidesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Rides this month'**
+  String get monthlyRidesCount;
+
   /// No description provided for @yourEarningsTitle.
   ///
   /// In en, this message translates to:
@@ -2377,6 +2383,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Disable'**
   String get disableAssistant;
+
+  /// No description provided for @assistantRegisterButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Register as assistant'**
+  String get assistantRegisterButton;
+
+  /// No description provided for @assistantRegisterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your assistant account with your name, email, and password. A manager will review and approve it before you can sign in.'**
+  String get assistantRegisterHint;
+
+  /// No description provided for @assistantPendingApprovalMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is waiting for manager approval. You will be able to sign in once a manager approves it.'**
+  String get assistantPendingApprovalMessage;
+
+  /// No description provided for @pendingAssistantsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending approvals'**
+  String get pendingAssistantsTitle;
+
+  /// No description provided for @assistantPendingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for approval'**
+  String get assistantPendingLabel;
+
+  /// No description provided for @approveAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve assistant'**
+  String get approveAssistantTitle;
+
+  /// No description provided for @approveAssistantButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get approveAssistantButton;
+
+  /// No description provided for @assistantApprovedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant approved.'**
+  String get assistantApprovedMessage;
+
+  /// No description provided for @ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get ok;
 
   /// No description provided for @permPendingDrivers.
   ///
