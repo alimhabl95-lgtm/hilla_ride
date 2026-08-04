@@ -1,6 +1,7 @@
 import CoreLocation
 import FirebaseFirestore
 import SwiftUI
+import UIKit
 
 struct CustomerActiveRideShell: View {
     @EnvironmentObject private var appState: AppState
@@ -290,8 +291,14 @@ struct ActiveRideMapView: View {
     let ride: Ride
 
     @State private var driverCoordinate: CLLocationCoordinate2D?
+    @State private var driverHeading: Double = 0
+    @State private var driverProfile: DriverProfile?
+    @State private var routePath: [CLLocationCoordinate2D] = []
+    @State private var etaMinutes: Int?
+    @State private var distanceKm: Double?
     @State private var driverTask: Task<Void, Never>?
     @State private var showChat = false
+    @State private var lastRouteRefresh: Date?
 
     var body: some View {
         NavigationStack {
@@ -302,31 +309,88 @@ struct ActiveRideMapView: View {
                         zoom: 14,
                         pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
                         destination: MapPlace(label: ride.destinationLabel, coordinate: ride.destinationCoordinate),
-                        driverCoordinate: driverCoordinate
+                        driverCoordinate: driverCoordinate,
+                        driverHeading: driverHeading,
+                        routePath: routePath
                     )
                     .ignoresSafeArea()
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(statusTitle)
-                        .font(.headline)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        AsyncImage(url: URL(string: driverProfile?.profilePhotoUrl ?? "")) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().scaledToFill()
+                            default:
+                                Image(systemName: "person.crop.circle.fill")
+                                    .resizable()
+                                    .foregroundStyle(BrandColors.teal)
+                            }
+                        }
+                        .frame(width: 52, height: 52)
+                        .clipShape(Circle())
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(statusTitle)
+                                .font(.headline)
+                            Text(driverProfile?.name ?? "—")
+                                .font(.subheadline)
+                            Text(appState.language == .arabic ? "توك توك" : "Tuk-Tuk")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                Image(systemName: "star.fill")
+                                    .foregroundStyle(BrandColors.gold)
+                                    .font(.caption)
+                                Text(String(format: "%.1f", driverProfile?.rating ?? 5))
+                                    .font(.caption)
+                            }
+                        }
+                        Spacer()
+                    }
+
+                    if let etaMinutes, let distanceKm {
+                        Text(
+                            appState.language == .arabic
+                                ? "الوصول خلال \(etaMinutes) د • \(String(format: "%.1f", distanceKm)) كم"
+                                : "ETA \(etaMinutes) min • \(String(format: "%.1f", distanceKm)) km"
+                        )
+                        .font(.subheadline)
+                    }
+
                     Text(formatIqd(ride.fareAmountIqd))
                         .font(.title3.bold())
                         .foregroundStyle(BrandColors.tealDark)
+
+                    HStack(spacing: 8) {
+                        Button {
+                            callDriver()
+                        } label: {
+                            Label(
+                                appState.language == .arabic ? "اتصال" : "Call",
+                                systemImage: "phone.fill"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button {
+                            showChat = true
+                        } label: {
+                            Label(
+                                appState.language == .arabic ? "محادثة" : "Chat",
+                                systemImage: "message.fill"
+                            )
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                 .padding(12)
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showChat = true
-                    } label: {
-                        Image(systemName: "message.fill")
-                    }
-                }
             }
             .navigationDestination(isPresented: $showChat) {
                 RideChatView(rideId: ride.id)
@@ -337,8 +401,11 @@ struct ActiveRideMapView: View {
             driverTask?.cancel()
             driverTask = nil
         }
-          .onChange(of: ride.driverId) { _ in
+        .onChange(of: ride.driverId) { _ in
             startWatchingDriver()
+        }
+        .onChange(of: ride.status) { _ in
+            refreshRouteIfNeeded()
         }
     }
 
@@ -359,35 +426,48 @@ struct ActiveRideMapView: View {
         appState.language == .arabic ? "\(amount) د.ع" : "\(amount) IQD"
     }
 
+    private func callDriver() {
+        let phone = driverProfile?.phone.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !phone.isEmpty, let url = URL(string: "tel://\(phone)") else { return }
+        UIApplication.shared.open(url)
+    }
+
+    private func refreshRouteIfNeeded() {
+        guard let driverCoordinate else { return }
+        let now = Date()
+        if let lastRouteRefresh, now.timeIntervalSince(lastRouteRefresh) < MapPresenceConfig.routeRefreshInterval {
+            return
+        }
+        lastRouteRefresh = now
+        let target = ride.status == .accepted || ride.status == .matched
+            ? ride.pickupCoordinate
+            : ride.destinationCoordinate
+        let km = NearbyProvidersService.distanceKm(from: driverCoordinate, to: target)
+        distanceKm = km
+        etaMinutes = NearbyProvidersService.estimateMinutes(distanceKm: km)
+        routePath = [driverCoordinate, target]
+    }
+
     private func startWatchingDriver() {
         driverTask?.cancel()
         guard let driverId = ride.driverId else {
             driverCoordinate = nil
+            driverProfile = nil
             return
         }
 
         driverTask = Task {
-            let firestore = Firestore.firestore()
-            let stream = AsyncStream<CLLocationCoordinate2D?> { continuation in
-                let listener = firestore.collection("drivers").document(driverId)
-                    .addSnapshotListener { snapshot, _ in
-                        guard let data = snapshot?.data(),
-                              let lat = (data["latitude"] as? NSNumber)?.doubleValue,
-                              let lng = (data["longitude"] as? NSNumber)?.doubleValue else {
-                            continuation.yield(nil)
-                            return
-                        }
-                        continuation.yield(CLLocationCoordinate2D(latitude: lat, longitude: lng))
-                    }
-                continuation.onTermination = { _ in
-                    listener.remove()
-                }
-            }
-
-            for await coordinate in stream {
+            for await profile in DriverRepository().watchDriver(uid: driverId) {
                 guard !Task.isCancelled else { break }
                 await MainActor.run {
-                    driverCoordinate = coordinate
+                    driverProfile = profile
+                    if let lat = profile?.latitude, let lng = profile?.longitude {
+                        driverCoordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                        driverHeading = profile?.heading ?? 0
+                        refreshRouteIfNeeded()
+                    } else {
+                        driverCoordinate = nil
+                    }
                 }
             }
         }

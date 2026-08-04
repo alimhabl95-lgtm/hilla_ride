@@ -84,6 +84,14 @@ final class RideRepository {
             throw RideServiceError.activeRideExists
         }
 
+        if await ServiceAreaCatalog.shared.validateForNewRide(
+            districtId: districtId,
+            subDistrictId: subDistrictId,
+            pickup: pickup.coordinate
+        ) != nil {
+            throw RideServiceError.outOfService
+        }
+
         let rideId = UUID().uuidString
         let rideRef = firestore.collection("rides").document(rideId)
         let rideNumber = try await allocateRideNumber()
@@ -144,8 +152,17 @@ final class RideRepository {
 
         var districtId = ride.districtId
         var subDistrictId = ride.subDistrictId
-        if districtId.isEmpty { districtId = BabilRegions.customerDistrictId }
-        if subDistrictId.isEmpty { subDistrictId = BabilRegions.customerDistrict.subDistricts[0].id }
+        if districtId.isEmpty || subDistrictId.isEmpty {
+            let fallback = await MainActor.run { () -> (String, String) in
+                let district = BabilRegions.customerDistrict
+                return (
+                    district.id,
+                    district.subDistricts.first?.id ?? "hashimiya_center"
+                )
+            }
+            if districtId.isEmpty { districtId = fallback.0 }
+            if subDistrictId.isEmpty { subDistrictId = fallback.1 }
+        }
 
         let drivers = try await driverRepository.findDriversForRide(
             districtId: districtId,
@@ -197,6 +214,7 @@ final class RideRepository {
     func acceptRide(rideId: String, driverId: String) async throws {
         let rideRef = firestore.collection("rides").document(rideId)
         let driverRef = firestore.collection("drivers").document(driverId)
+        let walletConfig = (try? await WalletService().fetchConfig()) ?? .default
 
         try await firestore.runTransaction { transaction, errorPointer in
             let driverSnap: DocumentSnapshot
@@ -216,9 +234,27 @@ final class RideRepository {
                 return nil
             }
 
+            let walletStatus = driverData["walletStatus"] as? String ?? "active"
+            let walletBalance = (driverData["walletBalanceIqd"] as? NSNumber)?.intValue ?? 0
+            let minBalance = max(walletConfig.minBalanceIqd, 1)
+            if walletStatus == "blocked" || walletBalance <= 0 || walletBalance < minBalance {
+                errorPointer?.pointee = NSError(domain: "RideRepository", code: 6, userInfo: [
+                    NSLocalizedDescriptionKey: L10n.string(.walletBlockedMessage)
+                ])
+                return nil
+            }
+
             guard let data = rideSnap.data() else {
                 errorPointer?.pointee = NSError(domain: "RideRepository", code: 2, userInfo: [
                     NSLocalizedDescriptionKey: "ride_not_found"
+                ])
+                return nil
+            }
+
+            let estimatedCommission = (data["platformCommissionIqd"] as? NSNumber)?.intValue ?? 0
+            if estimatedCommission > 0 && walletBalance < estimatedCommission {
+                errorPointer?.pointee = NSError(domain: "RideRepository", code: 6, userInfo: [
+                    NSLocalizedDescriptionKey: L10n.string(.walletBlockedMessage)
                 ])
                 return nil
             }
@@ -246,7 +282,10 @@ final class RideRepository {
                 "notifyDrivers": false,
                 "notifyCustomer": true
             ], forDocument: rideRef)
-            transaction.updateData(["hasActiveRide": true], forDocument: driverRef)
+            transaction.updateData([
+                "hasActiveRide": true,
+                "operationalStatus": DriverOperationalStatus.arrivingPickup.rawValue
+            ], forDocument: driverRef)
             return nil
         }
     }
@@ -284,10 +323,17 @@ final class RideRepository {
     }
 
     func startRide(rideId: String) async throws {
+        let rideDoc = try await firestore.collection("rides").document(rideId).getDocument()
+        let driverId = rideDoc.data()?["driverId"] as? String
         try await firestore.collection("rides").document(rideId).updateData([
             "status": RideStatus.inProgress.rawValue,
             "startedAt": FieldValue.serverTimestamp()
         ])
+        if let driverId, !driverId.isEmpty {
+            try await firestore.collection("drivers").document(driverId).updateData([
+                "operationalStatus": DriverOperationalStatus.onTrip.rawValue
+            ])
+        }
     }
 
     func endRideAwaitingCash(rideId: String) async throws {
@@ -339,7 +385,8 @@ final class RideRepository {
                     "totalDriverEarningsIqd": FieldValue.increment(Int64(split.driverEarningsIqd)),
                     "outstandingDriverEarningsIqd": FieldValue.increment(Int64(split.driverEarningsIqd)),
                       "completedRidesCount": FieldValue.increment(Int64(1)),
-                    "hasActiveRide": false
+                    "hasActiveRide": false,
+                    "operationalStatus": DriverOperationalStatus.available.rawValue
                 ], forDocument: driverRef)
             }
 
@@ -495,8 +542,15 @@ final class RideRepository {
     }
 
     private func setDriverActiveRide(driverId: String, active: Bool) async throws {
+        let driverDoc = try await firestore.collection("drivers").document(driverId).getDocument()
+        let isOnline = driverDoc.data()?["isOnline"] as? Bool ?? false
         try await firestore.collection("drivers").document(driverId).updateData([
-            "hasActiveRide": active
+            "hasActiveRide": active,
+            "operationalStatus": active
+                ? DriverOperationalStatus.arrivingPickup.rawValue
+                : (isOnline
+                    ? DriverOperationalStatus.available.rawValue
+                    : DriverOperationalStatus.offline.rawValue)
         ])
     }
 

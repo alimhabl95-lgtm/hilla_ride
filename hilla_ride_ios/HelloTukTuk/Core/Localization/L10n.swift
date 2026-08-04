@@ -131,6 +131,7 @@ enum L10nKey {
     case driverWorkAreaRequired
     case driverGoOnlineHint
     case driverWaitingForRequests
+    case walletBlockedMessage
     case acceptRide
     case rejectRide
     case startRide
@@ -155,6 +156,7 @@ enum L10nKey {
     case messageSendFailed
     case ok
     case deleteAccount
+    case deleteAccountSectionTitle
     case deleteAccountMessage
     case deleteAccountConfirm
     case deleteAccountSuccess
@@ -476,6 +478,10 @@ enum L10n {
             .english: "You are online. Waiting for ride requests…",
             .arabic: "أنت متصل. بانتظار طلبات المشاوير…"
         ],
+        .walletBlockedMessage: [
+            .english: "Wallet balance too low — recharge first",
+            .arabic: "رصيد المحفظة غير كافٍ — اشحن المحفظة أولاً"
+        ],
         .acceptRide: [.english: "Accept ride", .arabic: "قبول المشوار"],
         .rejectRide: [.english: "Reject", .arabic: "رفض"],
         .startRide: [.english: "Start ride", .arabic: "بدء المشوار"],
@@ -563,6 +569,10 @@ enum L10n {
         .messageSendFailed: [.english: "Couldn't send message", .arabic: "تعذّر إرسال الرسالة"],
         .ok: [.english: "OK", .arabic: "حسناً"],
         .deleteAccount: [.english: "Delete account", .arabic: "حذف الحساب"],
+        .deleteAccountSectionTitle: [
+            .english: "Account deletion",
+            .arabic: "حذف الحساب"
+        ],
         .deleteAccountMessage: [
             .english: "This permanently deletes your account, profile, and ride history. You can register again later with the same phone number.",
             .arabic: "سيؤدي هذا إلى حذف حسابك وملفك الشخصي وسجل رحلاتك نهائياً. يمكنك التسجيل مرة أخرى لاحقاً بنفس رقم الهاتف."

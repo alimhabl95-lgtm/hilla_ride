@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hilla_ride/core/models/pricing_config.dart';
+import 'package:hilla_ride/core/models/service_area_models.dart';
 import 'package:hilla_ride/core/services/driving_distance_service.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/core/utils/ride_location_utils.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -385,6 +387,21 @@ class PricingService {
     );
   }
 
+  /// Linear fare when a sub-district disables global pricing.
+  RideQuote? quoteFromAreaRules(double distanceKm, AreaPricingRules rules) {
+    if (rules.useGlobalPricing) return null;
+    final base = rules.baseFareIqd ?? 1000;
+    final perKm = rules.perKmIqd ?? 500;
+    final minFare = rules.minimumFareIqd ?? base;
+    final raw = base + (distanceKm * perKm).round();
+    final fare = raw < minFare ? minFare : raw;
+    return RideQuote(
+      distanceKm: distanceKm,
+      durationMinutes: 0,
+      fareIqd: fare,
+    );
+  }
+
   Future<RideQuote> quoteRide({
     required LatLng pickup,
     required LatLng destination,
@@ -394,6 +411,19 @@ class PricingService {
     bool preferFastEstimate = false,
   }) async {
     if (!RideLocationRules.areDistinct(pickup, destination)) {
+      return const RideQuote(
+        distanceKm: 0,
+        durationMinutes: 0,
+        outOfService: true,
+      );
+    }
+
+    final areaError = ServiceAreaCatalog.instance.validateForNewRide(
+      districtId: districtId,
+      subDistrictId: subDistrictId?.trim() ?? '',
+      pickup: pickup,
+    );
+    if (areaError != null && (subDistrictId ?? '').trim().isNotEmpty) {
       return const RideQuote(
         distanceKm: 0,
         durationMinutes: 0,
@@ -422,7 +452,13 @@ class PricingService {
       destination,
     );
 
-    final quote = quoteFromDistanceKm(route.distanceKm, pricingConfig);
+    final area = (subDistrictId != null && subDistrictId.trim().isNotEmpty)
+        ? ServiceAreaCatalog.instance.subDistrictConfig(subDistrictId.trim())
+        : null;
+    final areaQuote = area == null
+        ? null
+        : quoteFromAreaRules(route.distanceKm, area.pricing);
+    final quote = areaQuote ?? quoteFromDistanceKm(route.distanceKm, pricingConfig);
     if (quote.outOfService) {
       return RideQuote(
         distanceKm: route.distanceKm,

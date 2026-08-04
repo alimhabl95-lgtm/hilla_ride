@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/constants/hilla_constants.dart';
+import 'package:hilla_ride/core/models/announcement.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/utils/geohash.dart';
 import 'package:uuid/uuid.dart';
@@ -62,6 +63,74 @@ class AdminService {
       return snapshot.docs
           .map((doc) => Ride.fromMap(doc.id, doc.data()))
           .toList();
+    });
+  }
+
+  Stream<List<Ride>> watchRidesSince(DateTime start, {int limit = 500}) {
+    return _firestore
+        .collection('rides')
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => Ride.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  Stream<List<Ride>> watchCompletedRidesSince(
+    DateTime start, {
+    int limit = 500,
+  }) {
+    return _firestore
+        .collection('rides')
+        .where('status', isEqualTo: RideStatus.completed.value)
+        .where('completedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .orderBy('completedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => Ride.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  Stream<List<Ride>> watchCancelledRidesSince(
+    DateTime start, {
+    int limit = 300,
+  }) {
+    return _firestore
+        .collection('rides')
+        .where('status', isEqualTo: RideStatus.cancelled.value)
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => Ride.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  Stream<List<Announcement>> watchRecentAnnouncements({int limit = 40}) {
+    return _firestore
+        .collection('announcements')
+        .limit(limit)
+        .snapshots()
+        .map((snapshot) {
+      final items = snapshot.docs
+          .map((doc) => Announcement.fromMap(doc.id, doc.data()))
+          .toList();
+      items.sort((a, b) {
+        final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bTime.compareTo(aTime);
+      });
+      return items;
     });
   }
 

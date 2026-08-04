@@ -13,11 +13,16 @@ import 'package:hilla_ride/features/admin/widgets/admin_pricing_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_promo_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_driver_ratings_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_support_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_wallet_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_rewards_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_business_partners_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_broadcast_actions.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_fake_driver_controls.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_profile_button.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_driver_card.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_live_map_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_overview_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_service_areas_panel.dart';
 import 'package:hilla_ride/features/admin/screens/admin_ride_detail_screen.dart';
 import 'package:hilla_ride/features/admin/screens/admin_ride_status_screen.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_ride_promo_summary.dart';
@@ -54,7 +59,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedIndex = 0;
 
   List<_AdminTabDefinition> _tabs(AppLocalizations l10n) {
+    final isAr = l10n.localeName.startsWith('ar');
     final allTabs = <_AdminTabDefinition>[
+      _AdminTabDefinition(
+        permission: AdminPermissions.overview,
+        icon: Icons.dashboard_outlined,
+        selectedIcon: Icons.dashboard,
+        label: isAr ? 'نظرة عامة' : 'Overview',
+        builder: const AdminOverviewPanel(),
+      ),
       _AdminTabDefinition(
         permission: AdminPermissions.pendingDrivers,
         icon: Icons.pending_actions_outlined,
@@ -105,6 +118,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         builder: const AdminPricingPanel(),
       ),
       _AdminTabDefinition(
+        permission: AdminPermissions.serviceAreas,
+        icon: Icons.travel_explore_outlined,
+        selectedIcon: Icons.travel_explore,
+        label: isAr ? 'مناطق الخدمة' : 'Service areas',
+        builder: const AdminServiceAreasPanel(),
+      ),
+      _AdminTabDefinition(
         permission: AdminPermissions.promoCodes,
         icon: Icons.local_offer_outlined,
         selectedIcon: Icons.local_offer,
@@ -131,6 +151,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         selectedIcon: Icons.payments,
         label: l10n.earningsTab,
         builder: const AdminEarningsPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.wallet,
+        icon: Icons.account_balance_wallet_outlined,
+        selectedIcon: Icons.account_balance_wallet,
+        label: l10n.localeName.startsWith('ar') ? 'المحفظة' : 'Wallet',
+        builder: const AdminWalletPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.rewards,
+        icon: Icons.emoji_events_outlined,
+        selectedIcon: Icons.emoji_events,
+        label: isAr ? 'المكافآت' : 'Rewards',
+        builder: const AdminRewardsPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.businessPartners,
+        icon: Icons.storefront_outlined,
+        selectedIcon: Icons.storefront,
+        label: isAr ? 'شركاء الأعمال' : 'Business Partners',
+        builder: const AdminBusinessPartnersPanel(),
       ),
       _AdminTabDefinition(
         permission: AdminPermissions.driverReviews,

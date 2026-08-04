@@ -8,7 +8,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
+import 'package:hilla_ride/core/constants/map_presence_config.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
+import 'package:hilla_ride/core/models/wallet_models.dart';
 import 'package:hilla_ride/core/utils/ride_location_utils.dart';
 import 'package:hilla_ride/core/services/commission_service.dart';
 import 'package:hilla_ride/core/services/monthly_prize_service.dart';
@@ -16,6 +18,7 @@ import 'package:hilla_ride/core/services/notification_service.dart';
 import 'package:hilla_ride/core/services/pricing_service.dart';
 import 'package:hilla_ride/core/services/promo_service.dart';
 import 'package:hilla_ride/core/services/ride_number_service.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/core/services/session_service.dart';
 import 'package:hilla_ride/core/utils/geohash.dart';
 import 'package:latlong2/latlong.dart';
@@ -688,6 +691,18 @@ class DriverService {
 
       await _repairStaleActiveRideFlag(driverId);
 
+      final walletStatus = data['walletStatus'] as String? ?? 'active';
+      final walletBalance = (data['walletBalanceIqd'] as num?)?.toInt() ?? 0;
+      final walletConfig = await _fetchWalletConfig();
+      final minBalance = walletConfig.minBalanceIqd < 1
+          ? 1
+          : walletConfig.minBalanceIqd;
+      if (walletStatus == 'blocked' ||
+          walletBalance <= 0 ||
+          walletBalance < minBalance) {
+        throw StateError('wallet_blocked');
+      }
+
       final districtId = data['assignedDistrictId'] as String? ?? '';
       final subDistrictId = data['assignedSubDistrictId'] as String? ?? '';
       if (districtId.isEmpty || subDistrictId.isEmpty) {
@@ -701,6 +716,8 @@ class DriverService {
       await _firestore.collection('drivers').doc(driverId).update({
         'isOnline': true,
         'hasActiveRide': false,
+        'operationalStatus': DriverOperationalStatus.available.value,
+        'onlineSince': FieldValue.serverTimestamp(),
         if (data['latitude'] == null) 'latitude': sub.center.latitude,
         if (data['longitude'] == null) 'longitude': sub.center.longitude,
         if ((data['geohash'] as String? ?? '').isEmpty)
@@ -715,6 +732,8 @@ class DriverService {
     _workAreaCenter = null;
     await _firestore.collection('drivers').doc(driverId).update({
       'isOnline': false,
+      'operationalStatus': DriverOperationalStatus.offline.value,
+      'onlineSince': null,
     });
     await _stopLocationUpdates();
   }
@@ -769,8 +788,12 @@ class DriverService {
         .get();
 
     if (activeRide.docs.isEmpty) {
+      final isOnline = driverDoc.data()?['isOnline'] as bool? ?? false;
       await _firestore.collection('drivers').doc(driverId).update({
         'hasActiveRide': false,
+        'operationalStatus': isOnline
+            ? DriverOperationalStatus.available.value
+            : DriverOperationalStatus.offline.value,
       });
     }
   }
@@ -796,8 +819,8 @@ class DriverService {
     } catch (_) {}
 
     _locationSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        distanceFilter: 15,
+      locationSettings: LocationSettings(
+        distanceFilter: MapPresenceConfig.locationPublishMinMoveMeters.round(),
         accuracy: LocationAccuracy.best,
       ),
     ).listen((position) async {
@@ -832,7 +855,8 @@ class DriverService {
         position.latitude,
         position.longitude,
       );
-      if (elapsed.inSeconds < 10 && movedMeters < 25) {
+      if (elapsed < MapPresenceConfig.locationPublishMinInterval &&
+          movedMeters < MapPresenceConfig.locationPublishMinMoveMeters) {
         return;
       }
     }
@@ -840,9 +864,14 @@ class DriverService {
     _lastLocationWriteAt = DateTime.now();
     _lastWrittenPosition = position;
 
+    final heading = position.heading.isFinite && position.heading >= 0
+        ? position.heading
+        : 0.0;
+
     await _firestore.collection('drivers').doc(driverId).update({
       'latitude': position.latitude,
       'longitude': position.longitude,
+      'heading': heading,
       'geohash': Geohash.encode(position.latitude, position.longitude),
       'locationUpdatedAt': FieldValue.serverTimestamp(),
     });
@@ -984,6 +1013,13 @@ class DriverService {
     return BabilRegions.customerDistrict.subDistricts.first.center;
   }
 
+  Future<WalletConfig> fetchWalletConfig() async {
+    final doc = await _firestore.collection('config').doc('wallet').get();
+    return WalletConfig.fromMap(doc.data());
+  }
+
+  Future<WalletConfig> _fetchWalletConfig() => fetchWalletConfig();
+
   Future<List<DriverProfile>> findDriversForRide({
     required String districtId,
     required String subDistrictId,
@@ -993,6 +1029,8 @@ class DriverService {
     final trimmedDistrict = districtId.trim();
     final trimmedSub = subDistrictId.trim();
     if (trimmedDistrict.isEmpty || trimmedSub.isEmpty) return const [];
+
+    final walletConfig = await _fetchWalletConfig();
 
     var drivers = await getAvailableDriversForDistrict(
       trimmedDistrict,
@@ -1007,6 +1045,12 @@ class DriverService {
         excludeDriverIds: excludeDriverIds,
       );
     }
+
+    final minBalance =
+        walletConfig.minBalanceIqd < 1 ? 1 : walletConfig.minBalanceIqd;
+    drivers = drivers
+        .where((d) => d.walletAllowsMatchingWithMin(minBalance))
+        .toList();
 
     final distance = const Distance();
     drivers.sort((a, b) {
@@ -1137,8 +1181,15 @@ class RideService {
 
   Future<void> _setDriverActiveRide(String driverId, bool hasActiveRide) async {
     if (driverId.isEmpty) return;
+    final driverDoc = await _firestore.collection('drivers').doc(driverId).get();
+    final isOnline = driverDoc.data()?['isOnline'] as bool? ?? false;
     await _firestore.collection('drivers').doc(driverId).update({
       'hasActiveRide': hasActiveRide,
+      'operationalStatus': hasActiveRide
+          ? DriverOperationalStatus.arrivingPickup.value
+          : (isOnline
+              ? DriverOperationalStatus.available.value
+              : DriverOperationalStatus.offline.value),
     });
   }
 
@@ -1162,6 +1213,23 @@ class RideService {
 
     await _ensureCustomerHasNoActiveRide(customerId);
 
+    final pickupRegion = BabilRegions.resolveFromPoint(pickup);
+    final resolvedDistrictId = districtId.trim().isNotEmpty
+        ? districtId.trim()
+        : pickupRegion.districtId;
+    final resolvedSubDistrictId = subDistrictId.trim().isNotEmpty
+        ? subDistrictId.trim()
+        : pickupRegion.subDistrictId;
+
+    final areaError = ServiceAreaCatalog.instance.validateForNewRide(
+      districtId: resolvedDistrictId,
+      subDistrictId: resolvedSubDistrictId,
+      pickup: pickup,
+    );
+    if (areaError != null) {
+      throw StateError(areaError);
+    }
+
     final rideId = _uuid.v4();
     final rideRef = _firestore.collection('rides').doc(rideId);
     final rideNumber = await RideNumberService(firestore: _firestore)
@@ -1181,14 +1249,6 @@ class RideService {
       fareAmountIqd: fareAmountIqd,
       paymentMethod: PaymentMethod.cash,
     );
-
-    final pickupRegion = BabilRegions.resolveFromPoint(pickup);
-    final resolvedDistrictId = districtId.trim().isNotEmpty
-        ? districtId.trim()
-        : pickupRegion.districtId;
-    final resolvedSubDistrictId = subDistrictId.trim().isNotEmpty
-        ? subDistrictId.trim()
-        : pickupRegion.subDistrictId;
 
     await rideRef.set({
       ...ride.toMap(),
@@ -1477,6 +1537,8 @@ class RideService {
     Ride? assignedRide;
     Ride? offeredRide;
     Ride? searchingRide;
+    var walletEligible = true;
+    var minBalanceIqd = 1;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? assignedSubscription;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? offeredSubscription;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? subDistrictSubscription;
@@ -1488,9 +1550,12 @@ class RideService {
 
         void publish() {
           final assigned = _driverVisibleRide(assignedRide, driverId: driverId);
+          // Empty/blocked wallet: hide new offers; keep already-accepted trips.
           final next = assigned ??
-              _driverVisibleRide(offeredRide, driverId: driverId) ??
-              _driverVisibleRide(searchingRide, driverId: driverId);
+              (walletEligible
+                  ? (_driverVisibleRide(offeredRide, driverId: driverId) ??
+                      _driverVisibleRide(searchingRide, driverId: driverId))
+                  : null);
           if (next?.id == current?.id &&
               next?.status == current?.status &&
               next?.driverId == current?.driverId) {
@@ -1579,10 +1644,32 @@ class RideService {
             .collection('drivers')
             .doc(driverId)
             .snapshots()
-            .listen((driverSnap) {
+            .listen((driverSnap) async {
           if (controller.isClosed || !driverSnap.exists) return;
           final driverData = driverSnap.data();
           if (driverData == null) return;
+
+          try {
+            final config = await _driverService.fetchWalletConfig();
+            minBalanceIqd = config.minBalanceIqd < 1 ? 1 : config.minBalanceIqd;
+          } catch (_) {
+            minBalanceIqd = 1;
+          }
+          final walletStatus = driverData['walletStatus'] as String? ?? 'active';
+          final walletBalance =
+              (driverData['walletBalanceIqd'] as num?)?.toInt() ?? 0;
+          walletEligible = walletStatus != 'blocked' &&
+              walletBalance > 0 &&
+              walletBalance >= minBalanceIqd;
+          if (!walletEligible) {
+            offeredRide = null;
+            searchingRide = null;
+            subDistrictSubscription?.cancel();
+            subDistrictSubscription = null;
+            publish();
+            return;
+          }
+
           final districtId = driverData['assignedDistrictId'] as String? ?? '';
           final subDistrictId =
               driverData['assignedSubDistrictId'] as String? ?? '';
@@ -1597,6 +1684,7 @@ class RideService {
             districtId: districtId,
             subDistrictId: subDistrictId,
           );
+          publish();
         });
 
         controller.onCancel = () {
@@ -1680,17 +1768,36 @@ class RideService {
   }) async {
     final ref = _firestore.collection('rides').doc(rideId);
     final driverRef = _firestore.collection('drivers').doc(driverId);
+    final walletConfig = await _driverService.fetchWalletConfig();
 
     await _firestore.runTransaction((transaction) async {
       final driverSnap = await transaction.get(driverRef);
       if (driverSnap.data()?['hasActiveRide'] == true) {
         throw StateError('driver_busy');
       }
+      final walletStatus =
+          driverSnap.data()?['walletStatus'] as String? ?? 'active';
+      final walletBalance =
+          (driverSnap.data()?['walletBalanceIqd'] as num?)?.toInt() ?? 0;
+      final minBalance = walletConfig.minBalanceIqd < 1
+          ? 1
+          : walletConfig.minBalanceIqd;
+      if (walletStatus == 'blocked' ||
+          walletBalance <= 0 ||
+          walletBalance < minBalance) {
+        throw StateError('wallet_blocked');
+      }
 
       final snapshot = await transaction.get(ref);
       final data = snapshot.data();
       if (data == null) {
         throw StateError('ride_not_found');
+      }
+
+      final estimatedCommission =
+          (data['platformCommissionIqd'] as num?)?.toInt() ?? 0;
+      if (estimatedCommission > 0 && walletBalance < estimatedCommission) {
+        throw StateError('wallet_blocked');
       }
 
       final status = RideStatusX.fromString(data['status'] as String?);
@@ -1739,7 +1846,10 @@ class RideService {
         'notifyDrivers': false,
         'notifyCustomer': true,
       });
-      transaction.update(driverRef, {'hasActiveRide': true});
+      transaction.update(driverRef, {
+        'hasActiveRide': true,
+        'operationalStatus': DriverOperationalStatus.arrivingPickup.value,
+      });
     });
 
     NotificationService.clearDriverRideOffer(rideId);
@@ -1816,10 +1926,17 @@ class RideService {
   }
 
   Future<void> startRide(String rideId) async {
+    final rideDoc = await _firestore.collection('rides').doc(rideId).get();
+    final driverId = rideDoc.data()?['driverId'] as String?;
     await _firestore.collection('rides').doc(rideId).update({
       'status': RideStatus.inProgress.value,
       'startedAt': FieldValue.serverTimestamp(),
     });
+    if (driverId != null && driverId.isNotEmpty) {
+      await _firestore.collection('drivers').doc(driverId).update({
+        'operationalStatus': DriverOperationalStatus.onTrip.value,
+      });
+    }
   }
 
   Future<void> endRideAwaitingCash(String rideId) async {
@@ -1855,7 +1972,14 @@ class RideService {
 
       final fare = (data['fareAmountIqd'] as num?)?.toInt() ?? 0;
       final driverId = data['driverId'] as String?;
-      final split = _commissionService.splitFare(fare, config.platformPercent);
+      final subId = data['subDistrictId'] as String? ?? '';
+      final area = ServiceAreaCatalog.instance.subDistrictConfig(subId);
+      final commissionPercent = (area != null &&
+              !area.useGlobalCommission &&
+              area.commissionPercent != null)
+          ? area.commissionPercent!
+          : config.platformPercent;
+      final split = _commissionService.splitFare(fare, commissionPercent);
 
       transaction.update(ref, {
         'cashCollectedByDriver': true,
@@ -1881,6 +2005,7 @@ class RideService {
               FieldValue.increment(split.driverEarningsIqd),
           'completedRidesCount': FieldValue.increment(1),
           'hasActiveRide': false,
+          'operationalStatus': DriverOperationalStatus.available.value,
         });
       }
 
@@ -2003,7 +2128,13 @@ class RideService {
     final fare = (data['fareAmountIqd'] as num?)?.toInt() ?? 0;
     final driverId = data['driverId'] as String?;
     final config = await _commissionService.getConfig();
-    final split = _commissionService.splitFare(fare, config.platformPercent);
+    final subId = data['subDistrictId'] as String? ?? '';
+    final area = ServiceAreaCatalog.instance.subDistrictConfig(subId);
+    final commissionPercent =
+        (area != null && !area.useGlobalCommission && area.commissionPercent != null)
+            ? area.commissionPercent!
+            : config.platformPercent;
+    final split = _commissionService.splitFare(fare, commissionPercent);
 
     final batch = _firestore.batch();
     batch.update(ref, {
@@ -2027,6 +2158,7 @@ class RideService {
             FieldValue.increment(split.driverEarningsIqd),
         'completedRidesCount': FieldValue.increment(1),
         'hasActiveRide': false,
+        'operationalStatus': DriverOperationalStatus.available.value,
       });
     }
 

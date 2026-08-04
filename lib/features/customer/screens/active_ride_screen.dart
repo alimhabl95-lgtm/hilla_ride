@@ -4,6 +4,7 @@ import 'package:hilla_ride/core/constants/hilla_constants.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/core/widgets/animated_tuk_tuk.dart';
 import 'package:hilla_ride/core/widgets/app_map.dart';
 import 'package:hilla_ride/features/customer/customer_ride_actions.dart';
 import 'package:hilla_ride/features/customer/screens/trip_completed_screen.dart';
@@ -100,9 +101,9 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                 markers.add(
                   Marker(
                     point: driverPoint,
-                    width: 48,
+                    width: 56,
                     height: 48,
-                    child: const Icon(Icons.local_taxi, color: Colors.black, size: 36),
+                    child: const TukTukTileIcon(size: 48),
                   ),
                 );
               }

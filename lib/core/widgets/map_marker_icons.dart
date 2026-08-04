@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class MapMarkerIcons {
@@ -11,6 +12,12 @@ class MapMarkerIcons {
 
   static const Color pickupColor = Color(0xFFFF9500);
   static const Color destinationColor = Color(0xFF007AFF);
+
+  /// Official Hello Tuk-Tuk driver marker asset (no status labels).
+  static const String driverAssetPath = 'assets/images/tuk_tuk_map_marker.png';
+
+  /// On-screen marker size in logical pixels (constant across zoom levels).
+  static const int driverMarkerPx = 96;
 
   static Future<void> ensureLoaded() async {
     driver ??= await _buildDriverMarker();
@@ -143,51 +150,39 @@ class MapMarkerIcons {
     return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
+  /// Official attached tuk-tuk illustration — no status text/labels.
+  /// Soft shadow under the vehicle; flat + [Marker.rotation] for heading.
   static Future<BitmapDescriptor> _buildDriverMarker() async {
-    const size = 52.0;
+    final data = await rootBundle.load(driverAssetPath);
+    final codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: driverMarkerPx * 2,
+    );
+    final frame = await codec.getNextFrame();
+    final src = frame.image;
+
+    const pad = 10.0;
+    final width = src.width.toDouble() + pad * 2;
+    final height = src.height.toDouble() + pad * 2;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    final center = size / 2;
 
-    canvas.drawCircle(
-      Offset(center, center + 2),
-      center * 0.78,
-      Paint()..color = Colors.black26,
-    );
-    canvas.drawCircle(
-      Offset(center, center),
-      center * 0.78,
-      Paint()..color = const Color(0xFF0284C7),
-    );
-    canvas.drawCircle(
-      Offset(center, center),
-      center * 0.78,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = size * 0.05,
-    );
-
-    const icon = Icons.local_taxi_rounded;
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-    textPainter.text = TextSpan(
-      text: String.fromCharCode(icon.codePoint),
-      style: TextStyle(
-        fontSize: size * 0.38,
-        fontFamily: icon.fontFamily,
-        package: icon.fontPackage,
-        color: Colors.white,
+    // Extra soft ground shadow for map visibility (asset already has one).
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(width * 0.5, height * 0.88),
+        width: width * 0.55,
+        height: height * 0.12,
       ),
+      Paint()..color = const Color(0x33000000),
     );
-    textPainter.layout();
-    textPainter.paint(
-      canvas,
-      Offset(center - textPainter.width / 2, center - textPainter.height / 2),
-    );
+
+    canvas.drawImage(src, const Offset(pad, pad), Paint());
 
     final picture = recorder.endRecording();
-    final image = await picture.toImage(size.toInt(), size.toInt());
+    final image = await picture.toImage(width.ceil(), height.ceil());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    src.dispose();
     return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 }

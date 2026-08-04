@@ -19,6 +19,9 @@ struct CustomerHomeMapView: View {
     @State private var showSupport = false
     @State private var showAnnouncements = false
     @State private var errorMessage: String?
+    @State private var nearbyDrivers: [MapDriverMarker] = []
+    @State private var nearbyTask: Task<Void, Never>?
+    @State private var cameraCenter: CLLocationCoordinate2D?
 
     private var hasSubDistrict: Bool {
         !selectedSubDistrictId.isEmpty
@@ -48,8 +51,15 @@ struct CustomerHomeMapView: View {
                         zoom: 14,
                         pickup: pickup,
                         destination: destination,
+                        nearbyDrivers: nearbyDrivers,
                         onLongPress: { coordinate in
                             setDestination(at: coordinate)
+                        },
+                        onCameraIdle: { coordinate in
+                            cameraCenter = coordinate
+                            if pickup == nil {
+                                startNearbyWatch()
+                            }
                         }
                     )
                     .ignoresSafeArea(edges: .top)
@@ -151,6 +161,32 @@ struct CustomerHomeMapView: View {
             }
             .task {
                 locationService.requestAuthorizationIfNeeded()
+                startNearbyWatch()
+            }
+            .onChange(of: pickup) { _ in startNearbyWatch() }
+            .onChange(of: selectedSubDistrictId) { _ in startNearbyWatch() }
+            .onDisappear {
+                nearbyTask?.cancel()
+                nearbyTask = nil
+            }
+        }
+    }
+
+    private var nearbyCenter: CLLocationCoordinate2D {
+        pickup?.coordinate ?? cameraCenter ?? subDistrict.center
+    }
+
+    private func startNearbyWatch() {
+        nearbyTask?.cancel()
+        let center = nearbyCenter
+        nearbyTask = Task {
+            let stream = NearbyProvidersService().watchNearbyAvailable(center: center)
+            for await providers in stream {
+                guard !Task.isCancelled else { break }
+                let markers = providers.map {
+                    MapDriverMarker(id: $0.providerId, coordinate: $0.coordinate, heading: $0.heading)
+                }
+                await MainActor.run { nearbyDrivers = markers }
             }
         }
     }

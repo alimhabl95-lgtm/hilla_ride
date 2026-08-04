@@ -14,6 +14,10 @@ import 'package:hilla_ride/core/services/saved_places_service.dart';
 import 'package:hilla_ride/core/services/support_service.dart';
 import 'package:hilla_ride/core/services/storage_service.dart';
 import 'package:hilla_ride/core/services/session_service.dart';
+import 'package:hilla_ride/core/services/business_service.dart';
+import 'package:hilla_ride/core/services/reward_service.dart';
+import 'package:hilla_ride/core/services/service_area_service.dart';
+import 'package:hilla_ride/core/services/wallet_service.dart';
 
 class AppState extends ChangeNotifier {
   AppState({
@@ -34,6 +38,10 @@ class AppState extends ChangeNotifier {
     BroadcastService? broadcastService,
     SessionService? sessionService,
     AnnouncementService? announcementService,
+    WalletService? walletService,
+    ServiceAreaService? serviceAreaService,
+    RewardService? rewardService,
+    BusinessService? businessService,
   })  : sessionService = sessionService ?? SessionService(),
         authService = authService ??
             AuthService(sessionService: sessionService ?? SessionService()),
@@ -51,12 +59,18 @@ class AppState extends ChangeNotifier {
         supportService = supportService ?? SupportService(),
         commissionService = commissionService ?? CommissionService(),
         storageService = storageService ?? StorageService(),
+        walletService = walletService ?? WalletService(),
+        serviceAreaService = serviceAreaService ?? ServiceAreaService(),
+        rewardService = rewardService ?? RewardService(),
+        businessService = businessService ?? BusinessService(),
         rideService = rideService ??
             RideService(
               driverService: driverService ?? DriverService(),
               commissionService: commissionService ?? CommissionService(),
               monthlyPrizeService: monthlyPrizeService ?? MonthlyPrizeService(),
-            );
+            ) {
+    this.serviceAreaService.startCatalogSync();
+  }
 
   final AuthService authService;
   final SessionService sessionService;
@@ -75,6 +89,10 @@ class AppState extends ChangeNotifier {
   final SavedPlacesService savedPlacesService;
   final BroadcastService broadcastService;
   final AnnouncementService announcementService;
+  final WalletService walletService;
+  final ServiceAreaService serviceAreaService;
+  final RewardService rewardService;
+  final BusinessService businessService;
 
   factory AppState.create() {
     final sessionService = SessionService();
@@ -100,6 +118,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     driverService.dispose();
+    serviceAreaService.dispose();
     super.dispose();
   }
 }

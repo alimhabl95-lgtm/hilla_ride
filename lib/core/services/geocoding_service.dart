@@ -4,12 +4,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:hilla_ride/core/config/maps_config.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
-import 'package:hilla_ride/core/constants/hilla_constants.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/region_search_context.dart';
 import 'package:hilla_ride/core/services/google_places_service.dart';
 import 'package:hilla_ride/core/services/local_places_service.dart';
 import 'package:hilla_ride/core/services/native_google_places_service.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/core/utils/street_address_formatter.dart';
 import 'package:hilla_ride/core/services/web_geocoding_stub.dart'
     if (dart.library.js_interop) 'package:hilla_ride/core/services/web_geocoding_web.dart';
@@ -936,12 +936,8 @@ out center 40;
   }
 
   bool isWithinServiceArea(LatLng point) {
-    final km = _distance.as(
-      LengthUnit.Kilometer,
-      HillaConstants.cityCenter,
-      point,
-    );
-    return km <= HillaConstants.serviceRadiusKm;
+    // Dynamic Iraq service areas from Firestore catalog (active only).
+    return ServiceAreaCatalog.instance.isWithinAnyActiveArea(point);
   }
 
   bool get isGooglePlacesBlocked =>

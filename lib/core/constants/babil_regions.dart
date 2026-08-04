@@ -1,3 +1,4 @@
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:latlong2/latlong.dart';
 
 class BabilSubDistrict {
@@ -39,15 +40,40 @@ class BabilRegions {
   static const double defaultSubDistrictRadiusKm = 22.0;
   static const Distance _distance = Distance();
 
-  /// Customer app is limited to Al-Hashimiya district and its sub-districts.
-  static const String customerDistrictId = 'hashimiya';
+  /// Preferred customer district id when present in the live catalog.
+  static const String preferredCustomerDistrictId = 'hashimiya';
 
-  static BabilDistrict get customerDistrict =>
-      districts.firstWhere((d) => d.id == customerDistrictId);
+  /// Backward-compatible alias — prefer [customerDistrict].id at call sites.
+  static String get customerDistrictId => customerDistrict.id;
 
-  static List<BabilDistrict> get customerDistricts => [customerDistrict];
+  static BabilDistrict get customerDistrict {
+    final list = customerDistricts;
+    if (list.isEmpty) {
+      return seedCustomerDistricts.first;
+    }
+    return list.firstWhere(
+      (d) => d.id == preferredCustomerDistrictId,
+      orElse: () => list.first,
+    );
+  }
 
-  static const List<BabilDistrict> districts = [
+  /// Live Firestore catalog when available; otherwise hardcoded seed.
+  static List<BabilDistrict> get districts =>
+      ServiceAreaCatalog.instance.districtsAsBabil;
+
+  static List<BabilDistrict> get customerDistricts =>
+      ServiceAreaCatalog.instance.customerDistrictsAsBabil;
+
+  static List<BabilDistrict> get seedCustomerDistricts {
+    final hashimiya = seedDistricts.firstWhere(
+      (d) => d.id == preferredCustomerDistrictId,
+      orElse: () => seedDistricts.first,
+    );
+    return [hashimiya];
+  }
+
+  /// Built-in seed used until managers publish service areas in Admin.
+  static const List<BabilDistrict> seedDistricts = [
     BabilDistrict(
       id: 'hilla',
       nameAr: 'قضاء الحلة',
@@ -143,14 +169,22 @@ class BabilRegions {
   ];
 
   static BabilDistrict districtById(String id) {
-    return districts.firstWhere((d) => d.id == id, orElse: () => districts.first);
+    final list = districts;
+    return list.firstWhere((d) => d.id == id, orElse: () => list.first);
   }
 
   static BabilSubDistrict subDistrictById(String districtId, String subId) {
     final district = districtById(districtId);
     return district.subDistricts.firstWhere(
       (s) => s.id == subId,
-      orElse: () => district.subDistricts.first,
+      orElse: () => district.subDistricts.isNotEmpty
+          ? district.subDistricts.first
+          : const BabilSubDistrict(
+              id: 'hashimiya_center',
+              nameAr: 'ناحية مركز الهاشمية',
+              nameEn: 'Hashimiya Center',
+              center: LatLng(32.374, 44.665),
+            ),
     );
   }
 
@@ -203,9 +237,15 @@ class BabilRegions {
       }
     }
 
+    final fallback = customerDistricts.isNotEmpty
+        ? customerDistricts.first
+        : seedCustomerDistricts.first;
     return (
-      districtId: nearestDistrictId ?? customerDistrictId,
-      subDistrictId: nearestSubId ?? customerDistrict.subDistricts.first.id,
+      districtId: nearestDistrictId ?? fallback.id,
+      subDistrictId: nearestSubId ??
+          (fallback.subDistricts.isNotEmpty
+              ? fallback.subDistricts.first.id
+              : preferredCustomerDistrictId),
     );
   }
 }

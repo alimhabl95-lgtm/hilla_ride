@@ -44,6 +44,20 @@
 		A10000000000000000000036 /* MapsConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* MapsConfig.swift */; };
 		A10000000000000000000037 /* BabilRegions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* BabilRegions.swift */; };
 		A10000000000000000000038 /* GeoMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* GeoMath.swift */; };
+		A10000000000000000000090 /* Geohash.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000090 /* Geohash.swift */; };
+		A10000000000000000000091 /* MapPresenceConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000091 /* MapPresenceConfig.swift */; };
+		A10000000000000000000092 /* MapPresence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000092 /* MapPresence.swift */; };
+		A10000000000000000000093 /* NearbyProvidersService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000093 /* NearbyProvidersService.swift */; };
+		A10000000000000000000094 /* WalletModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000094 /* WalletModels.swift */; };
+		A10000000000000000000095 /* WalletService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000095 /* WalletService.swift */; };
+		A10000000000000000000096 /* DriverWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000096 /* DriverWalletView.swift */; };
+		A10000000000000000000097 /* ServiceAreaCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000097 /* ServiceAreaCatalog.swift */; };
+		A10000000000000000000098 /* BusinessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000098 /* BusinessModels.swift */; };
+		A10000000000000000000099 /* BusinessService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000099 /* BusinessService.swift */; };
+		A1000000000000000000009A /* CustomerHomeShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000009A /* CustomerHomeShellView.swift */; };
+		A1000000000000000000009B /* MarketplaceHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000009B /* MarketplaceHomeView.swift */; };
+		A1000000000000000000009C /* BusinessStoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000009C /* BusinessStoreView.swift */; };
+		A1000000000000000000009D /* DriverDeliveryOrdersPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000009D /* DriverDeliveryOrdersPanel.swift */; };
 		A10000000000000000000039 /* RideModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* RideModels.swift */; };
 		A10000000000000000000040 /* PricingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* PricingModels.swift */; };
 		A10000000000000000000041 /* PricingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* PricingService.swift */; };
@@ -121,6 +135,20 @@
 		A20000000000000000000033 /* MapsConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapsConfig.swift; sourceTree = "<group>"; };
 		A20000000000000000000034 /* BabilRegions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabilRegions.swift; sourceTree = "<group>"; };
 		A20000000000000000000035 /* GeoMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoMath.swift; sourceTree = "<group>"; };
+		A20000000000000000000090 /* Geohash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Geohash.swift; sourceTree = "<group>"; };
+		A20000000000000000000091 /* MapPresenceConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPresenceConfig.swift; sourceTree = "<group>"; };
+		A20000000000000000000092 /* MapPresence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPresence.swift; sourceTree = "<group>"; };
+		A20000000000000000000093 /* NearbyProvidersService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyProvidersService.swift; sourceTree = "<group>"; };
+		A20000000000000000000094 /* WalletModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000095 /* WalletService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletService.swift; sourceTree = "<group>"; };
+		A20000000000000000000096 /* DriverWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverWalletView.swift; sourceTree = "<group>"; };
+		A20000000000000000000097 /* ServiceAreaCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceAreaCatalog.swift; sourceTree = "<group>"; };
+		A20000000000000000000098 /* BusinessModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000099 /* BusinessService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessService.swift; sourceTree = "<group>"; };
+		A2000000000000000000009A /* CustomerHomeShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerHomeShellView.swift; sourceTree = "<group>"; };
+		A2000000000000000000009B /* MarketplaceHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceHomeView.swift; sourceTree = "<group>"; };
+		A2000000000000000000009C /* BusinessStoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessStoreView.swift; sourceTree = "<group>"; };
+		A2000000000000000000009D /* DriverDeliveryOrdersPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverDeliveryOrdersPanel.swift; sourceTree = "<group>"; };
 		A20000000000000000000036 /* RideModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000037 /* PricingModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000038 /* PricingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingService.swift; sourceTree = "<group>"; };
@@ -265,6 +293,7 @@
 			children = (
 				A20000000000000000000007 /* LegalConfig.swift */,
 				A20000000000000000000033 /* MapsConfig.swift */,
+				A20000000000000000000091 /* MapPresenceConfig.swift */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -287,6 +316,9 @@
 				A20000000000000000000055 /* PromoModels.swift */,
 				A20000000000000000000071 /* SavedPlaceModels.swift */,
 				A20000000000000000000073 /* AnnouncementModels.swift */,
+				A20000000000000000000092 /* MapPresence.swift */,
+				A20000000000000000000094 /* WalletModels.swift */,
+				A20000000000000000000098 /* BusinessModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -312,6 +344,10 @@
 				A20000000000000000000072 /* SavedPlacesService.swift */,
 				A20000000000000000000074 /* AnnouncementService.swift */,
 				A20000000000000000000079 /* GeocodingService.swift */,
+				A20000000000000000000093 /* NearbyProvidersService.swift */,
+				A20000000000000000000095 /* WalletService.swift */,
+				A20000000000000000000097 /* ServiceAreaCatalog.swift */,
+				A20000000000000000000099 /* BusinessService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -361,6 +397,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000035 /* GeoMath.swift */,
+				A20000000000000000000090 /* Geohash.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -377,7 +414,10 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000042 /* CustomerAppEntryView.swift */,
+				A2000000000000000000009A /* CustomerHomeShellView.swift */,
 				A20000000000000000000043 /* CustomerHomeMapView.swift */,
+				A2000000000000000000009B /* MarketplaceHomeView.swift */,
+				A2000000000000000000009C /* BusinessStoreView.swift */,
 				A20000000000000000000044 /* BookRideView.swift */,
 				A20000000000000000000045 /* CustomerActiveRideShell.swift */,
 				A20000000000000000000050 /* TripCompletedView.swift */,
@@ -407,6 +447,8 @@
 			children = (
 				A20000000000000000000048 /* DriverAppEntryView.swift */,
 				A20000000000000000000049 /* DriverHomeView.swift */,
+				A2000000000000000000009D /* DriverDeliveryOrdersPanel.swift */,
+				A20000000000000000000096 /* DriverWalletView.swift */,
 			);
 			path = Driver;
 			sourceTree = "<group>";
@@ -524,6 +566,20 @@
 				A10000000000000000000036 /* MapsConfig.swift in Sources */,
 				A10000000000000000000037 /* BabilRegions.swift in Sources */,
 				A10000000000000000000038 /* GeoMath.swift in Sources */,
+				A10000000000000000000090 /* Geohash.swift in Sources */,
+				A10000000000000000000091 /* MapPresenceConfig.swift in Sources */,
+				A10000000000000000000092 /* MapPresence.swift in Sources */,
+				A10000000000000000000093 /* NearbyProvidersService.swift in Sources */,
+				A10000000000000000000094 /* WalletModels.swift in Sources */,
+				A10000000000000000000095 /* WalletService.swift in Sources */,
+				A10000000000000000000096 /* DriverWalletView.swift in Sources */,
+				A10000000000000000000097 /* ServiceAreaCatalog.swift in Sources */,
+				A10000000000000000000098 /* BusinessModels.swift in Sources */,
+				A10000000000000000000099 /* BusinessService.swift in Sources */,
+				A1000000000000000000009A /* CustomerHomeShellView.swift in Sources */,
+				A1000000000000000000009B /* MarketplaceHomeView.swift in Sources */,
+				A1000000000000000000009C /* BusinessStoreView.swift in Sources */,
+				A1000000000000000000009D /* DriverDeliveryOrdersPanel.swift in Sources */,
 				A10000000000000000000039 /* RideModels.swift in Sources */,
 				A10000000000000000000040 /* PricingModels.swift in Sources */,
 				A10000000000000000000041 /* PricingService.swift in Sources */,
@@ -612,7 +668,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 86;
+				CURRENT_PROJECT_VERSION = 90;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -624,7 +680,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 2.2.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_BUNDLE_IDENTIFIER = com.hillaride.hillaRide;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -644,7 +700,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 86;
+				CURRENT_PROJECT_VERSION = 90;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -656,7 +712,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 2.2.0;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_BUNDLE_IDENTIFIER = com.hillaride.hillaRide;
 				PRODUCT_NAME = "$(TARGET_NAME)";

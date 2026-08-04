@@ -17,7 +17,7 @@ struct CustomerAppEntryView: View {
                         onSessionEnded: { self.sessionRideId = nil }
                     )
                 } else {
-                    CustomerHomeMapView(user: user)
+                    CustomerHomeShellView(user: user)
                 }
             }
         }

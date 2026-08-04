@@ -6,6 +6,7 @@ import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/theme/app_theme.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_profile_button.dart';
 import 'package:hilla_ride/features/auth/screens/app_shell.dart';
+import 'package:hilla_ride/features/business/screens/business_portal_shell.dart';
 import 'package:hilla_ride/features/customer/screens/customer_splash_screen.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -62,16 +63,16 @@ class _RootScaffold extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final selectedMode = context.watch<AppModeProvider>().selectedMode;
     final authService = context.read<AppState>().authService;
-    final title = variant.isWebAdmin ? l10n.adminPanelTitle : l10n.appTitle;
+    final title = variant.isWebPortal ? variant.appTitle : l10n.appTitle;
 
     return StreamBuilder<User?>(
       stream: authService.authStateChanges(),
       builder: (context, authSnapshot) {
         final isLoggedIn = authSnapshot.data != null;
         final onChooser =
-            !variant.isWebAdmin && !isLoggedIn && selectedMode == null;
+            !variant.isWebPortal && !isLoggedIn && selectedMode == null;
         final showBackToChooser =
-            !variant.isWebAdmin && !isLoggedIn && selectedMode != null;
+            !variant.isWebPortal && !isLoggedIn && selectedMode != null;
 
         return Scaffold(
           appBar: onChooser
@@ -88,14 +89,16 @@ class _RootScaffold extends StatelessWidget {
                   automaticallyImplyLeading: showBackToChooser,
                   actions: [
                     if (variant.isWebAdmin) const AdminProfileButton(),
-                    if (!variant.isWebAdmin) const MobileAppBarActions(),
+                    if (!variant.isWebPortal) const MobileAppBarActions(),
                     const LanguageToggle(),
-                    if (isLoggedIn || variant.isWebAdmin) const LogoutButton(),
+                    if (isLoggedIn || variant.isWebPortal) const LogoutButton(),
                   ],
                 ),
           body: variant.isWebAdmin
               ? const AppShell()
-              : const WelcomeSplashGate(child: AppShell()),
+              : variant.isWebBusiness
+                  ? const BusinessPortalShell()
+                  : const WelcomeSplashGate(child: AppShell()),
         );
       },
     );

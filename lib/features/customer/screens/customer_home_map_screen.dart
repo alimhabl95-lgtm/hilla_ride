@@ -4,13 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
+import 'package:hilla_ride/core/constants/map_presence_config.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
+import 'package:hilla_ride/core/models/map_presence.dart';
 import 'package:hilla_ride/core/models/region_search_context.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/core/services/nearby_providers_service.dart';
 import 'package:hilla_ride/core/utils/ride_location_utils.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
 import 'package:hilla_ride/core/widgets/map_camera_helper.dart';
+import 'package:hilla_ride/core/widgets/driver_marker_cluster.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
+import 'package:hilla_ride/core/widgets/marker_animator.dart';
 import 'package:hilla_ride/features/customer/screens/book_ride_screen.dart';
 import 'package:hilla_ride/features/customer/screens/google_map_pin_picker_screen.dart';
 import 'package:hilla_ride/features/customer/widgets/ride_search_panel.dart';
@@ -31,16 +36,25 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   GoogleMapController? _mapController;
   PlaceResult? _pickup;
   PlaceResult? _destination;
-  final String _districtId = BabilRegions.customerDistrictId;
+  late String _districtId = BabilRegions.customerDistrict.id;
   String? _subDistrictId;
   var _pickupLoading = false;
   var _markersReady = false;
   BitmapDescriptor? _pickupMarkerIcon;
   BitmapDescriptor? _destinationMarkerIcon;
+  final _nearbyService = NearbyProvidersService();
+  final _markerAnimator = MarkerAnimator();
+  StreamSubscription<List<MapPresence>>? _nearbySub;
+  LatLng? _cameraTarget;
+  LatLng? _lastWatchCenter;
+  double _cameraZoom = 14;
 
   @override
   void initState() {
     super.initState();
+    _markerAnimator.onTick = () {
+      if (mounted) setState(() {});
+    };
     MapMarkerIcons.ensureLoaded().then((_) {
       if (mounted) setState(() => _markersReady = true);
       _refreshTripMarkers();
@@ -49,6 +63,59 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
       context.read<AppState>().pricingService.prefetchConfig(
             districtId: _districtId,
           );
+      _restartNearbyWatch(force: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _nearbySub?.cancel();
+    _markerAnimator.dispose();
+    super.dispose();
+  }
+
+  LatLng get _watchCenter {
+    // Prefer pickup while booking; otherwise visible map camera center.
+    if (_pickup != null) {
+      return LatLng(_pickup!.latitude, _pickup!.longitude);
+    }
+    if (_cameraTarget != null) return _cameraTarget!;
+    return LatLng(
+      _region.searchCenter.latitude,
+      _region.searchCenter.longitude,
+    );
+  }
+
+  void _restartNearbyWatch({bool force = false}) {
+    final center = _watchCenter;
+    if (!force && _lastWatchCenter != null) {
+      final movedM = Geolocator.distanceBetween(
+        _lastWatchCenter!.latitude,
+        _lastWatchCenter!.longitude,
+        center.latitude,
+        center.longitude,
+      );
+      if (movedM < 180) return;
+    }
+    _lastWatchCenter = center;
+    _nearbySub?.cancel();
+    _nearbySub = _nearbyService
+        .watchNearbyAvailable(
+          center: ll.LatLng(center.latitude, center.longitude),
+          radiusKm: MapPresenceConfig.nearbyRadiusKm,
+          maxMarkers: MapPresenceConfig.maxNearbyMarkers,
+        )
+        .listen((providers) {
+      if (!mounted) return;
+      // Stream already filters status == available (+ fresh). Offline / on-trip never appear.
+      _markerAnimator.syncTargets({
+        for (final p in providers)
+          p.providerId: (
+            position: LatLng(p.latitude, p.longitude),
+            heading: p.heading,
+          ),
+      });
+      setState(() {});
     });
   }
 
@@ -244,6 +311,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     _moveMap(LatLng(place.latitude, place.longitude));
     _fitTripOnMap();
     unawaited(_refreshTripMarkers());
+    _restartNearbyWatch(force: true);
   }
 
   bool _applyDestination(PlaceResult place) {
@@ -342,6 +410,29 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
         ),
       );
     }
+
+    final driverIcon = MapMarkerIcons.driver;
+    if (driverIcon != null) {
+      // Only available drivers are in the animator stream (offline / on-trip excluded).
+      final visible = DriverMarkerCluster.apply(
+        _markerAnimator.markers.values,
+        zoom: _cameraZoom,
+      );
+      for (final animated in visible) {
+        markers.add(
+          Marker(
+            markerId: MarkerId('nearby_${animated.id}'),
+            position: animated.position,
+            icon: driverIcon,
+            rotation: animated.heading,
+            flat: true,
+            anchor: const Offset(0.5, 0.55),
+            zIndexInt: 1,
+            consumeTapEvents: true,
+          ),
+        );
+      }
+    }
     return markers;
   }
 
@@ -382,6 +473,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     unawaited(_refreshTripMarkers());
     final sub = BabilRegions.subDistrictById(_districtId, id);
     _moveMap(LatLng(sub.center.latitude, sub.center.longitude));
+    _restartNearbyWatch(force: true);
     if (_pickup == null) {
       unawaited(_useCurrentLocation());
     }
@@ -413,12 +505,17 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     final resolved = BabilRegions.resolveFromPoint(
       ll.LatLng(pickup.latitude, pickup.longitude),
     );
-    if (resolved.districtId != BabilRegions.customerDistrictId) {
+    final allowedDistrictIds = {
+      for (final d in BabilRegions.customerDistricts) d.id,
+    };
+    if (!allowedDistrictIds.contains(resolved.districtId)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.searchOutsideRegion)),
       );
       return;
     }
+    _districtId = resolved.districtId;
+    _subDistrictId = resolved.subDistrictId;
 
     try {
       final activeRide = await context
@@ -473,6 +570,18 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
             zoom: 14,
             onMapCreated: (c) => _mapController = c,
             markers: markers,
+            onCameraMove: (pos) {
+              _cameraTarget = pos.target;
+              _cameraZoom = pos.zoom;
+            },
+            onCameraIdle: () {
+              // Reload available drivers for the visible map area.
+              if (_pickup == null) {
+                _restartNearbyWatch();
+              } else if (mounted) {
+                setState(() {});
+              }
+            },
           ),
           Positioned(
             right: 16,

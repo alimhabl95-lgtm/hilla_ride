@@ -34,6 +34,8 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
 
   String _permissionLabel(AppLocalizations l10n, String permission) {
     return switch (permission) {
+      AdminPermissions.overview =>
+        l10n.localeName.startsWith('ar') ? 'نظرة عامة' : 'Overview dashboard',
       AdminPermissions.pendingDrivers => l10n.permPendingDrivers,
       AdminPermissions.activeRides => l10n.permActiveRides,
       AdminPermissions.liveMap => l10n.permLiveMap,
@@ -46,6 +48,14 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
       AdminPermissions.supportInbox => l10n.permSupportInbox,
       AdminPermissions.promoCodes => l10n.permPromoCodes,
       AdminPermissions.monthlyLeaderboard => l10n.permMonthlyLeaderboard,
+      AdminPermissions.wallet =>
+        l10n.localeName.startsWith('ar') ? 'محفظة السائقين' : 'Driver wallet',
+      AdminPermissions.serviceAreas =>
+        l10n.localeName.startsWith('ar') ? 'مناطق الخدمة' : 'Service areas',
+      AdminPermissions.rewards =>
+        l10n.localeName.startsWith('ar') ? 'المكافآت والحوافز' : 'Rewards & incentives',
+      AdminPermissions.businessPartners =>
+        l10n.localeName.startsWith('ar') ? 'شركاء الأعمال' : 'Business partners',
       _ => permission,
     };
   }

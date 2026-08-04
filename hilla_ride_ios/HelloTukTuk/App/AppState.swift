@@ -51,6 +51,7 @@ final class AppState: ObservableObject {
     }
 
     func finishBootstrap() async {
+        ServiceAreaCatalog.shared.start()
         await refreshCurrentUser(firebaseUser: Auth.auth().currentUser)
         await PushNotificationService.shared.requestAuthorizationIfNeeded()
         isBootstrapping = false

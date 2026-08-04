@@ -223,7 +223,11 @@ service cloud.firestore {
 
           && !request.resource.data.diff(resource.data).affectedKeys()
 
-            .hasAny(['isRemoved', 'removedAt', 'approvalStatus', 'reviewedAt', 'isBlocked', 'blockedAt'])
+            .hasAny([
+              'isRemoved', 'removedAt', 'approvalStatus', 'reviewedAt',
+              'isBlocked', 'blockedAt',
+              'walletBalanceIqd', 'walletStatus', 'walletUpdatedAt'
+            ])
 
         )
 
@@ -264,7 +268,12 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
-
+    // Live map presence for customers (ride + future delivery services).
+    // Writes come from Cloud Functions (Admin SDK). Clients may only read.
+    match /mapPresence/{providerId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
 
     match /rides/{rideId} {
 
@@ -284,7 +293,119 @@ service cloud.firestore {
 
     }
 
+    match /config/wallet {
+      allow read: if signedIn();
+      allow write: if false; // Cloud Functions only
+    }
 
+    match /walletLedger/{entryId} {
+      allow read: if signedIn()
+        && (
+          isAdminUser()
+          || resource.data.driverId == request.auth.uid
+        );
+      allow create, update, delete: if false;
+    }
+
+    match /walletRechargeRequests/{requestId} {
+      allow read: if signedIn()
+        && (
+          isAdminUser()
+          || resource.data.driverId == request.auth.uid
+        );
+      allow create, update, delete: if false;
+    }
+
+    match /serviceCountries/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /serviceProvinces/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /serviceDistricts/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /serviceSubDistricts/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /rewardCampaigns/{campaignId} {
+      allow read: if signedIn();
+      allow write: if false; // Cloud Functions only
+    }
+
+    match /rewardProgress/{progressId} {
+      allow read: if signedIn()
+        && (
+          isAdminUser()
+          || resource.data.driverId == request.auth.uid
+        );
+      allow write: if false;
+    }
+
+    match /rewardGrants/{grantId} {
+      allow read: if signedIn()
+        && (
+          isAdminUser()
+          || resource.data.driverId == request.auth.uid
+        );
+      allow write: if false;
+    }
+
+    match /rewardAuditLogs/{logId} {
+      allow read: if isAdminUser();
+      allow write: if false;
+    }
+
+    match /drivers/{driverId}/activeRewards/{rewardId} {
+      allow read: if signedIn()
+        && (isAdminUser() || request.auth.uid == driverId);
+      allow write: if false;
+    }
+
+    match /businesses/{businessId} {
+      allow read: if signedIn()
+        && (
+          isAdminUser()
+          || resource.data.status == 'live'
+          || resource.data.ownerUid == request.auth.uid
+        );
+      allow write: if false;
+
+      match /categories/{categoryId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+      match /products/{productId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+    match /businessOrders/{orderId} {
+      allow read: if signedIn()
+        && (
+          isAdminUser()
+          || resource.data.customerId == request.auth.uid
+          || resource.data.driverId == request.auth.uid
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId
+               == resource.data.businessId
+          || (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'driver'
+            && resource.data.status in ['ready', 'outForDelivery']
+          )
+        );
+      allow write: if false;
+    }
+
+    match /config/businessTypes {
+      allow read: if signedIn();
+      allow write: if false;
+    }
 
     match /config/{configId} {
 

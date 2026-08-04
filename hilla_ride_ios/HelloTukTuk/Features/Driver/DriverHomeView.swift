@@ -16,6 +16,9 @@ struct DriverHomeView: View {
     @State private var showSupport = false
     @State private var showAnnouncements = false
     @State private var showChat = false
+    @State private var showWallet = false
+    @State private var walletConfig = WalletConfig.default
+    @State private var walletConfigTask: Task<Void, Never>?
     @State private var monthlyStats: DriverMonthlyStats?
     @State private var statsTask: Task<Void, Never>?
     @State private var activeCustomer: AppUser?
@@ -76,6 +79,9 @@ struct DriverHomeView: View {
                     RideChatView(rideId: ride.id)
                 }
             }
+            .navigationDestination(isPresented: $showWallet) {
+                DriverWalletView(driver: currentDriver)
+            }
         }
         .onAppear { startWatching() }
         .onDisappear { stopWatching() }
@@ -86,6 +92,14 @@ struct DriverHomeView: View {
 
     private var overflowMenu: some View {
         Menu {
+            Button {
+                showWallet = true
+            } label: {
+                Label(
+                    appState.language == .arabic ? "المحفظة" : "Wallet",
+                    systemImage: "wallet.pass"
+                )
+            }
             Button {
                 showProfile = true
             } label: {
@@ -132,6 +146,12 @@ struct DriverHomeView: View {
                     .foregroundStyle(BrandColors.navy)
 
                 availabilityCard
+
+                DriverDeliveryOrdersPanel(driverId: currentDriver.uid)
+
+                if walletIsLow || walletIsBlocked {
+                    walletBanner
+                }
 
                 tripsStatsRow
 
@@ -287,6 +307,48 @@ struct DriverHomeView: View {
         .background(BrandColors.teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
     }
 
+    private var walletIsBlocked: Bool {
+        !currentDriver.walletAllowsMatching(minBalanceIqd: walletConfig.minBalanceIqd)
+    }
+
+    private var walletIsLow: Bool {
+        currentDriver.walletBalanceIqd <= walletConfig.lowBalanceWarningIqd
+    }
+
+    private var walletBanner: some View {
+        Button {
+            showWallet = true
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(walletIsBlocked ? Color.red : Color.orange)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        walletIsBlocked
+                            ? (appState.language == .arabic
+                                ? "المحفظة محظورة — اشحن لاستقبال الرحلات"
+                                : "Wallet blocked — recharge to receive trips")
+                            : (appState.language == .arabic
+                                ? "رصيد المحفظة منخفض"
+                                : "Wallet balance is low")
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrandColors.navy)
+                    Text(appState.language == .arabic ? "اضغط للشحن" : "Tap to recharge")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .background(
+                (walletIsBlocked ? Color.red : Color.orange).opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private func earningsCard(driver: DriverProfile) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L10n.string(.yourEarningsTitle, language: appState.language))
@@ -299,6 +361,17 @@ struct DriverHomeView: View {
             if driver.pendingBonusIqd > 0 {
                 Text("\(L10n.string(.pendingBonusLabel, language: appState.language)): \(formatIqd(driver.pendingBonusIqd))")
             }
+            Text(
+                "\(appState.language == .arabic ? "رصيد المحفظة" : "Wallet balance"): \(formatIqd(driver.walletBalanceIqd))"
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(BrandColors.tealDark)
+            Button {
+                showWallet = true
+            } label: {
+                Text(appState.language == .arabic ? "فتح المحفظة / شحن" : "Open wallet / recharge")
+            }
+            .buttonStyle(SecondaryButtonStyle())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -428,6 +501,12 @@ struct DriverHomeView: View {
                 await MainActor.run { liveDriver = profile }
             }
         }
+        walletConfigTask = Task {
+            for await config in WalletService().watchConfig() {
+                guard !Task.isCancelled else { break }
+                await MainActor.run { walletConfig = config }
+            }
+        }
         rideTask = Task {
             for await ride in RideRepository().watchAssignedRide(for: driverId) {
                 guard !Task.isCancelled else { break }
@@ -455,6 +534,7 @@ struct DriverHomeView: View {
         statsTask?.cancel()
         customerTask?.cancel()
         cancelledTask?.cancel()
+        walletConfigTask?.cancel()
     }
 
     private func startWatchingCustomer(_ customerId: String?) {

@@ -1,4 +1,4 @@
-enum UserRole { customer, driver, manager, assistant }
+enum UserRole { customer, driver, manager, assistant, businessOwner }
 
 extension UserRoleX on UserRole {
   String get value => name;
@@ -77,6 +77,7 @@ class AppUser {
     this.promoRidesLimit = 0,
     this.profilePhotoUrl = '',
     this.approvalStatus = '',
+    this.businessId = '',
   });
 
   final String uid;
@@ -96,6 +97,7 @@ class AppUser {
   final int promoRidesLimit;
   final String profilePhotoUrl;
   final String approvalStatus;
+  final String businessId;
 
   bool get hasActivePromo =>
       promoCode.isNotEmpty && promoRidesUsed < promoRidesLimit;
@@ -138,6 +140,7 @@ class AppUser {
       promoRidesLimit: (data['promoRidesLimit'] as num?)?.toInt() ?? 0,
       profilePhotoUrl: data['profilePhotoUrl'] as String? ?? '',
       approvalStatus: data['approvalStatus'] as String? ?? '',
+      businessId: data['businessId'] as String? ?? '',
     );
   }
 
@@ -152,6 +155,7 @@ class AppUser {
       'createdAt': createdAt,
       'isBlocked': isBlocked,
       'cancelledRidesCount': cancelledRidesCount,
+      if (businessId.isNotEmpty) 'businessId': businessId,
       if (permissions.isNotEmpty) 'permissions': permissions,
       if (createdBy != null) 'createdBy': createdBy,
       if (promoCode.isNotEmpty) 'promoCode': promoCode,
@@ -201,6 +205,10 @@ class DriverProfile {
     this.autoAcceptRides = false,
     this.hasActiveRide = false,
     this.geohash = '',
+    this.heading = 0,
+    this.operationalStatus = 'offline',
+    this.walletBalanceIqd = 0,
+    this.walletStatus = 'active',
     this.assignedDistrictId = '',
     this.assignedSubDistrictId = '',
   });
@@ -218,6 +226,10 @@ class DriverProfile {
   final int ratingCount;
   final double? latitude;
   final double? longitude;
+  final double heading;
+  final String operationalStatus;
+  final int walletBalanceIqd;
+  final String walletStatus;
   final DateTime? locationUpdatedAt;
   final int completedRidesCount;
   final int totalFareCollectedIqd;
@@ -249,11 +261,21 @@ class DriverProfile {
   bool get hasAssignedWorkArea =>
       assignedDistrictId.trim().isNotEmpty &&
       assignedSubDistrictId.trim().isNotEmpty;
+  /// Empty or blocked wallets cannot receive ride offers.
+  bool get walletAllowsMatching =>
+      walletStatus != 'blocked' && walletBalanceIqd > 0;
+
+  bool walletAllowsMatchingWithMin(int minBalanceIqd) =>
+      walletStatus != 'blocked' &&
+      walletBalanceIqd > 0 &&
+      walletBalanceIqd >= minBalanceIqd;
+
   bool get isAvailableForRides =>
       isOnline &&
       canDrive &&
       !hasActiveRide &&
-      hasAssignedWorkArea;
+      hasAssignedWorkArea &&
+      walletAllowsMatching;
 
   int get owedPlatformCommissionIqd => outstandingPlatformCommissionIqd;
 
@@ -310,6 +332,15 @@ class DriverProfile {
       autoAcceptRides: data['autoAcceptRides'] as bool? ?? false,
       hasActiveRide: data['hasActiveRide'] as bool? ?? false,
       geohash: data['geohash'] as String? ?? '',
+      heading: (data['heading'] as num?)?.toDouble() ?? 0,
+      operationalStatus: data['operationalStatus'] as String? ??
+          ((data['isOnline'] as bool? ?? false)
+              ? ((data['hasActiveRide'] as bool? ?? false)
+                  ? 'rideAccepted'
+                  : 'available')
+              : 'offline'),
+      walletBalanceIqd: (data['walletBalanceIqd'] as num?)?.toInt() ?? 0,
+      walletStatus: data['walletStatus'] as String? ?? 'active',
       assignedDistrictId: data['assignedDistrictId'] as String? ?? '',
       assignedSubDistrictId: data['assignedSubDistrictId'] as String? ?? '',
     );
@@ -326,6 +357,8 @@ class DriverProfile {
       'approvalStatus': approvalStatus.value,
       'isOnline': isOnline,
       'hasActiveRide': hasActiveRide,
+      'operationalStatus': operationalStatus,
+      'heading': heading,
       'rating': rating,
       'ratingCount': ratingCount,
       if (latitude != null) 'latitude': latitude,

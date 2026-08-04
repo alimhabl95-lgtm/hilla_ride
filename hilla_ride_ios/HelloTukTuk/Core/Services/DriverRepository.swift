@@ -7,12 +7,15 @@ enum DriverServiceError: LocalizedError {
     case blocked
     case notApproved
     case workAreaRequired
+    case walletBlocked
 
     var errorDescription: String? {
         switch self {
         case .blocked: return L10n.string(.driverBlockedTitle)
         case .notApproved: return L10n.string(.driverRejectedTitle)
         case .workAreaRequired: return L10n.string(.driverWorkAreaRequired)
+        case .walletBlocked:
+            return L10n.string(.walletBlockedMessage)
         }
     }
 }
@@ -39,12 +42,15 @@ final class DriverRepository {
             .limit(to: 20)
             .getDocuments()
 
+        let walletConfig = (try? await WalletService().fetchConfig()) ?? .default
+
         let drivers = snapshot.documents.compactMap { doc in
             DriverProfile(documentID: doc.documentID, data: doc.data())
         }.filter { driver in
             driver.isApproved &&
             !driver.isBlocked &&
-            !driver.hasActiveRide
+            !driver.hasActiveRide &&
+            driver.walletAllowsMatching(minBalanceIqd: walletConfig.minBalanceIqd)
         }
 
         return drivers.sorted { lhs, rhs in
@@ -89,20 +95,38 @@ final class DriverRepository {
                 throw DriverServiceError.workAreaRequired
             }
 
+            let walletStatus = data["walletStatus"] as? String ?? "active"
+            let walletBalance = (data["walletBalanceIqd"] as? NSNumber)?.intValue ?? 0
+            let walletConfig = (try? await WalletService().fetchConfig()) ?? .default
+            let minBalance = max(walletConfig.minBalanceIqd, 1)
+            if walletStatus == "blocked" || walletBalance <= 0 || walletBalance < minBalance {
+                throw DriverServiceError.walletBlocked
+            }
+
             let sub = BabilRegions.subDistrict(byId: subDistrictId)
             var updates: [String: Any] = [
                 "isOnline": true,
                 "hasActiveRide": false,
+                "operationalStatus": DriverOperationalStatus.available.rawValue,
+                "onlineSince": FieldValue.serverTimestamp(),
                 "locationUpdatedAt": FieldValue.serverTimestamp()
             ]
             if data["latitude"] == nil { updates["latitude"] = sub.center.latitude }
             if data["longitude"] == nil { updates["longitude"] = sub.center.longitude }
+            if (data["geohash"] as? String ?? "").isEmpty {
+                updates["geohash"] = Geohash.encode(
+                    latitude: sub.center.latitude,
+                    longitude: sub.center.longitude
+                )
+            }
 
             try await firestore.collection("drivers").document(driverId).updateData(updates)
             await DriverLocationPublisher.shared.start(for: driverId)
         } else {
             try await firestore.collection("drivers").document(driverId).updateData([
-                "isOnline": false
+                "isOnline": false,
+                "operationalStatus": DriverOperationalStatus.offline.rawValue,
+                "onlineSince": NSNull()
             ])
             await DriverLocationPublisher.shared.stop()
         }

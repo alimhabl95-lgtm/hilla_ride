@@ -28,6 +28,8 @@ struct DriverProfile: Identifiable, Equatable {
     let isOnline: Bool
     let latitude: Double?
     let longitude: Double?
+    let heading: Double
+    let operationalStatus: String
     let hasActiveRide: Bool
     let isFakeDriver: Bool
     let autoAcceptRides: Bool
@@ -40,11 +42,24 @@ struct DriverProfile: Identifiable, Equatable {
     let pendingBonusIqd: Int
     let monthlyRideCount: Int
     let monthlyMonthKey: String
+    let walletBalanceIqd: Int
+    let walletStatus: String
 
     var id: String { uid }
     var isApproved: Bool { approvalStatus == .approved }
     var hasAssignedWorkArea: Bool {
         !assignedDistrictId.isEmpty && !assignedSubDistrictId.isEmpty
+    }
+
+    var walletAllowsMatching: Bool {
+        walletStatus != "blocked" && walletBalanceIqd > 0
+    }
+
+    func walletAllowsMatching(minBalanceIqd: Int) -> Bool {
+        let minBalance = max(minBalanceIqd, 1)
+        return walletStatus != "blocked"
+            && walletBalanceIqd > 0
+            && walletBalanceIqd >= minBalance
     }
 
     var sortCoordinate: CLLocationCoordinate2D? {
@@ -70,6 +85,16 @@ struct DriverProfile: Identifiable, Equatable {
         isOnline = data["isOnline"] as? Bool ?? false
         latitude = (data["latitude"] as? NSNumber)?.doubleValue
         longitude = (data["longitude"] as? NSNumber)?.doubleValue
+        heading = (data["heading"] as? NSNumber)?.doubleValue ?? 0
+        if let status = data["operationalStatus"] as? String, !status.isEmpty {
+            operationalStatus = status
+        } else if isOnline {
+            operationalStatus = (data["hasActiveRide"] as? Bool ?? false)
+                ? DriverOperationalStatus.arrivingPickup.rawValue
+                : DriverOperationalStatus.available.rawValue
+        } else {
+            operationalStatus = DriverOperationalStatus.offline.rawValue
+        }
         hasActiveRide = data["hasActiveRide"] as? Bool ?? false
         isFakeDriver = data["isFakeDriver"] as? Bool ?? false
         autoAcceptRides = data["autoAcceptRides"] as? Bool ?? false
@@ -86,5 +111,7 @@ struct DriverProfile: Identifiable, Equatable {
         pendingBonusIqd = (data["pendingBonusIqd"] as? NSNumber)?.intValue ?? 0
         monthlyRideCount = (data["monthlyRideCount"] as? NSNumber)?.intValue ?? 0
         monthlyMonthKey = data["monthlyMonthKey"] as? String ?? ""
+        walletBalanceIqd = (data["walletBalanceIqd"] as? NSNumber)?.intValue ?? 0
+        walletStatus = data["walletStatus"] as? String ?? "active"
     }
 }

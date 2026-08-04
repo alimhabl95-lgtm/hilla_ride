@@ -220,10 +220,18 @@ class _BookRideScreenState extends State<BookRideScreen> {
 
     } catch (error) {
       if (!mounted) return;
+      final isAr = l10n.localeName.startsWith('ar');
       final message = error is StateError
           ? switch (error.message) {
               'pickup_destination_same' => l10n.pickupDestinationMustDiffer,
               'active_ride_exists' => l10n.activeRideExists,
+              'area_inactive' => isAr
+                  ? 'هذه المنطقة غير متاحة حالياً للطلبات الجديدة'
+                  : 'This service area is not accepting new requests',
+              'area_closed' => isAr
+                  ? 'المنطقة خارج ساعات العمل الآن'
+                  : 'This area is outside operating hours',
+              'outside_area' => l10n.searchOutsideRegion,
               _ => l10n.bookRideFailed,
             }
           : l10n.bookRideFailed;

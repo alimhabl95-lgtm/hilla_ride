@@ -8,6 +8,9 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+/** Late-bound rewards module (created after applyWalletDelta). */
+const rewardsRuntime = { mod: null };
+
 const AUTH_ADMIN_SERVICE_ACCOUNT =
   "firebase-adminsdk-fbsvc@hello-tiktok-57dc5.iam.gserviceaccount.com";
 
@@ -107,6 +110,172 @@ async function sendToToken(token, title, body, data = {}, soundName, options = {
   }
 }
 
+function encodeGeohash(latitude, longitude, precision = 6) {
+  const base32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+  let latMin = -90;
+  let latMax = 90;
+  let lngMin = -180;
+  let lngMax = 180;
+  let hash = "";
+  let bit = 0;
+  let ch = 0;
+  let isLng = true;
+  while (hash.length < precision) {
+    if (isLng) {
+      const mid = (lngMin + lngMax) / 2;
+      if (longitude >= mid) {
+        ch = (ch << 1) + 1;
+        lngMin = mid;
+      } else {
+        ch <<= 1;
+        lngMax = mid;
+      }
+    } else {
+      const mid = (latMin + latMax) / 2;
+      if (latitude >= mid) {
+        ch = (ch << 1) + 1;
+        latMin = mid;
+      } else {
+        ch <<= 1;
+        latMax = mid;
+      }
+    }
+    isLng = !isLng;
+    bit += 1;
+    if (bit === 5) {
+      hash += base32[ch];
+      bit = 0;
+      ch = 0;
+    }
+  }
+  return hash;
+}
+
+function deriveOperationalStatus(driverData, rideStatus) {
+  const isOnline = driverData.isOnline === true;
+  const hasActiveRide = driverData.hasActiveRide === true;
+  if (!isOnline) return "offline";
+  if (!hasActiveRide) return "available";
+  switch (String(rideStatus || "")) {
+    case "matched":
+      return "rideOffered";
+    case "accepted":
+      return "arrivingPickup";
+    case "inProgress":
+    case "awaitingCashPayment":
+      return "onTrip";
+    case "completed":
+      return "completed";
+    default:
+      return "rideAccepted";
+  }
+}
+
+async function syncMapPresenceFromDriver(driverId, driverData, rideStatus) {
+  const db = admin.firestore();
+  const presenceRef = db.collection("mapPresence").doc(driverId);
+  if (!driverData) {
+    await presenceRef.delete().catch(() => null);
+    return;
+  }
+
+  const lat = Number(driverData.latitude);
+  const lng = Number(driverData.longitude);
+  const isOnline = driverData.isOnline === true;
+  const approved = String(driverData.approvalStatus || "") === "approved";
+  const blocked = driverData.isBlocked === true || driverData.isRemoved === true;
+  const explicitStatus = String(driverData.operationalStatus || "").trim();
+  const status =
+    explicitStatus ||
+    deriveOperationalStatus(driverData, rideStatus);
+
+  const shouldPublish =
+    isOnline &&
+    approved &&
+    !blocked &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    status === "available";
+
+  if (!shouldPublish) {
+    // Keep a tombstone offline/busy doc out of available queries by deleting.
+    await presenceRef.delete().catch(() => null);
+    if (explicitStatus !== status && driverData) {
+      await db
+        .collection("drivers")
+        .doc(driverId)
+        .set({ operationalStatus: status }, { merge: true })
+        .catch(() => null);
+    }
+    return;
+  }
+
+  const geohash =
+    String(driverData.geohash || "").trim() || encodeGeohash(lat, lng);
+
+  await presenceRef.set(
+    {
+      providerId: driverId,
+      role: "driver",
+      serviceType: "ride",
+      status: "available",
+      latitude: lat,
+      longitude: lng,
+      heading: Number(driverData.heading) || 0,
+      geohash,
+      vehicleType: String(driverData.vehicleType || "tukTuk"),
+      displayName: String(driverData.name || ""),
+      photoUrl: String(driverData.profilePhotoUrl || ""),
+      rating: Number(driverData.rating) || 5,
+      phone: String(driverData.phone || ""),
+      locationUpdatedAt:
+        driverData.locationUpdatedAt ||
+        admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+exports.onDriverWritten = functions.firestore
+  .document("drivers/{driverId}")
+  .onWrite(async (change, context) => {
+    const driverId = context.params.driverId;
+    if (!change.after.exists) {
+      await admin
+        .firestore()
+        .collection("mapPresence")
+        .doc(driverId)
+        .delete()
+        .catch(() => null);
+      return null;
+    }
+    await syncMapPresenceFromDriver(driverId, change.after.data() || {});
+    return null;
+  });
+
+exports.cleanupStaleMapPresence = functions.pubsub
+  .schedule("every 15 minutes")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const cutoff = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() - 60 * 1000),
+    );
+    const snapshot = await db
+      .collection("mapPresence")
+      .where("locationUpdatedAt", "<", cutoff)
+      .limit(200)
+      .get();
+    if (snapshot.empty) return null;
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    functions.logger.info("cleanupStaleMapPresence", {
+      deleted: snapshot.size,
+    });
+    return null;
+  });
+
 exports.onRideUpdated = functions.firestore
   .document("rides/{rideId}")
   .onUpdate(async (change, context) => {
@@ -125,15 +294,35 @@ exports.onRideUpdated = functions.firestore
       !after.driverId;
 
     if (shouldNotifyDrivers) {
+      const newlyOffered = (after.offeredDriverIds || []).filter((id) => {
+        const beforeIds = Array.isArray(before.offeredDriverIds)
+          ? before.offeredDriverIds.map(String)
+          : [];
+        return !beforeIds.includes(String(id));
+      });
+      if (rewardsRuntime.mod && newlyOffered.length > 0) {
+        try {
+          await rewardsRuntime.mod.bumpOfferStats(
+            newlyOffered,
+            "statsOffersReceived",
+          );
+        } catch (_) {}
+      }
       for (const offeredDriverId of after.offeredDriverIds) {
-        const driverDoc = await admin
+        const driverRef = admin
           .firestore()
           .collection("drivers")
-          .doc(String(offeredDriverId))
-          .get();
+          .doc(String(offeredDriverId));
+        const driverDoc = await driverRef.get();
         const driverData = driverDoc.data() || {};
         if (driverData.isFakeDriver && driverData.autoAcceptRides) {
           continue;
+        }
+        if (driverData.isOnline === true && driverData.hasActiveRide !== true) {
+          await driverRef.set(
+            { operationalStatus: "rideOffered" },
+            { merge: true },
+          );
         }
         await sendToToken(
           driverData.fcmToken,
@@ -142,6 +331,55 @@ exports.onRideUpdated = functions.firestore
           { rideId, type: "ride_matched" },
           "driver_ride_request",
         );
+      }
+    }
+
+    // Assigned / started / completed status → update driver operationalStatus.
+    if (after.driverId && before.status !== after.status) {
+      const driverRef = admin
+        .firestore()
+        .collection("drivers")
+        .doc(String(after.driverId));
+      const driverDoc = await driverRef.get();
+      const driverData = driverDoc.data() || {};
+      let nextStatus = null;
+      if (after.status === "accepted") nextStatus = "arrivingPickup";
+      if (after.status === "inProgress" || after.status === "awaitingCashPayment") {
+        nextStatus = "onTrip";
+      }
+      if (after.status === "completed" || after.status === "cancelled") {
+        nextStatus = driverData.isOnline ? "available" : "offline";
+      }
+      if (nextStatus) {
+        await driverRef.set({ operationalStatus: nextStatus }, { merge: true });
+      }
+    }
+
+    // Offered drivers who were not selected return to available when ride leaves matched.
+    if (
+      before.status === "matched" &&
+      after.status !== "matched" &&
+      Array.isArray(before.offeredDriverIds)
+    ) {
+      const assigned = String(after.driverId || "");
+      for (const offeredId of before.offeredDriverIds) {
+        if (String(offeredId) === assigned) continue;
+        const driverRef = admin
+          .firestore()
+          .collection("drivers")
+          .doc(String(offeredId));
+        const driverDoc = await driverRef.get();
+        const driverData = driverDoc.data() || {};
+        if (
+          driverData.isOnline === true &&
+          driverData.hasActiveRide !== true &&
+          String(driverData.operationalStatus || "") === "rideOffered"
+        ) {
+          await driverRef.set(
+            { operationalStatus: "available" },
+            { merge: true },
+          );
+        }
       }
     }
 
@@ -181,9 +419,151 @@ exports.onRideUpdated = functions.firestore
         "customer_ride_accepted",
       );
     }
+
+    if (becameAccepted && after.driverId && rewardsRuntime.mod) {
+      try {
+        await rewardsRuntime.mod.bumpOfferStats(
+          [String(after.driverId)],
+          "statsOffersAccepted",
+        );
+      } catch (_) {}
+    }
+
+    // Track offer rejections for acceptance-rate rewards.
+    const beforeRejected = new Set(
+      (Array.isArray(before.rejectedDriverIds)
+        ? before.rejectedDriverIds
+        : []
+      ).map(String),
+    );
+    const afterRejected = (
+      Array.isArray(after.rejectedDriverIds) ? after.rejectedDriverIds : []
+    ).map(String);
+    const newlyRejected = afterRejected.filter((id) => !beforeRejected.has(id));
+    if (newlyRejected.length > 0 && rewardsRuntime.mod) {
+      try {
+        await rewardsRuntime.mod.bumpOfferStats(
+          newlyRejected,
+          "statsOffersRejected",
+        );
+      } catch (_) {}
+    }
+
+    // Debit prepaid wallet commission when earnings are first applied.
+    const earningsJustApplied =
+      before.earningsApplied !== true &&
+      after.earningsApplied === true &&
+      after.walletCommissionApplied !== true;
+    if (earningsJustApplied && after.driverId) {
+      const baseCommission = Math.trunc(Number(after.platformCommissionIqd) || 0);
+      let commission = baseCommission;
+      let rewardMeta = {
+        freeTripUsed: false,
+        discountPercent: 0,
+        activeRewardId: null,
+      };
+      if (rewardsRuntime.mod && baseCommission > 0) {
+        try {
+          rewardMeta = await rewardsRuntime.mod.resolveEffectiveCommission(
+            String(after.driverId),
+            baseCommission,
+          );
+          commission = Math.trunc(Number(rewardMeta.commissionIqd) || 0);
+        } catch (error) {
+          functions.logger.warn("reward commission resolve failed", {
+            rideId,
+            message: error.message,
+          });
+        }
+      }
+      if (commission > 0) {
+        try {
+          await applyWalletDelta({
+            driverId: String(after.driverId),
+            amountIqd: -commission,
+            type: "commission",
+            createdBy: "system",
+            note: rewardMeta.discountPercent > 0
+              ? `Trip commission for ride ${rideId} (${rewardMeta.discountPercent}% reward discount)`
+              : `Trip commission for ride ${rideId}`,
+            rideId,
+          });
+          await change.after.ref.set(
+            {
+              walletCommissionApplied: true,
+              walletCommissionChargedIqd: commission,
+              rewardCommissionDiscountPercent: rewardMeta.discountPercent || 0,
+              rewardFreeTripUsed: rewardMeta.freeTripUsed === true,
+              rewardActiveId: rewardMeta.activeRewardId || null,
+            },
+            { merge: true },
+          );
+        } catch (error) {
+          functions.logger.error("wallet commission debit failed", {
+            rideId,
+            driverId: after.driverId,
+            commission,
+            message: error.message,
+          });
+          // Fall back: keep outstanding debt and block wallet.
+          const config = await getWalletConfig();
+          await admin
+            .firestore()
+            .collection("drivers")
+            .doc(String(after.driverId))
+            .set(
+              {
+                walletStatus: "blocked",
+                walletUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            );
+          functions.logger.warn("driver wallet blocked after failed commission", {
+            minBalanceIqd: config.minBalanceIqd,
+          });
+        }
+      } else {
+        await change.after.ref.set(
+          {
+            walletCommissionApplied: true,
+            walletCommissionChargedIqd: 0,
+            rewardCommissionDiscountPercent: rewardMeta.discountPercent || 0,
+            rewardFreeTripUsed: rewardMeta.freeTripUsed === true,
+            rewardActiveId: rewardMeta.activeRewardId || null,
+          },
+          { merge: true },
+        );
+      }
+
+      // Evaluate reward campaigns after a completed (earnings-applied) trip.
+      if (rewardsRuntime.mod) {
+        const tripEarnings = Math.trunc(
+          Number(after.driverEarningsIqd) ||
+            Number(after.driverEarningIqd) ||
+            0,
+        );
+        try {
+          await rewardsRuntime.mod.evaluateDriverCampaigns(
+            String(after.driverId),
+            {
+              tripIncrement: true,
+              tripEarningsIqd: tripEarnings,
+              trigger: "trip_completed",
+            },
+          );
+        } catch (error) {
+          functions.logger.warn("reward evaluate after trip failed", {
+            rideId,
+            driverId: after.driverId,
+            message: error.message,
+          });
+        }
+      }
+    }
   });
 
 const allowedAssistantPermissions = new Set([
+  "overview",
   "pendingDrivers",
   "activeRides",
   "liveMap",
@@ -196,6 +576,10 @@ const allowedAssistantPermissions = new Set([
   "supportInbox",
   "promoCodes",
   "monthlyLeaderboard",
+  "wallet",
+  "serviceAreas",
+  "rewards",
+  "businessPartners",
 ]);
 
 function normalizePhone(raw) {
@@ -1880,6 +2264,7 @@ exports.expireStaleActiveRides = functions.pubsub
         if (driverId) {
           batch.update(db.collection("drivers").doc(driverId), {
             hasActiveRide: false,
+            operationalStatus: "available",
           });
         }
         await batch.commit();
@@ -1892,3 +2277,655 @@ exports.expireStaleActiveRides = functions.pubsub
     }
     return null;
   });
+
+// --- Driver wallet (internal prepaid balance + SuperQi manual recharge) ---
+
+function deriveWalletStatus(balanceIqd, minBalanceIqd, lowBalanceWarningIqd) {
+  if (balanceIqd < minBalanceIqd) return "blocked";
+  if (balanceIqd <= lowBalanceWarningIqd) return "low";
+  return "active";
+}
+
+async function getWalletConfig() {
+  const doc = await admin.firestore().collection("config").doc("wallet").get();
+  const data = doc.data() || {};
+  return {
+    minBalanceIqd: Math.max(1, Number(data.minBalanceIqd) || 1),
+    lowBalanceWarningIqd: Number(data.lowBalanceWarningIqd) || 5000,
+    companySuperQiNumber: String(data.companySuperQiNumber || ""),
+    companySuperQiName: String(data.companySuperQiName || "Hello Tuk-Tuk"),
+    rechargeInstructionsEn: String(
+      data.rechargeInstructionsEn ||
+        "Transfer the amount to the company SuperQi number, then submit your receipt for verification.",
+    ),
+    rechargeInstructionsAr: String(
+      data.rechargeInstructionsAr ||
+        "حوّل المبلغ إلى رقم سوبر كي الخاص بالشركة، ثم أرسل إيصال الدفع للمراجعة.",
+    ),
+    enabledMethods: Array.isArray(data.enabledMethods)
+      ? data.enabledMethods.map(String)
+      : ["superQi", "cash", "bankTransfer"],
+  };
+}
+
+async function applyWalletDelta({
+  driverId,
+  amountIqd,
+  type,
+  createdBy,
+  note = "",
+  rideId = "",
+  rechargeRequestId = "",
+  rewardCampaignId = "",
+  rewardGrantId = "",
+}) {
+  const db = admin.firestore();
+  const driverRef = db.collection("drivers").doc(driverId);
+  const ledgerRef = db.collection("walletLedger").doc();
+  const config = await getWalletConfig();
+
+  return db.runTransaction(async (tx) => {
+    const driverSnap = await tx.get(driverRef);
+    if (!driverSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "Driver not found.");
+    }
+    const current = Number(driverSnap.data().walletBalanceIqd) || 0;
+    const next = current + amountIqd;
+    if (next < 0) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Insufficient wallet balance.",
+      );
+    }
+    const walletStatus = deriveWalletStatus(
+      next,
+      config.minBalanceIqd,
+      config.lowBalanceWarningIqd,
+    );
+    tx.update(driverRef, {
+      walletBalanceIqd: next,
+      walletStatus,
+      walletUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.set(ledgerRef, {
+      driverId,
+      type,
+      amountIqd,
+      balanceAfterIqd: next,
+      rideId: rideId || null,
+      rechargeRequestId: rechargeRequestId || null,
+      rewardCampaignId: rewardCampaignId || null,
+      rewardGrantId: rewardGrantId || null,
+      createdBy: createdBy || "system",
+      note: note || "",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { balanceAfterIqd: next, walletStatus };
+  });
+}
+
+exports.saveWalletConfig = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["wallet", "earnings"]);
+  const minBalanceIqd = Math.max(1, Math.trunc(Number(data.minBalanceIqd) || 1));
+  const lowBalanceWarningIqd = Math.max(
+    0,
+    Math.trunc(Number(data.lowBalanceWarningIqd) || 5000),
+  );
+  const enabledMethods = Array.isArray(data.enabledMethods)
+    ? data.enabledMethods.map(String)
+    : ["superQi", "cash", "bankTransfer"];
+
+  await admin.firestore().collection("config").doc("wallet").set(
+    {
+      minBalanceIqd,
+      lowBalanceWarningIqd,
+      companySuperQiNumber: String(data.companySuperQiNumber || "").trim(),
+      companySuperQiName:
+        String(data.companySuperQiName || "Hello Tuk-Tuk").trim() ||
+        "Hello Tuk-Tuk",
+      rechargeInstructionsEn: String(data.rechargeInstructionsEn || "").trim(),
+      rechargeInstructionsAr: String(data.rechargeInstructionsAr || "").trim(),
+      enabledMethods,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: context.auth.uid,
+    },
+    { merge: true },
+  );
+  return { ok: true };
+});
+
+exports.submitWalletRechargeRequest = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+  const amountIqd = Math.trunc(Number(data.amountIqd));
+  const method = String(data.method || "superQi").trim();
+  const screenshotUrl = String(data.screenshotUrl || "").trim();
+  const referenceNumber = String(data.referenceNumber || "").trim();
+  const notes = String(data.notes || "").trim();
+  const allowed = new Set(["superQi", "cash", "bankTransfer", "gateway"]);
+
+  if (!Number.isFinite(amountIqd) || amountIqd < 1000) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Minimum recharge is 1000 IQD.",
+    );
+  }
+  if (!allowed.has(method)) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid payment method.");
+  }
+  if (!screenshotUrl) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Payment screenshot is required.",
+    );
+  }
+
+  const driverId = context.auth.uid;
+  const driverDoc = await admin.firestore().collection("drivers").doc(driverId).get();
+  if (!driverDoc.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "Driver profile required.");
+  }
+  const driver = driverDoc.data() || {};
+
+  const ref = await admin.firestore().collection("walletRechargeRequests").add({
+    driverId,
+    driverName: String(driver.name || ""),
+    driverPhone: String(driver.phone || ""),
+    method,
+    amountIqd,
+    screenshotUrl,
+    referenceNumber,
+    notes,
+    status: "pending",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  // Notify managers (best effort).
+  try {
+    const managers = await admin
+      .firestore()
+      .collection("users")
+      .where("role", "==", "manager")
+      .limit(20)
+      .get();
+    for (const doc of managers.docs) {
+      const token = doc.data()?.fcmToken;
+      await sendToToken(
+        token,
+        "Wallet recharge request",
+        `${driver.name || "Driver"} requested ${amountIqd} IQD`,
+        { type: "wallet_recharge_pending", requestId: ref.id },
+        "default",
+      );
+    }
+  } catch (error) {
+    functions.logger.warn("wallet recharge manager notify failed", {
+      message: error.message,
+    });
+  }
+
+  return { ok: true, requestId: ref.id };
+});
+
+exports.reviewWalletRechargeRequest = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["wallet", "earnings"]);
+  const requestId = String(data.requestId || "").trim();
+  const approve = data.approve === true;
+  const rejectionReason = String(data.rejectionReason || "").trim();
+  const hasApprovedAmount = data.approvedAmountIqd !== undefined &&
+    data.approvedAmountIqd !== null &&
+    String(data.approvedAmountIqd).trim() !== "";
+  const approvedAmountRaw = hasApprovedAmount
+    ? Math.trunc(Number(data.approvedAmountIqd))
+    : null;
+  if (!requestId) {
+    throw new functions.https.HttpsError("invalid-argument", "requestId required.");
+  }
+  if (!approve && !rejectionReason) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Rejection reason is required.",
+    );
+  }
+  if (approve && hasApprovedAmount && (!Number.isFinite(approvedAmountRaw) || approvedAmountRaw < 1000)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Approved amount must be at least 1000 IQD.",
+    );
+  }
+
+  const db = admin.firestore();
+  const requestRef = db.collection("walletRechargeRequests").doc(requestId);
+
+  const result = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(requestRef);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "Request not found.");
+    }
+    const req = snap.data() || {};
+    if (req.status !== "pending") {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Request already reviewed.",
+      );
+    }
+    if (!approve) {
+      tx.update(requestRef, {
+        status: "rejected",
+        rejectionReason,
+        reviewedBy: context.auth.uid,
+        reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { driverId: String(req.driverId || ""), approved: false, amountIqd: 0 };
+    }
+    const requestedAmountIqd = Number(req.amountIqd) || 0;
+    const creditAmountIqd = hasApprovedAmount
+      ? approvedAmountRaw
+      : requestedAmountIqd;
+    if (!Number.isFinite(creditAmountIqd) || creditAmountIqd < 1000) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Approved amount must be at least 1000 IQD.",
+      );
+    }
+    tx.update(requestRef, {
+      status: "approved",
+      rejectionReason: "",
+      requestedAmountIqd,
+      approvedAmountIqd: creditAmountIqd,
+      amountIqd: creditAmountIqd,
+      reviewedBy: context.auth.uid,
+      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {
+      driverId: String(req.driverId || ""),
+      approved: true,
+      amountIqd: creditAmountIqd,
+      requestedAmountIqd,
+    };
+  });
+
+  if (result.approved && result.driverId) {
+    const amountNote =
+      result.requestedAmountIqd !== result.amountIqd
+        ? `SuperQi/manual recharge approved (${requestId}); requested ${result.requestedAmountIqd}, credited ${result.amountIqd}`
+        : `SuperQi/manual recharge approved (${requestId})`;
+    await applyWalletDelta({
+      driverId: result.driverId,
+      amountIqd: result.amountIqd,
+      type: "recharge",
+      createdBy: context.auth.uid,
+      note: amountNote,
+      rechargeRequestId: requestId,
+    });
+  }
+
+  try {
+    const driverUser = await db.collection("users").doc(result.driverId).get();
+    const token = driverUser.data()?.fcmToken;
+    await sendToToken(
+      token,
+      result.approved ? "Wallet recharged" : "Recharge rejected",
+      result.approved
+        ? `Your wallet was credited ${result.amountIqd} IQD.`
+        : rejectionReason || "Your recharge request was rejected.",
+      {
+        type: result.approved ? "wallet_recharge_approved" : "wallet_recharge_rejected",
+        requestId,
+      },
+      "default",
+    );
+  } catch (_) {}
+
+  return { ok: true, approved: result.approved };
+});
+
+exports.adjustDriverWallet = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["wallet", "earnings"]);
+  const driverId = String(data.driverId || "").trim();
+  const amountIqd = Math.trunc(Number(data.amountIqd));
+  const note = String(data.note || "").trim();
+  if (!driverId || !Number.isFinite(amountIqd) || amountIqd === 0) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid adjustment.");
+  }
+  if (!note) {
+    throw new functions.https.HttpsError("invalid-argument", "Note is required.");
+  }
+  const result = await applyWalletDelta({
+    driverId,
+    amountIqd,
+    type: amountIqd > 0 ? "adjustment" : "penalty",
+    createdBy: context.auth.uid,
+    note,
+  });
+  return { ok: true, ...result };
+});
+
+const serviceAreaCollections = {
+  country: "serviceCountries",
+  province: "serviceProvinces",
+  district: "serviceDistricts",
+  subDistrict: "serviceSubDistricts",
+};
+
+exports.saveServiceArea = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["serviceAreas", "pricing"]);
+  const kind = String(data.kind || "").trim();
+  const id = String(data.id || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "_");
+  const payload = data.data && typeof data.data === "object" ? data.data : {};
+  const mergeOnly = data.mergeOnly === true;
+  const collection = serviceAreaCollections[kind];
+  if (!collection || !id) {
+    throw new functions.https.HttpsError("invalid-argument", "kind and id required.");
+  }
+  const ref = admin.firestore().collection(collection).doc(id);
+  if (mergeOnly) {
+    await ref.set(
+      {
+        ...payload,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: context.auth.uid,
+      },
+      { merge: true },
+    );
+  } else {
+    await ref.set(
+      {
+        ...payload,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: context.auth.uid,
+      },
+      { merge: true },
+    );
+  }
+  return { ok: true, id };
+});
+
+const SERVICE_AREA_STATUSES = new Set([
+  "active",
+  "inactive",
+  "maintenance",
+  "archived",
+]);
+
+async function cascadeServiceAreaStatus({
+  kind,
+  id,
+  status,
+  actorUid,
+  deletedAt = false,
+}) {
+  const db = admin.firestore();
+  const stamp = {
+    status,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedBy: actorUid,
+    ...(deletedAt
+      ? { deletedAt: admin.firestore.FieldValue.serverTimestamp() }
+      : {}),
+  };
+
+  if (kind === "country") {
+    await db.collection("serviceCountries").doc(id).set(stamp, { merge: true });
+    const provinces = await db
+      .collection("serviceProvinces")
+      .where("countryId", "==", id)
+      .get();
+    for (const doc of provinces.docs) {
+      await cascadeServiceAreaStatus({
+        kind: "province",
+        id: doc.id,
+        status,
+        actorUid,
+        deletedAt,
+      });
+    }
+    return;
+  }
+
+  if (kind === "province") {
+    await db.collection("serviceProvinces").doc(id).set(stamp, { merge: true });
+    const districts = await db
+      .collection("serviceDistricts")
+      .where("provinceId", "==", id)
+      .get();
+    for (const doc of districts.docs) {
+      await cascadeServiceAreaStatus({
+        kind: "district",
+        id: doc.id,
+        status,
+        actorUid,
+        deletedAt,
+      });
+    }
+    return;
+  }
+
+  if (kind === "district") {
+    await db.collection("serviceDistricts").doc(id).set(stamp, { merge: true });
+    const subs = await db
+      .collection("serviceSubDistricts")
+      .where("districtId", "==", id)
+      .get();
+    const batch = db.batch();
+    for (const doc of subs.docs) {
+      batch.set(doc.ref, stamp, { merge: true });
+    }
+    await batch.commit();
+    return;
+  }
+
+  if (kind === "subDistrict") {
+    await db.collection("serviceSubDistricts").doc(id).set(stamp, { merge: true });
+  }
+}
+
+exports.setServiceAreaStatus = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["serviceAreas", "pricing"]);
+  const kind = String(data.kind || "").trim();
+  const id = String(data.id || "").trim();
+  const status = String(data.status || "").trim();
+  const cascade = data.cascade !== false;
+  if (!serviceAreaCollections[kind] || !id || !SERVICE_AREA_STATUSES.has(status)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "kind, id, and valid status required.",
+    );
+  }
+  if (cascade) {
+    await cascadeServiceAreaStatus({
+      kind,
+      id,
+      status,
+      actorUid: context.auth.uid,
+    });
+  } else {
+    await admin.firestore().collection(serviceAreaCollections[kind]).doc(id).set(
+      {
+        status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: context.auth.uid,
+      },
+      { merge: true },
+    );
+  }
+  return { ok: true };
+});
+
+exports.deleteServiceArea = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["serviceAreas", "pricing"]);
+  const kind = String(data.kind || "").trim();
+  const id = String(data.id || "").trim();
+  const collection = serviceAreaCollections[kind];
+  if (!collection || !id) {
+    throw new functions.https.HttpsError("invalid-argument", "kind and id required.");
+  }
+  // Soft-delete → archived (+ cascade) so history remains but new rides stop.
+  await cascadeServiceAreaStatus({
+    kind,
+    id,
+    status: "archived",
+    actorUid: context.auth.uid,
+    deletedAt: true,
+  });
+  return { ok: true };
+});
+
+exports.seedServiceAreas = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["serviceAreas", "pricing"]);
+  const db = admin.firestore();
+  const batch = db.batch();
+  const countryRef = db.collection("serviceCountries").doc("iq");
+  batch.set(
+    countryRef,
+    {
+      nameEn: "Iraq",
+      nameAr: "العراق",
+      code: "IQ",
+      currency: "IQD",
+      status: "active",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: context.auth.uid,
+    },
+    { merge: true },
+  );
+  const provinceRef = db.collection("serviceProvinces").doc("babil");
+  batch.set(
+    provinceRef,
+    {
+      countryId: "iq",
+      nameEn: "Babil Province",
+      nameAr: "محافظة بابل",
+      status: "active",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: context.auth.uid,
+    },
+    { merge: true },
+  );
+
+  const districts = [
+    { id: "hilla", nameEn: "Al-Hillah District", nameAr: "قضاء الحلة", customerVisible: false },
+    { id: "mahawil", nameEn: "Al-Mahawil District", nameAr: "قضاء المحاويل", customerVisible: false },
+    { id: "musayab", nameEn: "Al-Musayab District", nameAr: "قضاء المسيب", customerVisible: false },
+    { id: "hashimiya", nameEn: "Al-Hashimiya District", nameAr: "قضاء الهاشمية", customerVisible: true },
+  ];
+  for (const d of districts) {
+    batch.set(
+      db.collection("serviceDistricts").doc(d.id),
+      {
+        provinceId: "babil",
+        countryId: "iq",
+        nameEn: d.nameEn,
+        nameAr: d.nameAr,
+        customerVisible: d.customerVisible,
+        status: "active",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: context.auth.uid,
+      },
+      { merge: true },
+    );
+  }
+
+  const subs = [
+    { id: "hilla_center", districtId: "hilla", nameEn: "Hilla Center", nameAr: "ناحية مركز الحلة", lat: 32.4637, lng: 44.4197, r: 22 },
+    { id: "jameaa", districtId: "hilla", nameEn: "Al-Jamiyah", nameAr: "ناحية الجامعة", lat: 32.461, lng: 44.415, r: 22 },
+    { id: "qadisiyah", districtId: "hilla", nameEn: "Al-Qadisiyah", nameAr: "حي القادسية", lat: 32.471, lng: 44.425, r: 22 },
+    { id: "mahawil_center", districtId: "mahawil", nameEn: "Mahawil Center", nameAr: "ناحية مركز المحاويل", lat: 32.655, lng: 44.385, r: 22 },
+    { id: "musayab_center", districtId: "musayab", nameEn: "Musayab Center", nameAr: "ناحية مركز المسيب", lat: 32.778, lng: 44.29, r: 22 },
+    { id: "hashimiya_center", districtId: "hashimiya", nameEn: "Hashimiya Center", nameAr: "ناحية مركز الهاشمية", lat: 32.374, lng: 44.665, r: 22 },
+    { id: "qasim", districtId: "hashimiya", nameEn: "Al-Qasim", nameAr: "ناحية القاسم", lat: 32.3014, lng: 44.6892, r: 25 },
+    { id: "madhatiyah", districtId: "hashimiya", nameEn: "Al-Madhatiyah", nameAr: "ناحية المدحتية", lat: 32.3964, lng: 44.6536, r: 25 },
+    { id: "shumali", districtId: "hashimiya", nameEn: "Al-Shumali", nameAr: "ناحية الشوملي", lat: 32.328, lng: 44.918, r: 28 },
+    { id: "taleaa", districtId: "hashimiya", nameEn: "Al-Taleaa", nameAr: "ناحية الطليعة", lat: 32.35, lng: 44.78, r: 25 },
+  ];
+  for (const s of subs) {
+    batch.set(
+      db.collection("serviceSubDistricts").doc(s.id),
+      {
+        districtId: s.districtId,
+        provinceId: "babil",
+        countryId: "iq",
+        nameEn: s.nameEn,
+        nameAr: s.nameAr,
+        latitude: s.lat,
+        longitude: s.lng,
+        searchRadiusKm: s.r,
+        status: "active",
+        services: ["ride"],
+        useGlobalCommission: true,
+        pricing: { useGlobalPricing: true },
+        operatingHours: { alwaysOpen: true },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: context.auth.uid,
+      },
+      { merge: true },
+    );
+  }
+
+  await batch.commit();
+  return { ok: true, districts: districts.length, subDistricts: subs.length };
+});
+
+// --- Driver Rewards & Incentives ---
+const { createRewardsModule } = require("./rewards");
+rewardsRuntime.mod = createRewardsModule({
+  admin,
+  functions,
+  applyWalletDelta,
+  sendToToken,
+  assertAdminPermissionAny,
+});
+exports.saveRewardCampaign = rewardsRuntime.mod.saveRewardCampaign;
+exports.setRewardCampaignStatus = rewardsRuntime.mod.setRewardCampaignStatus;
+exports.deleteRewardCampaign = rewardsRuntime.mod.deleteRewardCampaign;
+exports.evaluateDriverRewards = rewardsRuntime.mod.evaluateDriverRewards;
+
+exports.onDriverUpdatedForRewards = functions.firestore
+  .document("drivers/{driverId}")
+  .onUpdate(async (change, context) => {
+    if (!rewardsRuntime.mod) return null;
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+    try {
+      await rewardsRuntime.mod.accumulateOnlineSeconds(
+        context.params.driverId,
+        before,
+        after,
+      );
+    } catch (error) {
+      functions.logger.warn("online seconds accumulate failed", {
+        driverId: context.params.driverId,
+        message: error.message,
+      });
+    }
+    return null;
+  });
+
+// --- Multi-Business Management ---
+const { createBusinessModule } = require("./business");
+const businessModule = createBusinessModule({
+  admin,
+  functions,
+  assertAdminPermissionAny,
+  sendToToken,
+  authAdminCallable,
+});
+exports.seedBusinessTypes = businessModule.seedBusinessTypes;
+exports.saveBusinessTypes = businessModule.saveBusinessTypes;
+exports.createBusinessPartner = businessModule.createBusinessPartner;
+exports.setBusinessStatus = businessModule.setBusinessStatus;
+exports.saveBusinessProfile = businessModule.saveBusinessProfile;
+exports.submitBusinessForReview = businessModule.submitBusinessForReview;
+exports.deleteBusiness = businessModule.deleteBusiness;
+exports.saveBusinessCategory = businessModule.saveBusinessCategory;
+exports.deleteBusinessCategory = businessModule.deleteBusinessCategory;
+exports.saveBusinessProduct = businessModule.saveBusinessProduct;
+exports.deleteBusinessProduct = businessModule.deleteBusinessProduct;
+exports.duplicateBusinessProduct = businessModule.duplicateBusinessProduct;
+exports.bulkUpdateBusinessPrices = businessModule.bulkUpdateBusinessPrices;
+exports.placeBusinessOrder = businessModule.placeBusinessOrder;
+exports.updateBusinessOrderStatus = businessModule.updateBusinessOrderStatus;

@@ -48,7 +48,7 @@ Future<void> bootstrapApp(AppVariant variant) async {
     ),
   );
 
-  if (firebaseReady && !AppConfig.variant.isWebAdmin) {
+  if (firebaseReady && !AppConfig.variant.isWebPortal) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(() async {
         try {

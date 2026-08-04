@@ -1,6 +1,7 @@
 class AdminPermissions {
   AdminPermissions._();
 
+  static const overview = 'overview';
   static const pendingDrivers = 'pendingDrivers';
   static const activeRides = 'activeRides';
   static const liveMap = 'liveMap';
@@ -14,8 +15,13 @@ class AdminPermissions {
   static const manageAssistants = 'manageAssistants';
   static const promoCodes = 'promoCodes';
   static const monthlyLeaderboard = 'monthlyLeaderboard';
+  static const wallet = 'wallet';
+  static const serviceAreas = 'serviceAreas';
+  static const rewards = 'rewards';
+  static const businessPartners = 'businessPartners';
 
   static const defaultAssistant = [
+    overview,
     pendingDrivers,
     activeRides,
     liveMap,
@@ -25,6 +31,7 @@ class AdminPermissions {
   ];
 
   static const all = [
+    overview,
     pendingDrivers,
     activeRides,
     liveMap,
@@ -38,11 +45,16 @@ class AdminPermissions {
     manageAssistants,
     promoCodes,
     monthlyLeaderboard,
+    wallet,
+    serviceAreas,
+    rewards,
+    businessPartners,
   ];
 }
 
 extension AdminPermissionLabels on String {
   String labelKey() => switch (this) {
+        AdminPermissions.overview => 'permOverview',
         AdminPermissions.pendingDrivers => 'permPendingDrivers',
         AdminPermissions.activeRides => 'permActiveRides',
         AdminPermissions.liveMap => 'permLiveMap',
@@ -56,6 +68,10 @@ extension AdminPermissionLabels on String {
         AdminPermissions.manageAssistants => 'permManageAssistants',
         AdminPermissions.promoCodes => 'permPromoCodes',
         AdminPermissions.monthlyLeaderboard => 'permMonthlyLeaderboard',
+        AdminPermissions.wallet => 'permWallet',
+        AdminPermissions.serviceAreas => 'permServiceAreas',
+        AdminPermissions.rewards => 'permRewards',
+        AdminPermissions.businessPartners => 'permBusinessPartners',
         _ => 'permUnknown',
       };
 }

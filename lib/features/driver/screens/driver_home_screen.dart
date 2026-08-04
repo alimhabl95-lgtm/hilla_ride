@@ -6,6 +6,10 @@ import 'package:hilla_ride/core/models/promo_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
+import 'package:hilla_ride/core/models/wallet_models.dart';
+import 'package:hilla_ride/features/driver/screens/driver_rewards_screen.dart';
+import 'package:hilla_ride/features/driver/screens/driver_wallet_screen.dart';
+import 'package:hilla_ride/features/driver/widgets/driver_delivery_orders_panel.dart';
 import 'package:hilla_ride/features/driver/widgets/driver_ride_map_panel.dart';
 import 'package:hilla_ride/features/shared/screens/ride_chat_screen.dart';
 import 'package:hilla_ride/features/shared/widgets/profile_avatar_circle.dart';
@@ -76,9 +80,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     } catch (error) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
+      final isAr = l10n.localeName.startsWith('ar');
       final message = error is StateError && error.message == 'work_area_required'
           ? l10n.driverWorkDistrictRequired
-          : l10n.accountBlockedTitle;
+          : error is StateError && error.message == 'wallet_blocked'
+              ? (isAr
+                  ? 'رصيد المحفظة غير كافٍ — اشحن المحفظة أولاً'
+                  : 'Wallet balance too low — recharge first')
+              : l10n.accountBlockedTitle;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
@@ -139,6 +148,28 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       appBar: AppBar(
         title: Text(l10n.roleDriver),
         actions: [
+          IconButton(
+            tooltip: l10n.localeName.startsWith('ar') ? 'المكافآت' : 'Rewards',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DriverRewardsScreen(driver: widget.driver),
+                ),
+              );
+            },
+            icon: const Icon(Icons.emoji_events_outlined),
+          ),
+          IconButton(
+            tooltip: l10n.localeName.startsWith('ar') ? 'المحفظة' : 'Wallet',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DriverWalletScreen(driver: widget.driver),
+                ),
+              );
+            },
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+          ),
           Switch(
             value: widget.driver.isOnline,
             onChanged: _isUpdatingOnline || !widget.driver.hasAssignedWorkArea
@@ -178,6 +209,49 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           Theme.of(context).colorScheme.errorContainer,
                       actions: const [SizedBox.shrink()],
                     ),
+                  StreamBuilder<WalletConfig>(
+                    stream:
+                        context.read<AppState>().walletService.watchConfig(),
+                    builder: (context, configSnap) {
+                      final config = configSnap.data ?? const WalletConfig();
+                      final low = driver.walletBalanceIqd <=
+                          config.lowBalanceWarningIqd;
+                      final blocked = driver.walletStatus == 'blocked' ||
+                          driver.walletBalanceIqd < config.minBalanceIqd;
+                      if (!low && !blocked) {
+                        return const SizedBox.shrink();
+                      }
+                      final isAr = l10n.localeName.startsWith('ar');
+                      return MaterialBanner(
+                        content: Text(
+                          blocked
+                              ? (isAr
+                                  ? 'المحفظة محظورة — اشحن لاستقبال الرحلات'
+                                  : 'Wallet blocked — recharge to receive trips')
+                              : (isAr
+                                  ? 'رصيد المحفظة منخفض'
+                                  : 'Wallet balance is low'),
+                        ),
+                        leading: Icon(
+                          Icons.account_balance_wallet,
+                          color: blocked ? Colors.red : const Color(0xFFD97706),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      DriverWalletScreen(driver: driver),
+                                ),
+                              );
+                            },
+                            child: Text(isAr ? 'شحن' : 'Recharge'),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                   Expanded(
                     child: Builder(
                       builder: (context) {
@@ -185,6 +259,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           return ListView(
                             padding: const EdgeInsets.all(24),
                             children: [
+                              DriverDeliveryOrdersPanel(driverId: driver.uid),
                               StreamBuilder<DriverMonthlyStats>(
                                 stream: context
                                     .read<AppState>()
@@ -301,6 +376,34 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                         Text(
                                           '${l10n.pendingBonusLabel}: ${fareService.formatIqd(driver.pendingBonusIqd, locale: l10n.localeName)}',
                                         ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        '${l10n.localeName.startsWith('ar') ? 'رصيد المحفظة' : 'Wallet balance'}: ${fareService.formatIqd(driver.walletBalanceIqd, locale: l10n.localeName)}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                              color: const Color(0xFF0F766E),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  DriverWalletScreen(
+                                                driver: driver,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        child: Text(
+                                          l10n.localeName.startsWith('ar')
+                                              ? 'فتح المحفظة / شحن'
+                                              : 'Open wallet / recharge',
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -448,11 +551,36 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                                     rideId: activeRide.id,
                                                     action: 'accept',
                                                     label: l10n.acceptRide,
-                                                    onPressed: () => rideService
-                                                        .acceptRide(
-                                                      rideId: activeRide.id,
-                                                      driverId: driver.uid,
-                                                    ),
+                                                    onPressed: () async {
+                                                      try {
+                                                        await rideService
+                                                            .acceptRide(
+                                                          rideId: activeRide.id,
+                                                          driverId: driver.uid,
+                                                        );
+                                                      } catch (error) {
+                                                        if (!mounted) return;
+                                                        final isAr = l10n
+                                                            .localeName
+                                                            .startsWith('ar');
+                                                        final message = error
+                                                                    is StateError &&
+                                                                error.message ==
+                                                                    'wallet_blocked'
+                                                            ? (isAr
+                                                                ? 'رصيد المحفظة غير كافٍ — اشحن المحفظة أولاً'
+                                                                : 'Wallet balance too low — recharge first')
+                                                            : '$error';
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content:
+                                                                Text(message),
+                                                          ),
+                                                        );
+                                                      }
+                                                    },
                                                   ),
                                                 ),
                                               ],

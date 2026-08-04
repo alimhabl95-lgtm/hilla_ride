@@ -3,25 +3,25 @@
 App name: Hello Tuk-Tuk
 
 Short description (max 80 characters):
-Book tuk-tuk rides in Al-Hashimiya. Cash trips for customers and drivers.
+Tuk-tuk rides plus stores & delivery in Al-Hashimiya — live, local, bilingual.
 
 Full description:
-Hello Tuk-Tuk is a local ride-hailing app for tuk-tuk trips in Al-Hashimiya District, Babil Governorate, Iraq.
+Hello Tuk-Tuk is a local multi-service app for tuk-tuk rides and business delivery in Al-Hashimiya District, Babil Governorate, Iraq.
 
 For passengers:
-• Choose your sub-district and set pickup and destination on the map
-• See the fare before you book — pay in cash only
-• Track your driver live on the map
-• Chat with your driver during the trip
-• Return to your active ride anytime from the app bar
+• Book tuk-tuk rides with live map tracking and in-app chat
+• Browse Stores for restaurants, shops, and more — all loaded live from the server
+• Order products with real-time prices, offers, and delivery
+• See the fare before you book — pay in cash
+• Arabic and English throughout
 
 For drivers:
 • Go online in your work area and receive nearby ride requests
-• Accept or reject trips with one tap
+• Accept ready delivery orders from partner businesses
 • Navigate to pickup and destination on the map
-• See trip earnings and platform commission clearly
+• Track wallet, earnings, and platform commission
 
-Hello Tuk-Tuk is built for our community — simple, fast, and in Arabic and English.
+Hello Tuk-Tuk is built for our community — simple, fast, and always up to date without forcing app updates for new businesses.
 
 Category suggestion: Maps & Navigation (or Travel & Local)
 

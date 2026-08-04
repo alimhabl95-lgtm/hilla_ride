@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
-import 'package:hilla_ride/core/constants/hilla_constants.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:latlong2/latlong.dart';
 
 class LocalPlace {
@@ -147,12 +147,6 @@ class LocalPlacesService {
   static final RegExp _arabicScript = RegExp(r'[\u0600-\u06FF]');
 
   bool isWithinServiceArea(double lat, double lon) {
-    const distance = Distance();
-    final km = distance.as(
-      LengthUnit.Kilometer,
-      HillaConstants.cityCenter,
-      LatLng(lat, lon),
-    );
-    return km <= HillaConstants.serviceRadiusKm;
+    return ServiceAreaCatalog.instance.isWithinAnyActiveArea(LatLng(lat, lon));
   }
 }

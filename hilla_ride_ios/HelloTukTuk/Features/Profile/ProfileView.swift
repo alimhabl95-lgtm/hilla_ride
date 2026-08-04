@@ -47,6 +47,8 @@ struct ProfileView: View {
                             .font(.subheadline.bold())
                             .foregroundStyle(BrandColors.tealDark)
                     }
+
+                    accountDeletionSection
                 }
 
                 Divider().padding(.vertical, 8)
@@ -82,17 +84,6 @@ struct ProfileView: View {
                     }
                 }
                 .buttonStyle(SecondaryButtonStyle())
-
-                Button(role: .destructive) {
-                    showDeleteConfirm = true
-                } label: {
-                    if isDeleting {
-                        ProgressView()
-                    } else {
-                        Text(L10n.string(.deleteAccount, language: appState.language))
-                    }
-                }
-                .disabled(isDeleting)
             }
             .padding(24)
         }
@@ -112,6 +103,44 @@ struct ProfileView: View {
         } message: {
             Text(L10n.string(.deleteAccountMessage, language: appState.language))
         }
+    }
+
+    private var accountDeletionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L10n.string(.deleteAccountSectionTitle, language: appState.language))
+                .font(.headline)
+                .foregroundStyle(.red)
+
+            Text(L10n.string(.deleteAccountMessage, language: appState.language))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Button(role: .destructive) {
+                showDeleteConfirm = true
+            } label: {
+                if isDeleting {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text(L10n.string(.deleteAccount, language: appState.language))
+                        .font(.body.bold())
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+            .disabled(isDeleting)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.red.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.red.opacity(0.35), lineWidth: 1)
+        )
+        .padding(.top, 8)
     }
 
     private func profileRow(title: String, value: String) -> some View {

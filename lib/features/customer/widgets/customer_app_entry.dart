@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
-import 'package:hilla_ride/features/customer/screens/customer_home_map_screen.dart';
 import 'package:hilla_ride/features/customer/widgets/customer_active_ride_shell.dart';
+import 'package:hilla_ride/features/customer/widgets/customer_home_shell.dart';
 import 'package:provider/provider.dart';
 
 class CustomerAppEntry extends StatefulWidget {
@@ -62,7 +62,7 @@ class _CustomerAppEntryState extends State<CustomerAppEntry> {
           );
         }
 
-        return CustomerHomeMapScreen(user: widget.user);
+        return CustomerHomeShell(user: widget.user);
       },
     );
   }

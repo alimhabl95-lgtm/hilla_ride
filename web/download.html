@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="حمّل تطبيق Hello Tuk-Tuk — احجز مشوار توك توك في الحلة. Download Hello Tuk-Tuk ride app.">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Hello Tuk-Tuk — Download</title>
+  <style>
+    :root {
+      --teal: #0d9488;
+      --teal-dark: #0f766e;
+      --surface: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(160deg, #ecfdf5 0%, var(--surface) 45%, #fff 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    html[dir="ltr"] body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card);
+      border-radius: 24px;
+      padding: 32px 28px;
+      box-shadow: 0 20px 50px rgba(15, 118, 110, 0.12);
+      text-align: center;
+    }
+    .logo {
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+      margin: 0 auto 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 1.75rem; margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 28px; }
+    .store-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 16px 20px;
+      margin-bottom: 12px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .store-btn:active { transform: scale(0.98); }
+    .store-btn svg { width: 28px; height: 28px; flex-shrink: 0; }
+    .btn-android {
+      background: #1a1a1a;
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
+    .btn-ios {
+      background: var(--teal);
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(13, 148, 136, 0.35);
+    }
+    .btn-ios.secondary {
+      background: #fff;
+      color: var(--teal-dark);
+      border: 2px solid var(--teal);
+      box-shadow: none;
+    }
+    .hint {
+      margin-top: 20px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .lang-toggle {
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+    .lang-toggle button {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .lang-toggle button.active {
+      background: var(--teal);
+      color: #fff;
+      border-color: var(--teal);
+    }
+    .badge {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="lang-toggle">
+      <button type="button" id="btn-ar" class="active">العربية</button>
+      <button type="button" id="btn-en">English</button>
+    </div>
+    <img class="logo" src="app-logo.png" alt="Hello Tuk-Tuk" onerror="this.style.display='none'">
+    <h1 id="title">Hello Tuk-Tuk</h1>
+    <p class="subtitle" id="subtitle">حمّل التطبيق واحجز مشوارك بسهولة في مدينة الحلة</p>
+    <p class="badge" id="ios-badge" hidden></p>
+
+    <a class="store-btn btn-android" id="link-android" href="#">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a1.004 1.004 0 0 1-.395-.395 1 1 0 0 1-.215-.61V2.82a1 1 0 0 1 1.215-.996c.15.028.29.09.404.19zm2.983 20.562l9.544-5.51-2.116-2.116-7.428 7.626zm12.787-9.01L17.21 7.05l2.116-2.117 2.983 5.51-2.983 5.51-2.116-2.117 2.169-2.169zM6.592 2.364l7.428 7.627 2.116-2.117L6.592 2.364z"/></svg>
+      <span id="label-android">حمّل من Google Play</span>
+    </a>
+
+    <a class="store-btn btn-ios" id="link-ios" href="#">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+      <span id="label-ios">حمّل من App Store</span>
+    </a>
+
+    <p class="hint" id="hint">امسح رمز QR أو اختر متجر التطبيقات المناسب لهاتفك</p>
+  </div>
+
+  <script>
+    // Update IOS_APP_STORE_ID after Apple approves your app (from App Store Connect URL).
+    const IOS_APP_STORE_ID = '';
+    const LINKS = {
+      android: 'https://play.google.com/store/apps/details?id=com.hillaride.hilla_ride',
+      ios: IOS_APP_STORE_ID
+        ? 'https://apps.apple.com/app/id' + IOS_APP_STORE_ID
+        : 'https://apps.apple.com/search?term=Hello%20Tuk-Tuk',
+    };
+
+    const STRINGS = {
+      ar: {
+        subtitle: 'حمّل التطبيق واحجز مشوارك بسهولة في مدينة الحلة',
+        android: 'حمّل من Google Play',
+        ios: 'حمّل من App Store',
+        hint: 'امسح رمز QR أو اختر متجر التطبيقات المناسب لهاتفك',
+        iosPending: 'قريباً على App Store — قيد المراجعة',
+      },
+      en: {
+        subtitle: 'Download the app and book your ride easily in Al-Hilla',
+        android: 'Get it on Google Play',
+        ios: 'Download on the App Store',
+        hint: 'Scan the QR code or choose your phone\'s app store',
+        iosPending: 'Coming soon on App Store — under review',
+      },
+    };
+
+    function setLang(lang) {
+      const s = STRINGS[lang];
+      document.documentElement.lang = lang;
+      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+      document.getElementById('subtitle').textContent = s.subtitle;
+      document.getElementById('label-android').textContent = s.android;
+      document.getElementById('label-ios').textContent = s.ios;
+      document.getElementById('hint').textContent = s.hint;
+      document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
+      document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+      if (!IOS_APP_STORE_ID) {
+        const badge = document.getElementById('ios-badge');
+        badge.hidden = false;
+        badge.textContent = s.iosPending;
+      }
+    }
+
+    document.getElementById('btn-ar').onclick = () => setLang('ar');
+    document.getElementById('btn-en').onclick = () => setLang('en');
+
+    document.getElementById('link-android').href = LINKS.android;
+    document.getElementById('link-ios').href = LINKS.ios;
+
+    const ua = navigator.userAgent || '';
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const isAndroid = /Android/i.test(ua);
+
+    if (isAndroid) {
+      window.location.replace(LINKS.android);
+    } else if (isIOS && IOS_APP_STORE_ID) {
+      window.location.replace(LINKS.ios);
+    }
+
+    const browserLang = (navigator.language || '').toLowerCase();
+    setLang(browserLang.startsWith('ar') ? 'ar' : 'en');
+  </script>
+</body>
+</html>
