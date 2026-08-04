@@ -8,6 +8,7 @@ import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DriverWalletScreen extends StatefulWidget {
   const DriverWalletScreen({super.key, required this.driver});
@@ -265,6 +266,55 @@ class _DriverWalletRechargeScreenState extends State<DriverWalletRechargeScreen>
     setState(() => _screenshotBytes = bytes);
   }
 
+  Future<void> _sendReceiptWhatsApp() async {
+    final l10n = AppLocalizations.of(context)!;
+    final isAr = l10n.localeName.startsWith('ar');
+    final digits = widget.config.managerWhatsappDigits;
+    if (digits.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAr
+                ? 'لم يُضبط رقم واتساب الإدارة بعد'
+                : 'Manager WhatsApp number is not set yet',
+          ),
+        ),
+      );
+      return;
+    }
+    final amount = _amountCtrl.text.trim();
+    final ref = _refCtrl.text.trim();
+    final driver = widget.driver;
+    final message = isAr
+        ? 'شحن محفظة Hello Tuk-Tuk\n'
+            'السائق: ${driver.name}\n'
+            'الهاتف: ${driver.phone}\n'
+            'المبلغ: ${amount.isEmpty ? '—' : amount} د.ع\n'
+            'الطريقة: ${_method.value}\n'
+            'المرجع: ${ref.isEmpty ? '—' : ref}\n'
+            'أرفق صورة إيصال الدفع في هذه المحادثة.'
+        : 'Hello Tuk-Tuk wallet recharge\n'
+            'Driver: ${driver.name}\n'
+            'Phone: ${driver.phone}\n'
+            'Amount: ${amount.isEmpty ? '—' : amount} IQD\n'
+            'Method: ${_method.value}\n'
+            'Ref: ${ref.isEmpty ? '—' : ref}\n'
+            'Please attach the payment receipt screenshot here.';
+    final uri = Uri.parse(
+      'https://wa.me/$digits?text=${Uri.encodeComponent(message)}',
+    );
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAr ? 'تعذر فتح واتساب' : 'Could not open WhatsApp',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     final isAr = l10n.localeName.startsWith('ar');
@@ -358,6 +408,39 @@ class _DriverWalletRechargeScreenState extends State<DriverWalletRechargeScreen>
                   ),
                   const SizedBox(height: 12),
                   Text(config.instructionsForLocale(l10n.localeName)),
+                  if (config.managerWhatsappDigits.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      isAr ? 'واتساب استلام الإيصال' : 'Send receipt on WhatsApp',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      config.managerWhatsappNumber,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: _sendReceiptWhatsApp,
+                      icon: const Icon(Icons.chat),
+                      label: Text(
+                        isAr
+                            ? 'فتح واتساب وإرسال الإيصال'
+                            : 'Open WhatsApp & send receipt',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isAr
+                          ? 'أرفق صورة الإيصال داخل واتساب بعد فتح المحادثة.'
+                          : 'Attach the receipt photo inside WhatsApp after the chat opens.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.black54,
+                          ),
+                    ),
+                  ],
                 ],
               ),
             ),

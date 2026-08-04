@@ -84,6 +84,8 @@ class WalletConfig {
     this.lowBalanceWarningIqd = 5000,
     this.companySuperQiNumber = '',
     this.companySuperQiName = 'Hello Tuk-Tuk',
+    /// WhatsApp number drivers use to send SuperQi / payment receipts.
+    this.managerWhatsappNumber = '',
     this.rechargeInstructionsEn =
         'Transfer the amount to the company SuperQi number, then submit your receipt for verification.',
     this.rechargeInstructionsAr =
@@ -95,6 +97,7 @@ class WalletConfig {
   final int lowBalanceWarningIqd;
   final String companySuperQiNumber;
   final String companySuperQiName;
+  final String managerWhatsappNumber;
   final String rechargeInstructionsEn;
   final String rechargeInstructionsAr;
   final List<String> enabledMethods;
@@ -108,6 +111,7 @@ class WalletConfig {
       companySuperQiNumber: data['companySuperQiNumber'] as String? ?? '',
       companySuperQiName:
           data['companySuperQiName'] as String? ?? 'Hello Tuk-Tuk',
+      managerWhatsappNumber: data['managerWhatsappNumber'] as String? ?? '',
       rechargeInstructionsEn: data['rechargeInstructionsEn'] as String? ??
           'Transfer the amount to the company SuperQi number, then submit your receipt for verification.',
       rechargeInstructionsAr: data['rechargeInstructionsAr'] as String? ??
@@ -124,10 +128,15 @@ class WalletConfig {
         'lowBalanceWarningIqd': lowBalanceWarningIqd,
         'companySuperQiNumber': companySuperQiNumber,
         'companySuperQiName': companySuperQiName,
+        'managerWhatsappNumber': managerWhatsappNumber,
         'rechargeInstructionsEn': rechargeInstructionsEn,
         'rechargeInstructionsAr': rechargeInstructionsAr,
         'enabledMethods': enabledMethods,
       };
+
+  /// Digits only for `wa.me/{digits}`.
+  String get managerWhatsappDigits =>
+      managerWhatsappNumber.replaceAll(RegExp(r'[^0-9]'), '');
 
   String instructionsForLocale(String locale) =>
       locale.startsWith('ar') ? rechargeInstructionsAr : rechargeInstructionsEn;

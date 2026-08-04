@@ -6,6 +6,7 @@ struct WalletConfig: Equatable {
     var lowBalanceWarningIqd: Int
     var companySuperQiNumber: String
     var companySuperQiName: String
+    var managerWhatsappNumber: String
     var rechargeInstructionsEn: String
     var rechargeInstructionsAr: String
     var enabledMethods: [String]
@@ -15,6 +16,7 @@ struct WalletConfig: Equatable {
         lowBalanceWarningIqd: 5000,
         companySuperQiNumber: "",
         companySuperQiName: "Hello Tuk-Tuk",
+        managerWhatsappNumber: "",
         rechargeInstructionsEn:
             "Transfer the amount to the company SuperQi number, then submit your receipt for verification.",
         rechargeInstructionsAr:
@@ -27,6 +29,7 @@ struct WalletConfig: Equatable {
         lowBalanceWarningIqd: Int,
         companySuperQiNumber: String,
         companySuperQiName: String,
+        managerWhatsappNumber: String,
         rechargeInstructionsEn: String,
         rechargeInstructionsAr: String,
         enabledMethods: [String]
@@ -35,6 +38,7 @@ struct WalletConfig: Equatable {
         self.lowBalanceWarningIqd = lowBalanceWarningIqd
         self.companySuperQiNumber = companySuperQiNumber
         self.companySuperQiName = companySuperQiName
+        self.managerWhatsappNumber = managerWhatsappNumber
         self.rechargeInstructionsEn = rechargeInstructionsEn
         self.rechargeInstructionsAr = rechargeInstructionsAr
         self.enabledMethods = enabledMethods
@@ -46,11 +50,16 @@ struct WalletConfig: Equatable {
         lowBalanceWarningIqd = (source["lowBalanceWarningIqd"] as? NSNumber)?.intValue ?? 5000
         companySuperQiNumber = source["companySuperQiNumber"] as? String ?? ""
         companySuperQiName = source["companySuperQiName"] as? String ?? "Hello Tuk-Tuk"
+        managerWhatsappNumber = source["managerWhatsappNumber"] as? String ?? ""
         rechargeInstructionsEn = source["rechargeInstructionsEn"] as? String
             ?? WalletConfig.default.rechargeInstructionsEn
         rechargeInstructionsAr = source["rechargeInstructionsAr"] as? String
             ?? WalletConfig.default.rechargeInstructionsAr
         enabledMethods = (source["enabledMethods"] as? [String]) ?? ["superQi", "cash", "bankTransfer"]
+    }
+
+    var managerWhatsappDigits: String {
+        managerWhatsappNumber.filter(\.isNumber)
     }
 
     func instructions(language: AppLanguage) -> String {

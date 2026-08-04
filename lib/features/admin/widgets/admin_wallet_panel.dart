@@ -456,17 +456,20 @@ class _WalletSettingsTab extends StatefulWidget {
 class _WalletSettingsTabState extends State<_WalletSettingsTab> {
   final _numberCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
+  final _whatsappCtrl = TextEditingController();
   final _minCtrl = TextEditingController();
   final _lowCtrl = TextEditingController();
   final _enCtrl = TextEditingController();
   final _arCtrl = TextEditingController();
   var _loaded = false;
   var _busy = false;
+  var _backfilling = false;
 
   @override
   void dispose() {
     _numberCtrl.dispose();
     _nameCtrl.dispose();
+    _whatsappCtrl.dispose();
     _minCtrl.dispose();
     _lowCtrl.dispose();
     _enCtrl.dispose();
@@ -479,6 +482,7 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
     _loaded = true;
     _numberCtrl.text = config.companySuperQiNumber;
     _nameCtrl.text = config.companySuperQiName;
+    _whatsappCtrl.text = config.managerWhatsappNumber;
     _minCtrl.text = '${config.minBalanceIqd < 1 ? 1 : config.minBalanceIqd}';
     _lowCtrl.text = '${config.lowBalanceWarningIqd}';
     _enCtrl.text = config.rechargeInstructionsEn;
@@ -495,6 +499,7 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
         companySuperQiName: _nameCtrl.text.trim().isEmpty
             ? 'Hello Tuk-Tuk'
             : _nameCtrl.text.trim(),
+        managerWhatsappNumber: _whatsappCtrl.text.trim(),
         rechargeInstructionsEn: _enCtrl.text.trim(),
         rechargeInstructionsAr: _arCtrl.text.trim(),
       );
@@ -510,6 +515,29 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _ensureWallets() async {
+    setState(() => _backfilling = true);
+    try {
+      final result =
+          await context.read<AppState>().walletService.ensureDriverWallets();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.isAr
+                ? 'تم تهيئة المحفظة لـ ${result.updated} من ${result.total} سائق'
+                : 'Initialized wallets for ${result.updated} of ${result.total} drivers',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _backfilling = false);
     }
   }
 
@@ -545,6 +573,20 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
               decoration: InputDecoration(
                 labelText:
                     widget.isAr ? 'رقم سوبر كي للشركة' : 'Company SuperQi number',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _whatsappCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: widget.isAr
+                    ? 'واتساب استلام الإيصالات (للسائق)'
+                    : 'WhatsApp for receipts (shown to drivers)',
+                hintText: '+9647XXXXXXXXX',
+                helperText: widget.isAr
+                    ? 'يظهر للسائق ليرسل إيصال الشحن على واتساب'
+                    : 'Drivers open this number to send SuperQi/payment receipts',
               ),
             ),
             const SizedBox(height: 12),
@@ -593,6 +635,22 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Text(widget.isAr ? 'حفظ' : 'Save'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _backfilling ? null : _ensureWallets,
+              icon: _backfilling
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.account_balance_wallet_outlined),
+              label: Text(
+                widget.isAr
+                    ? 'تهيئة المحفظة لكل السائقين الحاليين'
+                    : 'Initialize wallets for existing drivers',
+              ),
             ),
           ],
         );

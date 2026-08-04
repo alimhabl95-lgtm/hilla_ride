@@ -340,7 +340,10 @@ class DriverProfile {
                   : 'available')
               : 'offline'),
       walletBalanceIqd: (data['walletBalanceIqd'] as num?)?.toInt() ?? 0,
-      walletStatus: data['walletStatus'] as String? ?? 'active',
+      walletStatus: data['walletStatus'] as String? ??
+          (((data['walletBalanceIqd'] as num?)?.toInt() ?? 0) > 0
+              ? 'active'
+              : 'blocked'),
       assignedDistrictId: data['assignedDistrictId'] as String? ?? '',
       assignedSubDistrictId: data['assignedSubDistrictId'] as String? ?? '',
     );

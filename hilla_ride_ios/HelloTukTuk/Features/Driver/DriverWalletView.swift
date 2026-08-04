@@ -1,5 +1,6 @@
 import PhotosUI
 import SwiftUI
+import UIKit
 
 struct DriverWalletView: View {
     @EnvironmentObject private var appState: AppState
@@ -192,6 +193,30 @@ struct DriverWalletRechargeView: View {
                 Text(config.instructions(language: appState.language))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+
+                if !config.managerWhatsappDigits.isEmpty {
+                    Divider().padding(.vertical, 4)
+                    Text(isAr ? "واتساب استلام الإيصال" : "Send receipt on WhatsApp")
+                        .font(.subheadline.weight(.semibold))
+                    Text(config.managerWhatsappNumber)
+                        .font(.headline)
+                        .textSelection(.enabled)
+                    Button {
+                        openWhatsAppReceipt()
+                    } label: {
+                        Label(
+                            isAr ? "فتح واتساب وإرسال الإيصال" : "Open WhatsApp & send receipt",
+                            systemImage: "message.fill"
+                        )
+                    }
+                    Text(
+                        isAr
+                            ? "أرفق صورة الإيصال داخل واتساب بعد فتح المحادثة."
+                            : "Attach the receipt photo inside WhatsApp after the chat opens."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
 
             Section {
@@ -246,6 +271,44 @@ struct DriverWalletRechargeView: View {
         }
         .navigationTitle(isAr ? "شحن عبر سوبر كي" : "SuperQi recharge")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func openWhatsAppReceipt() {
+        let digits = config.managerWhatsappDigits
+        guard !digits.isEmpty else {
+            errorMessage = isAr
+                ? "لم يُضبط رقم واتساب الإدارة بعد"
+                : "Manager WhatsApp number is not set yet"
+            return
+        }
+        let amount = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ref = reference.trimmingCharacters(in: .whitespacesAndNewlines)
+        let message: String
+        if isAr {
+            message = """
+            شحن محفظة Hello Tuk-Tuk
+            السائق: \(driver.name)
+            الهاتف: \(driver.phone)
+            المبلغ: \(amount.isEmpty ? "—" : amount) د.ع
+            الطريقة: \(method)
+            المرجع: \(ref.isEmpty ? "—" : ref)
+            أرفق صورة إيصال الدفع في هذه المحادثة.
+            """
+        } else {
+            message = """
+            Hello Tuk-Tuk wallet recharge
+            Driver: \(driver.name)
+            Phone: \(driver.phone)
+            Amount: \(amount.isEmpty ? "—" : amount) IQD
+            Method: \(method)
+            Ref: \(ref.isEmpty ? "—" : ref)
+            Please attach the payment receipt screenshot here.
+            """
+        }
+        var components = URLComponents(string: "https://wa.me/\(digits)")
+        components?.queryItems = [URLQueryItem(name: "text", value: message)]
+        guard let url = components?.url else { return }
+        UIApplication.shared.open(url)
     }
 
     private func submit() async {

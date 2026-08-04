@@ -127,4 +127,15 @@ class WalletService {
   Future<void> saveConfig(WalletConfig config) async {
     await _functions.httpsCallable('saveWalletConfig').call(config.toMap());
   }
+
+  /// Backfill `walletBalanceIqd` / `walletStatus` on drivers missing them.
+  Future<({int updated, int total})> ensureDriverWallets() async {
+    final result =
+        await _functions.httpsCallable('ensureDriverWallets').call();
+    final data = Map<String, dynamic>.from(result.data as Map? ?? {});
+    return (
+      updated: (data['updated'] as num?)?.toInt() ?? 0,
+      total: (data['total'] as num?)?.toInt() ?? 0,
+    );
+  }
 }

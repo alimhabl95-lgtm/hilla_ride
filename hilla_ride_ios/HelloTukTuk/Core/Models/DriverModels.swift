@@ -112,6 +112,10 @@ struct DriverProfile: Identifiable, Equatable {
         monthlyRideCount = (data["monthlyRideCount"] as? NSNumber)?.intValue ?? 0
         monthlyMonthKey = data["monthlyMonthKey"] as? String ?? ""
         walletBalanceIqd = (data["walletBalanceIqd"] as? NSNumber)?.intValue ?? 0
-        walletStatus = data["walletStatus"] as? String ?? "active"
+        if let status = data["walletStatus"] as? String, !status.isEmpty {
+            walletStatus = status
+        } else {
+            walletStatus = walletBalanceIqd > 0 ? "active" : "blocked"
+        }
     }
 }

@@ -1219,6 +1219,21 @@ exports.setDriverApprovalStatus = functions.https.onCall(async (data, context) =
     }
   }
 
+  // Ensure every approved/pending driver has wallet fields for the driver apps.
+  if (existingData.walletBalanceIqd == null) {
+    update.walletBalanceIqd = 0;
+  }
+  if (!existingData.walletStatus) {
+    const balance =
+      existingData.walletBalanceIqd == null
+        ? 0
+        : Number(existingData.walletBalanceIqd) || 0;
+    update.walletStatus = balance > 0 ? "active" : "blocked";
+  }
+  if (!existingData.walletUpdatedAt && update.walletBalanceIqd != null) {
+    update.walletUpdatedAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
   await driverRef.set(update, { merge: true });
 
   functions.logger.info("setDriverApprovalStatus", {
@@ -1553,6 +1568,17 @@ exports.submitDriverRegistration = functions.https.onCall(async (data, context) 
   const existing = await driverRef.get();
   const existingData = existing.exists ? existing.data() || {} : {};
 
+  const walletPatch = {};
+  if (existingData.walletBalanceIqd == null) {
+    walletPatch.walletBalanceIqd = 0;
+  }
+  if (!existingData.walletStatus) {
+    walletPatch.walletStatus = "blocked";
+  }
+  if (!existingData.walletUpdatedAt) {
+    walletPatch.walletUpdatedAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
   await driverRef.set(
     {
       phone,
@@ -1570,6 +1596,7 @@ exports.submitDriverRegistration = functions.https.onCall(async (data, context) 
       hasActiveRide: false,
       cancelledRidesCount: existingData.cancelledRidesCount || 0,
       createdAt: existingData.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+      ...walletPatch,
     },
     { merge: true },
   );
@@ -2294,6 +2321,7 @@ async function getWalletConfig() {
     lowBalanceWarningIqd: Number(data.lowBalanceWarningIqd) || 5000,
     companySuperQiNumber: String(data.companySuperQiNumber || ""),
     companySuperQiName: String(data.companySuperQiName || "Hello Tuk-Tuk"),
+    managerWhatsappNumber: String(data.managerWhatsappNumber || ""),
     rechargeInstructionsEn: String(
       data.rechargeInstructionsEn ||
         "Transfer the amount to the company SuperQi number, then submit your receipt for verification.",
@@ -2383,6 +2411,7 @@ exports.saveWalletConfig = functions.https.onCall(async (data, context) => {
       companySuperQiName:
         String(data.companySuperQiName || "Hello Tuk-Tuk").trim() ||
         "Hello Tuk-Tuk",
+      managerWhatsappNumber: String(data.managerWhatsappNumber || "").trim(),
       rechargeInstructionsEn: String(data.rechargeInstructionsEn || "").trim(),
       rechargeInstructionsAr: String(data.rechargeInstructionsAr || "").trim(),
       enabledMethods,
@@ -2392,6 +2421,51 @@ exports.saveWalletConfig = functions.https.onCall(async (data, context) => {
     { merge: true },
   );
   return { ok: true };
+});
+
+/** One-time / ops: create wallet fields on drivers that never received them. */
+exports.ensureDriverWallets = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["wallet", "earnings", "allDrivers"]);
+  const db = admin.firestore();
+  const config = await getWalletConfig();
+  const snap = await db.collection("drivers").get();
+  let updated = 0;
+  let batch = db.batch();
+  let batchCount = 0;
+
+  for (const doc of snap.docs) {
+    const d = doc.data() || {};
+    if (d.walletBalanceIqd != null && d.walletStatus) continue;
+    const balance = Number(d.walletBalanceIqd) || 0;
+    const walletStatus =
+      d.walletStatus ||
+      deriveWalletStatus(balance, config.minBalanceIqd, config.lowBalanceWarningIqd);
+    batch.set(
+      doc.ref,
+      {
+        walletBalanceIqd: d.walletBalanceIqd == null ? 0 : balance,
+        walletStatus,
+        walletUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+    updated += 1;
+    batchCount += 1;
+    if (batchCount >= 400) {
+      await batch.commit();
+      batch = db.batch();
+      batchCount = 0;
+    }
+  }
+  if (batchCount > 0) {
+    await batch.commit();
+  }
+  functions.logger.info("ensureDriverWallets", {
+    updated,
+    total: snap.size,
+    by: context.auth.uid,
+  });
+  return { ok: true, updated, total: snap.size };
 });
 
 exports.submitWalletRechargeRequest = functions.https.onCall(async (data, context) => {
