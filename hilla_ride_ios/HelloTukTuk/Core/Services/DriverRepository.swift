@@ -103,7 +103,9 @@ final class DriverRepository {
                 throw DriverServiceError.walletBlocked
             }
 
-            let sub = BabilRegions.subDistrict(byId: subDistrictId)
+            let sub = await MainActor.run {
+                BabilRegions.subDistrict(byId: subDistrictId)
+            }
             var updates: [String: Any] = [
                 "isOnline": true,
                 "hasActiveRide": false,

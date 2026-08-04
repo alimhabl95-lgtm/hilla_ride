@@ -216,7 +216,7 @@ final class RideRepository {
         let driverRef = firestore.collection("drivers").document(driverId)
         let walletConfig = (try? await WalletService().fetchConfig()) ?? .default
 
-        try await firestore.runTransaction { transaction, errorPointer in
+        _ = try await firestore.runTransaction { transaction, errorPointer in
             let driverSnap: DocumentSnapshot
             let rideSnap: DocumentSnapshot
             do {

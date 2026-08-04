@@ -20,7 +20,7 @@ workflows:
         XCODE_PROJECT: hilla_ride_ios/HelloTukTuk.xcodeproj
         XCODE_SCHEME: HelloTukTuk
         MARKETING_VERSION: "2.2.0"
-        BUILD_NUMBER: "91"
+        BUILD_NUMBER: "92"
       xcode: latest
     triggering:
       events:
@@ -74,7 +74,7 @@ workflows:
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
             --archive-flags="-destination 'generic/platform=iOS'" \
-            --archive-xcargs "DEVELOPMENT_TEAM=XAZ6V7UTYT MARKETING_VERSION=${MARKETING_VERSION} CURRENT_PROJECT_VERSION=${BUILD_NUMBER} CODE_SIGN_STYLE=Manual COMPILER_INDEX_STORE_ENABLE=NO SWIFT_STRICT_CONCURRENCY=minimal SWIFT_VERSION=5.0" \
+            --archive-xcargs "DEVELOPMENT_TEAM=XAZ6V7UTYT MARKETING_VERSION=${MARKETING_VERSION} CURRENT_PROJECT_VERSION=${BUILD_NUMBER} CODE_SIGN_STYLE=Manual COMPILER_INDEX_STORE_ENABLE=NO SWIFT_STRICT_CONCURRENCY=minimal SWIFT_VERSION=5.0 SWIFT_DEFAULT_ACTOR_ISOLATION=nonisolated" \
             2>&1 | tee "$LOG_DIR/archive_export.log"
           ARCHIVE_STATUS=${PIPESTATUS[0]}
           set -e

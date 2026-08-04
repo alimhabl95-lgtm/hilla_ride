@@ -9,7 +9,8 @@ struct PhotoUploadField: View {
     @State private var selectedItem: PhotosPickerItem?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let language = appState.language
+        return VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.subheadline.bold())
 
@@ -30,23 +31,23 @@ struct PhotoUploadField: View {
                             Image(systemName: "camera.fill")
                                 .font(.title2)
                                 .foregroundStyle(BrandColors.teal)
-                            Text(L10n.string(.tapToUploadPhoto, language: appState.language))
+                            Text(L10n.string(.tapToUploadPhoto, language: language))
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
             }
-              .onChange(of: selectedItem) { newItem in
-    guard let newItem else { return }
-    Task {
-        if let data = try? await newItem.loadTransferable(type: Data.self) {
-            await MainActor.run {
-                imageData = data
+            .onChange(of: selectedItem) { newItem in
+                guard let newItem else { return }
+                Task {
+                    if let data = try? await newItem.loadTransferable(type: Data.self) {
+                        await MainActor.run {
+                            imageData = data
+                        }
+                    }
+                }
             }
-        }
-    }
-}
         }
     }
 }

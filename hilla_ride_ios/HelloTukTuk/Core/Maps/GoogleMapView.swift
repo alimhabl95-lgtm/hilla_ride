@@ -35,8 +35,9 @@ struct GoogleMapView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> GMSMapView {
         let camera = GMSCameraPosition.camera(withTarget: cameraTarget, zoom: zoom)
-        let mapView = GMSMapView(frame: .zero)
-        mapView.camera = camera
+        let options = GMSMapViewOptions()
+        options.camera = camera
+        let mapView = GMSMapView(options: options)
         mapView.isMyLocationEnabled = true
         mapView.settings.myLocationButton = false
         mapView.settings.compassButton = true
