@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/constants/babil_regions.dart';
+import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/wallet_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
@@ -60,11 +64,18 @@ class _AdminWalletPanelState extends State<AdminWalletPanel>
   }
 }
 
-class _PendingRechargesTab extends StatelessWidget {
+class _PendingRechargesTab extends StatefulWidget {
   const _PendingRechargesTab({required this.fare, required this.isAr});
 
   final FareService fare;
   final bool isAr;
+
+  @override
+  State<_PendingRechargesTab> createState() => _PendingRechargesTabState();
+}
+
+class _PendingRechargesTabState extends State<_PendingRechargesTab> {
+  String? _cityFilterId;
 
   void _openDriverWallet(BuildContext context, WalletRechargeRequest request) {
     Navigator.of(context).push(
@@ -78,11 +89,29 @@ class _PendingRechargesTab extends StatelessWidget {
     );
   }
 
+  String _districtIdFor(
+    WalletRechargeRequest req,
+    Map<String, DriverProfile> driversById,
+  ) {
+    if (req.districtId.isNotEmpty) return req.districtId;
+    return driversById[req.driverId]?.assignedDistrictId ?? '';
+  }
+
+  String _cityLabel(String districtId) {
+    if (districtId.isEmpty) {
+      return widget.isAr ? 'بدون مدينة' : 'No city';
+    }
+    final d = BabilRegions.districtById(districtId);
+    return widget.isAr ? d.nameAr : d.nameEn;
+  }
+
   Future<void> _review(
     BuildContext context, {
     required WalletRechargeRequest request,
     required bool approve,
   }) async {
+    final isAr = widget.isAr;
+    final fare = widget.fare;
     var reason = '';
     int? approvedAmount;
     if (!approve) {
@@ -198,104 +227,302 @@ class _PendingRechargesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = widget.isAr;
+    final fare = widget.fare;
     final wallet = context.watch<AppState>().walletService;
-    return StreamBuilder<List<WalletRechargeRequest>>(
-      stream: wallet.watchPendingRechargeRequests(),
-      builder: (context, snap) {
-        final items = snap.data ?? const [];
-        if (snap.connectionState == ConnectionState.waiting &&
-            !snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (items.isEmpty) {
-          return Center(
-            child: Text(isAr ? 'لا توجد طلبات معلّقة' : 'No pending requests'),
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final req = items[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
+    final admin = context.watch<AppState>().adminService;
+
+    return StreamBuilder<List<DriverProfile>>(
+      stream: admin.watchAllDrivers(),
+      builder: (context, driversSnap) {
+        final driversById = {
+          for (final d in driversSnap.data ?? const <DriverProfile>[]) d.uid: d,
+        };
+
+        return StreamBuilder<List<WalletRechargeRequest>>(
+          stream: wallet.watchPendingRechargeRequests(),
+          builder: (context, snap) {
+            final all = snap.data ?? const [];
+            if (snap.connectionState == ConnectionState.waiting &&
+                !snap.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final items = all.where((req) {
+              if (_cityFilterId == null) return true;
+              return _districtIdFor(req, driversById) == _cityFilterId;
+            }).toList();
+
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: DropdownButtonFormField<String?>(
+                    // ignore: deprecated_member_use
+                    value: _cityFilterId,
+                    decoration: InputDecoration(
+                      labelText: isAr ? 'تصفية حسب المدينة' : 'Filter by city',
+                      prefixIcon: const Icon(Icons.location_city_outlined),
+                    ),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(isAr ? 'كل المدن' : 'All cities'),
+                      ),
+                      for (final district in BabilRegions.districts)
+                        DropdownMenuItem<String?>(
+                          value: district.id,
                           child: Text(
-                            '${req.driverName.isEmpty ? req.driverId : req.driverName}'
-                            '${req.driverPhone.isNotEmpty ? ' • ${req.driverPhone}' : ''}',
-                            style: Theme.of(context).textTheme.titleMedium,
+                            isAr ? district.nameAr : district.nameEn,
                           ),
                         ),
-                        TextButton(
-                          onPressed: () => _openDriverWallet(context, req),
-                          child: Text(isAr ? 'المحفظة' : 'Wallet'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${fare.formatIqd(req.amountIqd)} • ${req.method.value}'
-                      '${req.referenceNumber.isNotEmpty ? ' • ref ${req.referenceNumber}' : ''}',
-                    ),
-                    if (req.notes.isNotEmpty) Text(req.notes),
-                    if (req.createdAt != null)
-                      Text(
-                        req.createdAt!.toLocal().toString().substring(0, 16),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    if (req.screenshotUrl.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          req.screenshotUrl,
-                          height: 160,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Text(
-                            isAr ? 'تعذّر تحميل الصورة' : 'Image failed to load',
-                          ),
-                        ),
-                      ),
                     ],
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () => _review(
-                              context,
-                              request: req,
-                              approve: true,
-                            ),
-                            child: Text(isAr ? 'موافقة' : 'Approve'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => _review(
-                              context,
-                              request: req,
-                              approve: false,
-                            ),
-                            child: Text(isAr ? 'رفض' : 'Reject'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    onChanged: (v) => setState(() => _cityFilterId = v),
+                  ),
                 ),
-              ),
+                Expanded(
+                  child: items.isEmpty
+                      ? Center(
+                          child: Text(
+                            isAr
+                                ? 'لا توجد طلبات معلّقة'
+                                : 'No pending requests',
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: items.length,
+                          itemBuilder: (context, index) {
+                            final req = items[index];
+                            final city =
+                                _cityLabel(_districtIdFor(req, driversById));
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${req.driverName.isEmpty ? req.driverId : req.driverName}'
+                                            '${req.driverPhone.isNotEmpty ? ' • ${req.driverPhone}' : ''}',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              _openDriverWallet(context, req),
+                                          child: Text(
+                                            isAr ? 'المحفظة' : 'Wallet',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      city,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: const Color(0xFF0F766E),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${fare.formatIqd(req.amountIqd)} • ${req.method.value}'
+                                      '${req.referenceNumber.isNotEmpty ? ' • ref ${req.referenceNumber}' : ''}',
+                                    ),
+                                    if (req.notes.isNotEmpty) Text(req.notes),
+                                    if (req.createdAt != null)
+                                      Text(
+                                        req.createdAt!
+                                            .toLocal()
+                                            .toString()
+                                            .substring(0, 16),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                    if (req.screenshotUrl.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      _WalletReceiptImage(
+                                        url: req.screenshotUrl,
+                                        isAr: isAr,
+                                      ),
+                                    ],
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: FilledButton(
+                                            onPressed: () => _review(
+                                              context,
+                                              request: req,
+                                              approve: true,
+                                            ),
+                                            child: Text(
+                                              isAr ? 'موافقة' : 'Approve',
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            onPressed: () => _review(
+                                              context,
+                                              request: req,
+                                              approve: false,
+                                            ),
+                                            child: Text(
+                                              isAr ? 'رفض' : 'Reject',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             );
           },
+        );
+      },
+    );
+  }
+}
+
+class _WalletReceiptImage extends StatefulWidget {
+  const _WalletReceiptImage({required this.url, required this.isAr});
+
+  final String url;
+  final bool isAr;
+
+  @override
+  State<_WalletReceiptImage> createState() => _WalletReceiptImageState();
+}
+
+class _WalletReceiptImageState extends State<_WalletReceiptImage> {
+  Future<Uint8List?>? _bytesFuture;
+  String? _loadedUrl;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loadedUrl == widget.url && _bytesFuture != null) return;
+    _loadedUrl = widget.url;
+    _bytesFuture = context
+        .read<AppState>()
+        .storageService
+        .loadBytesFromDownloadUrl(widget.url);
+  }
+
+  @override
+  void didUpdateWidget(covariant _WalletReceiptImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _loadedUrl = widget.url;
+      _bytesFuture = context
+          .read<AppState>()
+          .storageService
+          .loadBytesFromDownloadUrl(widget.url);
+    }
+  }
+
+  void _retry() {
+    setState(() {
+      _bytesFuture = context
+          .read<AppState>()
+          .storageService
+          .loadBytesFromDownloadUrl(widget.url);
+    });
+  }
+
+  void _preview(Uint8List bytes) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(ctx).width * 0.9,
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
+          ),
+          child: Column(
+            children: [
+              AppBar(
+                title: Text(widget.isAr ? 'إيصال الدفع' : 'Payment receipt'),
+                automaticallyImplyLeading: false,
+                actions: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: InteractiveViewer(
+                  child: Image.memory(bytes, fit: BoxFit.contain),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Uint8List?>(
+      future: _bytesFuture,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 160,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+        final bytes = snap.data;
+        if (bytes == null || bytes.isEmpty) {
+          return SizedBox(
+            height: 80,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.isAr ? 'تعذّر تحميل الصورة' : 'Image failed to load',
+                  ),
+                ),
+                IconButton(
+                  onPressed: _retry,
+                  icon: const Icon(Icons.refresh),
+                  tooltip: widget.isAr ? 'إعادة' : 'Retry',
+                ),
+              ],
+            ),
+          );
+        }
+        return InkWell(
+          onTap: () => _preview(bytes),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              bytes,
+              height: 160,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
         );
       },
     );

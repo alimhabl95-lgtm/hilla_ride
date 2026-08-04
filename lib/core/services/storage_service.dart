@@ -341,4 +341,49 @@ class StorageService {
 
     return null;
   }
+
+  /// Load image bytes via the Storage SDK (works on web; avoids CORS on download URLs).
+  Future<Uint8List?> loadBytesFromDownloadUrl(
+    String downloadUrl, {
+    int maxBytes = _maxPhotoBytes,
+  }) async {
+    final url = downloadUrl.trim();
+    if (url.isEmpty) return null;
+
+    if (_auth.currentUser == null) {
+      if (kDebugMode) {
+        debugPrint('Storage URL load blocked: user is not signed in.');
+      }
+      return null;
+    }
+
+    try {
+      final ref = _storage.refFromURL(url);
+      final data = await ref.getData(maxBytes);
+      if (data != null && data.isNotEmpty) return data;
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Storage getData from URL failed: $error');
+      }
+    }
+
+    // Path fallback for wallet receipts: .../wallet_recharges/{uid}/{file}
+    try {
+      final uri = Uri.parse(url);
+      final encoded = uri.pathSegments.contains('o')
+          ? uri.pathSegments[uri.pathSegments.indexOf('o') + 1]
+          : '';
+      final path = Uri.decodeComponent(encoded);
+      if (path.isNotEmpty) {
+        final data = await _storage.ref().child(path).getData(maxBytes);
+        if (data != null && data.isNotEmpty) return data;
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Storage path fallback failed: $error');
+      }
+    }
+
+    return null;
+  }
 }

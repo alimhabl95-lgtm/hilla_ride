@@ -198,6 +198,8 @@ class WalletRechargeRequest {
     this.screenshotUrl = '',
     this.driverName = '',
     this.driverPhone = '',
+    this.districtId = '',
+    this.subDistrictId = '',
     this.reviewedBy = '',
     this.reviewedAt,
     this.rejectionReason = '',
@@ -214,6 +216,8 @@ class WalletRechargeRequest {
   final String screenshotUrl;
   final String driverName;
   final String driverPhone;
+  final String districtId;
+  final String subDistrictId;
   final String reviewedBy;
   final DateTime? reviewedAt;
   final String rejectionReason;
@@ -234,6 +238,8 @@ class WalletRechargeRequest {
       screenshotUrl: data['screenshotUrl'] as String? ?? '',
       driverName: data['driverName'] as String? ?? '',
       driverPhone: data['driverPhone'] as String? ?? '',
+      districtId: data['districtId'] as String? ?? '',
+      subDistrictId: data['subDistrictId'] as String? ?? '',
       reviewedBy: data['reviewedBy'] as String? ?? '',
       reviewedAt: (data['reviewedAt'] as Timestamp?)?.toDate(),
       rejectionReason: data['rejectionReason'] as String? ?? '',

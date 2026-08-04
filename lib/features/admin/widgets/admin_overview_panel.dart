@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/models/announcement.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/wallet_models.dart';
@@ -32,6 +33,7 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
   List<Announcement> _announcements = const [];
   final _subs = <StreamSubscription>[];
   var _ready = false;
+  String? _cityFilterId;
 
   @override
   void initState() {
@@ -87,12 +89,31 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    bool rideInCity(Ride r) =>
+        _cityFilterId == null || r.districtId == _cityFilterId;
+    bool driverInCity(DriverProfile d) =>
+        _cityFilterId == null || d.assignedDistrictId == _cityFilterId;
+
+    final active = _active.where(rideInCity).toList();
+    final ridesMonth = _ridesMonth.where(rideInCity).toList();
+    final completedMonth = _completedMonth.where(rideInCity).toList();
+    final cancelledMonth = _cancelledMonth.where(rideInCity).toList();
+    final drivers = _drivers.where(driverInCity).toList();
+    final driversById = {for (final d in _drivers) d.uid: d};
+    final pendingRecharges = _pendingRecharges.where((req) {
+      if (_cityFilterId == null) return true;
+      final district = req.districtId.isNotEmpty
+          ? req.districtId
+          : (driversById[req.driverId]?.assignedDistrictId ?? '');
+      return district == _cityFilterId;
+    }).toList();
+
     final stats = AdminOverviewStats.compute(
-      activeRides: _active,
-      ridesSinceMonth: _ridesMonth,
-      completedSinceMonth: _completedMonth,
-      cancelledSinceMonth: _cancelledMonth,
-      drivers: _drivers,
+      activeRides: active,
+      ridesSinceMonth: ridesMonth,
+      completedSinceMonth: completedMonth,
+      cancelledSinceMonth: cancelledMonth,
+      drivers: drivers,
       customers: _customers,
     );
 
@@ -113,6 +134,28 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Colors.black54,
               ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String?>(
+          // ignore: deprecated_member_use
+          value: _cityFilterId,
+          decoration: InputDecoration(
+            labelText: isAr ? 'عرض حسب المدينة' : 'View by city',
+            prefixIcon: const Icon(Icons.location_city_outlined),
+            border: const OutlineInputBorder(),
+          ),
+          items: [
+            DropdownMenuItem<String?>(
+              value: null,
+              child: Text(isAr ? 'كل المدن' : 'All cities'),
+            ),
+            for (final district in BabilRegions.districts)
+              DropdownMenuItem<String?>(
+                value: district.id,
+                child: Text(isAr ? district.nameAr : district.nameEn),
+              ),
+          ],
+          onChanged: (v) => setState(() => _cityFilterId = v),
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -309,11 +352,11 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
               ),
               _WidgetCard(
                 title: isAr ? 'طلبات شحن المحفظة' : 'Wallet recharge requests',
-                child: _pendingRecharges.isEmpty
+                child: pendingRecharges.isEmpty
                     ? Text(isAr ? 'لا طلبات معلّقة' : 'No pending requests')
                     : Column(
                         children: [
-                          for (final r in _pendingRecharges.take(6))
+                          for (final r in pendingRecharges.take(6))
                             ListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,

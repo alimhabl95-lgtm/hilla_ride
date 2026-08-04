@@ -2506,6 +2506,8 @@ exports.submitWalletRechargeRequest = functions.https.onCall(async (data, contex
     driverId,
     driverName: String(driver.name || ""),
     driverPhone: String(driver.phone || ""),
+    districtId: String(driver.assignedDistrictId || "").trim(),
+    subDistrictId: String(driver.assignedSubDistrictId || "").trim(),
     method,
     amountIqd,
     screenshotUrl,
