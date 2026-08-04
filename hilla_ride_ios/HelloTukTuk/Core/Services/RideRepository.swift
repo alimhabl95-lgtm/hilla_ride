@@ -293,7 +293,7 @@ final class RideRepository {
     func rejectRide(rideId: String, driverId: String) async throws {
         let rideRef = firestore.collection("rides").document(rideId)
         let snapshot = try await rideRef.getDocument()
-        guard var data = snapshot.data() else { throw RideServiceError.rideNotFound }
+        guard let data = snapshot.data() else { throw RideServiceError.rideNotFound }
 
         let status = RideStatus.fromFirestore(data["status"] as? String)
         guard status == .matched else { throw RideServiceError.rideUnavailable }

@@ -26,12 +26,15 @@ final class BusinessService {
 
     func watchLiveBusinesses(typeId: String? = nil, limit: Int = 80) -> AsyncStream<[BusinessPartner]> {
         AsyncStream { continuation in
-            var query: Query = firestore.collection("businesses")
+            let base = firestore.collection("businesses")
                 .whereField("status", isEqualTo: "live")
-            if let typeId, !typeId.isEmpty {
-                query = query.whereField("typeId", isEqualTo: typeId)
-            }
-            let listener = query.limit(to: limit).addSnapshotListener { snapshot, _ in
+            let query: Query = {
+                if let typeId, !typeId.isEmpty {
+                    return base.whereField("typeId", isEqualTo: typeId).limit(to: limit)
+                }
+                return base.limit(to: limit)
+            }()
+            let listener = query.addSnapshotListener { snapshot, _ in
                 let items = (snapshot?.documents.compactMap {
                     BusinessPartner(documentID: $0.documentID, data: $0.data())
                 } ?? []).filter(\.isCustomerOrderable)
