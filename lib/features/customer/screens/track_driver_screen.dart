@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/constants/map_presence_config.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
@@ -9,6 +10,7 @@ import 'package:hilla_ride/core/services/driving_distance_service.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/nearby_providers_service.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/core/widgets/map_camera_helper.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
 import 'package:hilla_ride/core/widgets/marker_animator.dart';
@@ -301,7 +303,7 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
                       Polyline(
                         polylineId: const PolylineId('route'),
                         points: _routePoints,
-                        color: const Color(0xFF0F766E),
+                        color: AppBrandAssets.brandTealDark,
                         width: 5,
                       ),
                     }
@@ -325,161 +327,194 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
                         ),
                         if (driverPos == null)
                           Positioned(
-                            top: 12,
-                            left: 12,
-                            right: 12,
-                            child: Material(
-                              elevation: 2,
-                              borderRadius: BorderRadius.circular(12),
-                              color: Theme.of(context).colorScheme.surface,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                child: Row(
-                                  children: [
-                                    SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        l10n.noLocationYet,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                            top: AppSpacing.md,
+                            left: AppSpacing.md,
+                            right: AppSpacing.md,
+                            child: AppBanner(
+                              message: l10n.noLocationYet,
+                              icon: Icons.location_searching,
+                              tone: AppBannerTone.info,
                             ),
                           ),
                       ],
                     ),
                   ),
-                  Material(
-                    elevation: 8,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              ProfileAvatarCircle.driver(
-                                driverId: driverId,
-                                name: driver?.name ?? '',
-                                profilePhotoUrl: driver?.profilePhotoUrl ?? '',
-                                radius: 28,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _statusText(l10n, ride.status),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium,
-                                    ),
-                                    Text(driver?.name ?? ''),
-                                    Text(
-                                      '${isArabic ? 'توك توك' : 'Tuk-Tuk'}'
-                                      '${(driver?.vehiclePlate ?? '').isNotEmpty ? ' • ${driver!.vehiclePlate}' : ''}',
-                                    ),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.star,
-                                            size: 16, color: Color(0xFFE6A800)),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          (driver?.rating ?? 5)
-                                              .toStringAsFixed(1),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(AppRadii.xl),
+                      ),
+                      boxShadow: AppShadows.card,
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          AppSpacing.sm,
+                          AppSpacing.lg,
+                          AppSpacing.lg,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const AppSheetHandle(),
+                            const SizedBox(height: AppSpacing.md),
+                            Row(
+                              children: [
+                                ProfileAvatarCircle.driver(
+                                  driverId: driverId,
+                                  name: driver?.name ?? '',
+                                  profilePhotoUrl:
+                                      driver?.profilePhotoUrl ?? '',
+                                  radius: 28,
                                 ),
-                              ),
-                            ],
-                          ),
-                          if (_etaMinutes != null || _distanceKm != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              [
-                                if (_etaMinutes != null)
-                                  '${isArabic ? 'الوصول خلال' : 'ETA'} $_etaMinutes ${l10n.minutes}',
-                                if (_distanceKm != null)
-                                  '${_distanceKm!.toStringAsFixed(1)} ${isArabic ? 'كم' : 'km'}',
-                              ].join(' • '),
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          Text(
-                            '${l10n.cashFare}: ${_fareService.formatIqd(ride.fareAmountIqd, locale: l10n.localeName)}',
-                          ),
-                          Text(l10n.paymentMethodCash),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _callDriver(driver?.phone),
-                                  icon: const Icon(Icons.phone),
-                                  label: Text(isArabic ? 'اتصال' : 'Call'),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: currentUser == null
-                                      ? null
-                                      : () async {
-                                          final profile = await authService
-                                              .watchCurrentProfile()
-                                              .first;
-                                          if (!context.mounted) return;
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) => RideChatScreen(
-                                                rideId: widget.rideId,
-                                                currentUserId: currentUser.uid,
-                                                currentUserRole:
-                                                    UserRole.customer,
-                                                currentUserName: profile?.name ??
-                                                    l10n.roleCustomer,
-                                              ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _statusText(l10n, ride.status),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: AppBrandAssets.brandNavy,
                                             ),
-                                          );
-                                        },
-                                  icon: const Icon(Icons.chat_bubble_outline),
-                                  label: Text(l10n.openChat),
+                                      ),
+                                      Text(
+                                        driver?.name ?? '',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      Text(
+                                        '${isArabic ? 'توك توك' : 'Tuk-Tuk'}'
+                                        '${(driver?.vehiclePlate ?? '').isNotEmpty ? ' • ${driver!.vehiclePlate}' : ''}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: AppBrandAssets.brandMuted,
+                                            ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.star,
+                                            size: 16,
+                                            color: AppBrandAssets.brandGold,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            (driver?.rating ?? 5)
+                                                .toStringAsFixed(1),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_etaMinutes != null || _distanceKm != null) ...[
+                              const SizedBox(height: AppSpacing.md),
+                              Row(
+                                children: [
+                                  if (_etaMinutes != null)
+                                    Expanded(
+                                      child: AppStatCard(
+                                        label: l10n.minutes,
+                                        value: '$_etaMinutes',
+                                        icon: Icons.schedule,
+                                      ),
+                                    ),
+                                  if (_etaMinutes != null &&
+                                      _distanceKm != null)
+                                    const SizedBox(width: AppSpacing.md),
+                                  if (_distanceKm != null)
+                                    Expanded(
+                                      child: AppStatCard(
+                                        label: isArabic ? 'كم' : 'km',
+                                        value:
+                                            _distanceKm!.toStringAsFixed(1),
+                                        icon: Icons.route,
+                                        accent: AppBrandAssets.brandGold,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                            const SizedBox(height: AppSpacing.md),
+                            AppBanner(
+                              message:
+                                  '${l10n.cashFare}: ${_fareService.formatIqd(ride.fareAmountIqd, locale: l10n.localeName)} • ${l10n.paymentMethodCash}',
+                              icon: Icons.payments_outlined,
+                              tone: AppBannerTone.info,
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: AppSecondaryButton(
+                                    label: isArabic ? 'اتصال' : 'Call',
+                                    icon: Icons.phone,
+                                    onPressed: () =>
+                                        _callDriver(driver?.phone),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: AppSecondaryButton(
+                                    label: l10n.openChat,
+                                    icon: Icons.chat_bubble_outline,
+                                    onPressed: currentUser == null
+                                        ? null
+                                        : () async {
+                                            final profile = await authService
+                                                .watchCurrentProfile()
+                                                .first;
+                                            if (!context.mounted) return;
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => RideChatScreen(
+                                                  rideId: widget.rideId,
+                                                  currentUserId:
+                                                      currentUser.uid,
+                                                  currentUserRole:
+                                                      UserRole.customer,
+                                                  currentUserName:
+                                                      profile?.name ??
+                                                          l10n.roleCustomer,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (customerCanCancelRide(ride.status)) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              AppSecondaryButton(
+                                label: l10n.cancel,
+                                destructive: true,
+                                onPressed: () => cancelCustomerRideAndExit(
+                                  context,
+                                  widget.rideId,
                                 ),
                               ),
                             ],
-                          ),
-                          if (customerCanCancelRide(ride.status)) ...[
-                            const SizedBox(height: 8),
-                            OutlinedButton(
-                              onPressed: () => cancelCustomerRideAndExit(
-                                context,
-                                widget.rideId,
-                              ),
-                              child: Text(l10n.cancel),
-                            ),
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),

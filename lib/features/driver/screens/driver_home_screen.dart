@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/promo_models.dart';
+import 'package:hilla_ride/core/models/wallet_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
-import 'package:hilla_ride/core/models/wallet_models.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/driver/screens/driver_rewards_screen.dart';
 import 'package:hilla_ride/features/driver/screens/driver_wallet_screen.dart';
 import 'package:hilla_ride/features/driver/widgets/driver_delivery_orders_panel.dart';
@@ -113,43 +115,56 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
+  void _openWallet(DriverProfile driver) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DriverWalletScreen(driver: driver),
+      ),
+    );
+  }
+
   Widget _actionButton({
     required String rideId,
     required String action,
     required String label,
     required Future<void> Function() onPressed,
+    IconData? icon,
   }) {
-    final pending = _isActionPending(rideId, action);
-    return FilledButton(
-      onPressed: pending
+    return AppPrimaryButton(
+      label: label,
+      icon: icon,
+      isLoading: _isActionPending(rideId, action),
+      onPressed: _isActionPending(rideId, action)
           ? null
           : () => _runRideAction(
                 rideId: rideId,
                 action: action,
                 task: onPressed,
               ),
-      child: pending
-          ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Text(label),
     );
+  }
+
+  String _availabilityHint(DriverProfile driver, AppLocalizations l10n) {
+    if (!driver.hasAssignedWorkArea) {
+      return l10n.driverWorkDistrictRequired;
+    }
+    return driver.isOnline ? l10n.waitingForRides : l10n.goOnline;
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isAr = l10n.localeName.startsWith('ar');
     final rideService = context.read<AppState>().rideService;
     const fareService = FareService();
 
     return Scaffold(
+      backgroundColor: AppBrandAssets.brandSurface,
       appBar: AppBar(
         title: Text(l10n.roleDriver),
         actions: [
           IconButton(
-            tooltip: l10n.localeName.startsWith('ar') ? 'المكافآت' : 'Rewards',
+            tooltip: isAr ? 'المكافآت' : 'Rewards',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -160,28 +175,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             icon: const Icon(Icons.emoji_events_outlined),
           ),
           IconButton(
-            tooltip: l10n.localeName.startsWith('ar') ? 'المحفظة' : 'Wallet',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => DriverWalletScreen(driver: widget.driver),
-                ),
-              );
-            },
+            tooltip: isAr ? 'المحفظة' : 'Wallet',
+            onPressed: () => _openWallet(widget.driver),
             icon: const Icon(Icons.account_balance_wallet_outlined),
           ),
-          Switch(
-            value: widget.driver.isOnline,
-            onChanged: _isUpdatingOnline || !widget.driver.hasAssignedWorkArea
-                ? null
-                : _toggleOnline,
-          ),
-          Padding(
-            padding: const EdgeInsetsDirectional.only(end: 12),
-            child: Center(
-              child: Text(widget.driver.isOnline ? l10n.goOnline : l10n.goOffline),
-            ),
-          ),
+          const SizedBox(width: AppSpacing.sm),
         ],
       ),
       body: StreamBuilder<DriverProfile?>(
@@ -202,12 +200,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               return Column(
                 children: [
                   if (!driver.hasAssignedWorkArea)
-                    MaterialBanner(
-                      content: Text(l10n.driverWorkDistrictRequired),
-                      leading: const Icon(Icons.location_city_outlined),
-                      backgroundColor:
-                          Theme.of(context).colorScheme.errorContainer,
-                      actions: const [SizedBox.shrink()],
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.lg,
+                        AppSpacing.md,
+                        AppSpacing.lg,
+                        0,
+                      ),
+                      child: AppBanner(
+                        message: l10n.driverWorkDistrictRequired,
+                        icon: Icons.location_city_outlined,
+                        tone: AppBannerTone.danger,
+                      ),
                     ),
                   StreamBuilder<WalletConfig>(
                     stream:
@@ -221,34 +225,27 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       if (!low && !blocked) {
                         return const SizedBox.shrink();
                       }
-                      final isAr = l10n.localeName.startsWith('ar');
-                      return MaterialBanner(
-                        content: Text(
-                          blocked
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          AppSpacing.md,
+                          AppSpacing.lg,
+                          0,
+                        ),
+                        child: AppBanner(
+                          message: blocked
                               ? (isAr
                                   ? 'المحفظة محظورة — اشحن لاستقبال الرحلات'
                                   : 'Wallet blocked — recharge to receive trips')
                               : (isAr
                                   ? 'رصيد المحفظة منخفض'
                                   : 'Wallet balance is low'),
+                          icon: Icons.account_balance_wallet_outlined,
+                          tone: blocked
+                              ? AppBannerTone.danger
+                              : AppBannerTone.warning,
+                          onTap: () => _openWallet(driver),
                         ),
-                        leading: Icon(
-                          Icons.account_balance_wallet,
-                          color: blocked ? Colors.red : const Color(0xFFD97706),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      DriverWalletScreen(driver: driver),
-                                ),
-                              );
-                            },
-                            child: Text(isAr ? 'شحن' : 'Recharge'),
-                          ),
-                        ],
                       );
                     },
                   ),
@@ -256,399 +253,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     child: Builder(
                       builder: (context) {
                         if (activeRide == null) {
-                          return ListView(
-                            padding: const EdgeInsets.all(24),
-                            children: [
-                              DriverDeliveryOrdersPanel(driverId: driver.uid),
-                              StreamBuilder<DriverMonthlyStats>(
-                                stream: context
-                                    .read<AppState>()
-                                    .monthlyPrizeService
-                                    .watchDriverStats(driver.uid),
-                                builder: (context, statsSnapshot) {
-                                  final stats = statsSnapshot.data;
-                                  if (stats == null) {
-                                    return const SizedBox.shrink();
-                                  }
-
-                                  return Card(
-                                    color: const Color(0xFF0F766E)
-                                        .withValues(alpha: 0.08),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(20),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              const Icon(
-                                                Icons.emoji_events_outlined,
-                                                color: Color(0xFFD97706),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: Text(
-                                                  l10n.driverMonthlyPrizeTitle,
-                                                  style: Theme.of(context)
-                                                      .textTheme
-                                                      .titleMedium,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Text(
-                                            l10n.driverMonthlyRideCount(
-                                              stats.rideCount,
-                                            ),
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .headlineSmall
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            l10n.driverMonthlyRank(
-                                              stats.rank,
-                                              stats.rideCount,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            l10n.driverMonthlyPrizeAmount(
-                                              fareService.formatIqd(
-                                                stats.prizeAmountIqd,
-                                                locale: l10n.localeName,
-                                              ),
-                                            ),
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyMedium
-                                                ?.copyWith(
-                                                  color:
-                                                      const Color(0xFFD97706),
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              Card(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        l10n.yourEarningsTitle,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '${l10n.monthlyRidesCount}: ${driver.monthlyRideCount}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall,
-                                      ),
-                                      Text(
-                                        '${l10n.completedRidesCount}: ${driver.completedRidesCount}',
-                                      ),
-                                      Text(
-                                        '${l10n.driverNetEarnings}: ${fareService.formatIqd(driver.outstandingDriverEarningsIqd, locale: l10n.localeName)}',
-                                      ),
-                                      Text(
-                                        '${l10n.owedToPlatformLabel}: ${fareService.formatIqd(driver.owedPlatformCommissionIqd, locale: l10n.localeName)}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall,
-                                      ),
-                                      if (driver.pendingBonusIqd > 0)
-                                        Text(
-                                          '${l10n.pendingBonusLabel}: ${fareService.formatIqd(driver.pendingBonusIqd, locale: l10n.localeName)}',
-                                        ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '${l10n.localeName.startsWith('ar') ? 'رصيد المحفظة' : 'Wallet balance'}: ${fareService.formatIqd(driver.walletBalanceIqd, locale: l10n.localeName)}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall
-                                            ?.copyWith(
-                                              color: const Color(0xFF0F766E),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  DriverWalletScreen(
-                                                driver: driver,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        child: Text(
-                                          l10n.localeName.startsWith('ar')
-                                              ? 'فتح المحفظة / شحن'
-                                              : 'Open wallet / recharge',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              Center(
-                                child: Text(
-                                  driver.isOnline
-                                      ? l10n.waitingForRides
-                                      : l10n.goOnline,
-                                ),
-                              ),
-                            ],
+                          return _IdleDriverPanel(
+                            driver: driver,
+                            l10n: l10n,
+                            fareService: fareService,
+                            isUpdatingOnline: _isUpdatingOnline,
+                            onToggleOnline: _toggleOnline,
+                            onOpenWallet: () => _openWallet(driver),
+                            availabilityHint: _availabilityHint(driver, l10n),
                           );
                         }
 
-                        return Column(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: DriverRideMapPanel(
-                                ride: activeRide,
-                                driver: driver,
-                              ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: ListView(
-                                padding: const EdgeInsets.all(16),
-                                children: [
-                                  Card(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(20),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          StreamBuilder<AppUser?>(
-                                            stream: context
-                                                .read<AppState>()
-                                                .authService
-                                                .watchUser(activeRide.customerId),
-                                            builder: (context, customerSnapshot) {
-                                              final customer =
-                                                  customerSnapshot.data;
-                                              return Row(
-                                                children: [
-                                                  ProfileAvatarCircle.customer(
-                                                    userId: activeRide.customerId,
-                                                    name: customer?.name ?? '',
-                                                    profilePhotoUrl:
-                                                        customer?.profilePhotoUrl ??
-                                                            '',
-                                                    radius: 28,
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          l10n.newRideRequest,
-                                                          style: Theme.of(context)
-                                                              .textTheme
-                                                              .titleLarge,
-                                                        ),
-                                                        if (customer?.name
-                                                                .isNotEmpty ==
-                                                            true)
-                                                          Text(customer!.name),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          ),
-                                          const SizedBox(height: 12),
-                                          _TripLocationTile(
-                                            icon: Icons.trip_origin,
-                                            iconColor: const Color(0xFF16A34A),
-                                            title: l10n.pickup,
-                                            label: activeRide.pickupLabel,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          _TripLocationTile(
-                                            icon: Icons.flag_rounded,
-                                            iconColor: const Color(0xFFDC2626),
-                                            title: l10n.destination,
-                                            label: activeRide.destinationLabel,
-                                          ),
-                                          Text(
-                                            '${l10n.cashFare}: ${fareService.formatIqd(activeRide.fareAmountIqd, locale: l10n.localeName)}',
-                                          ),
-                                          if (activeRide.status ==
-                                              RideStatus.completed)
-                                            RideEarningsSummary(
-                                              ride: activeRide,
-                                              showDriverNet: true,
-                                            ),
-                                          const SizedBox(height: 16),
-                                          if (activeRide.status ==
-                                              RideStatus.matched) ...[
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: OutlinedButton(
-                                                    onPressed: _isActionPending(
-                                                            activeRide.id,
-                                                            'reject')
-                                                        ? null
-                                                        : () => _runRideAction(
-                                                              rideId:
-                                                                  activeRide.id,
-                                                              action: 'reject',
-                                                              task: () =>
-                                                                  rideService
-                                                                      .rejectRide(
-                                                                rideId:
-                                                                    activeRide
-                                                                        .id,
-                                                                driverId:
-                                                                    driver.uid,
-                                                              ),
-                                                            ),
-                                                    child: _isActionPending(
-                                                            activeRide.id,
-                                                            'reject')
-                                                        ? const SizedBox(
-                                                            height: 20,
-                                                            width: 20,
-                                                            child:
-                                                                CircularProgressIndicator(
-                                                              strokeWidth: 2,
-                                                            ),
-                                                          )
-                                                        : Text(l10n.rejectRide),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  child: _actionButton(
-                                                    rideId: activeRide.id,
-                                                    action: 'accept',
-                                                    label: l10n.acceptRide,
-                                                    onPressed: () async {
-                                                      try {
-                                                        await rideService
-                                                            .acceptRide(
-                                                          rideId: activeRide.id,
-                                                          driverId: driver.uid,
-                                                        );
-                                                      } catch (error) {
-                                                        if (!mounted) return;
-                                                        final isAr = l10n
-                                                            .localeName
-                                                            .startsWith('ar');
-                                                        final message = error
-                                                                    is StateError &&
-                                                                error.message ==
-                                                                    'wallet_blocked'
-                                                            ? (isAr
-                                                                ? 'رصيد المحفظة غير كافٍ — اشحن المحفظة أولاً'
-                                                                : 'Wallet balance too low — recharge first')
-                                                            : '$error';
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          SnackBar(
-                                                            content:
-                                                                Text(message),
-                                                          ),
-                                                        );
-                                                      }
-                                                    },
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                          if (activeRide.status ==
-                                              RideStatus.accepted)
-                                            _actionButton(
-                                              rideId: activeRide.id,
-                                              action: 'start',
-                                              label: l10n.startRide,
-                                              onPressed: () => rideService
-                                                  .startRide(activeRide.id),
-                                            ),
-                                          if (activeRide.status ==
-                                              RideStatus.inProgress)
-                                            _actionButton(
-                                              rideId: activeRide.id,
-                                              action: 'end',
-                                              label: l10n.endRide,
-                                              onPressed: () => rideService
-                                                  .endRideAwaitingCash(
-                                                activeRide.id,
-                                              ),
-                                            ),
-                                          if (activeRide.status ==
-                                                  RideStatus
-                                                      .awaitingCashPayment &&
-                                              !activeRide.cashCollectedByDriver)
-                                            _actionButton(
-                                              rideId: activeRide.id,
-                                              action: 'cash',
-                                              label: l10n.cashCollected,
-                                              onPressed: () =>
-                                                  _confirmCashCollected(
-                                                activeRide,
-                                              ),
-                                            ),
-                                          const SizedBox(height: 12),
-                                          OutlinedButton.icon(
-                                            onPressed: () {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      RideChatScreen(
-                                                    rideId: activeRide.id,
-                                                    currentUserId: driver.uid,
-                                                    currentUserRole:
-                                                        UserRole.driver,
-                                                    currentUserName:
-                                                        driver.name,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            icon: const Icon(
-                                              Icons.chat_bubble_outline,
-                                            ),
-                                            label: Text(l10n.openChat),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        return _ActiveRidePanel(
+                          ride: activeRide,
+                          driver: driver,
+                          l10n: l10n,
+                          fareService: fareService,
+                          isActionPending: _isActionPending,
+                          runRideAction: _runRideAction,
+                          actionButton: _actionButton,
+                          onConfirmCash: _confirmCashCollected,
                         );
                       },
                     ),
@@ -659,6 +283,563 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+class _IdleDriverPanel extends StatelessWidget {
+  const _IdleDriverPanel({
+    required this.driver,
+    required this.l10n,
+    required this.fareService,
+    required this.isUpdatingOnline,
+    required this.onToggleOnline,
+    required this.onOpenWallet,
+    required this.availabilityHint,
+  });
+
+  final DriverProfile driver;
+  final AppLocalizations l10n;
+  final FareService fareService;
+  final bool isUpdatingOnline;
+  final Future<void> Function(bool) onToggleOnline;
+  final VoidCallback onOpenWallet;
+  final String availabilityHint;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = l10n.localeName.startsWith('ar');
+
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      children: [
+        AppWalletCard(
+          title: isAr ? 'رصيد المحفظة' : 'Wallet balance',
+          balanceLabel: fareService.formatIqd(
+            driver.walletBalanceIqd,
+            locale: l10n.localeName,
+          ),
+          subtitle: driver.isOnline
+              ? (isAr ? 'متصل — بانتظار الطلبات' : 'Online — waiting for trips')
+              : (isAr ? 'غير متصل' : 'Offline'),
+          actionLabel: isAr ? 'فتح المحفظة / شحن' : 'Open wallet / recharge',
+          onAction: onOpenWallet,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        AppCard(
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isAr ? 'التوفر' : 'Availability',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppBrandAssets.brandNavy,
+                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      driver.isOnline ? l10n.goOnline : l10n.goOffline,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: driver.isOnline
+                                ? AppBrandAssets.brandTealDark
+                                : AppBrandAssets.brandMuted,
+                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      availabilityHint,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: driver.hasAssignedWorkArea
+                                ? AppBrandAssets.brandMuted
+                                : AppBrandAssets.brandDanger,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isUpdatingOnline)
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: AppBrandAssets.brandTeal,
+                  ),
+                )
+              else
+                Switch(
+                  value: driver.isOnline,
+                  activeTrackColor: AppBrandAssets.brandTeal,
+                  activeThumbColor: Colors.white,
+                  onChanged: !driver.hasAssignedWorkArea
+                      ? null
+                      : onToggleOnline,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        DriverDeliveryOrdersPanel(driverId: driver.uid),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: AppStatCard(
+                label: l10n.completedRidesCount,
+                value: '${driver.completedRidesCount}',
+                icon: Icons.check_circle_outline,
+                accent: AppBrandAssets.brandTealDark,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: AppStatCard(
+                label: l10n.monthlyRidesCount,
+                value: '${driver.monthlyRideCount}',
+                icon: Icons.calendar_month_outlined,
+                accent: AppBrandAssets.brandGoldDark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        StreamBuilder<DriverMonthlyStats>(
+          stream: context
+              .read<AppState>()
+              .monthlyPrizeService
+              .watchDriverStats(driver.uid),
+          builder: (context, statsSnapshot) {
+            final stats = statsSnapshot.data;
+            if (stats == null) {
+              return const SizedBox.shrink();
+            }
+
+            return AppCard(
+              color: AppBrandAssets.brandTeal.withValues(alpha: 0.08),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppBrandAssets.brandGold.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(AppRadii.sm),
+                        ),
+                        child: const Icon(
+                          Icons.emoji_events_outlined,
+                          color: AppBrandAssets.brandGoldDark,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          l10n.driverMonthlyPrizeTitle,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    l10n.driverMonthlyRideCount(stats.rideCount),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppBrandAssets.brandNavy,
+                        ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(l10n.driverMonthlyRank(stats.rank, stats.rideCount)),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    l10n.driverMonthlyPrizeAmount(
+                      fareService.formatIqd(
+                        stats.prizeAmountIqd,
+                        locale: l10n.localeName,
+                      ),
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppBrandAssets.brandGoldDark,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.yourEarningsTitle,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppBrandAssets.brandNavy,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _EarningsRow(
+                label: l10n.monthlyRidesCount,
+                value: '${driver.monthlyRideCount}',
+              ),
+              _EarningsRow(
+                label: l10n.completedRidesCount,
+                value: '${driver.completedRidesCount}',
+              ),
+              _EarningsRow(
+                label: l10n.driverNetEarnings,
+                value: fareService.formatIqd(
+                  driver.outstandingDriverEarningsIqd,
+                  locale: l10n.localeName,
+                ),
+                emphasized: true,
+              ),
+              _EarningsRow(
+                label: l10n.owedToPlatformLabel,
+                value: fareService.formatIqd(
+                  driver.owedPlatformCommissionIqd,
+                  locale: l10n.localeName,
+                ),
+              ),
+              if (driver.pendingBonusIqd > 0)
+                _EarningsRow(
+                  label: l10n.pendingBonusLabel,
+                  value: fareService.formatIqd(
+                    driver.pendingBonusIqd,
+                    locale: l10n.localeName,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Center(
+          child: Text(
+            driver.isOnline ? l10n.waitingForRides : l10n.goOnline,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: AppBrandAssets.brandMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EarningsRow extends StatelessWidget {
+  const _EarningsRow({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppBrandAssets.brandMuted,
+                  ),
+            ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: emphasized ? FontWeight.w700 : FontWeight.w600,
+                  color: emphasized
+                      ? AppBrandAssets.brandTealDark
+                      : AppBrandAssets.brandNavy,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActiveRidePanel extends StatelessWidget {
+  const _ActiveRidePanel({
+    required this.ride,
+    required this.driver,
+    required this.l10n,
+    required this.fareService,
+    required this.isActionPending,
+    required this.runRideAction,
+    required this.actionButton,
+    required this.onConfirmCash,
+  });
+
+  final Ride ride;
+  final DriverProfile driver;
+  final AppLocalizations l10n;
+  final FareService fareService;
+  final bool Function(String rideId, String action) isActionPending;
+  final Future<void> Function({
+    required String rideId,
+    required String action,
+    required Future<void> Function() task,
+  }) runRideAction;
+  final Widget Function({
+    required String rideId,
+    required String action,
+    required String label,
+    required Future<void> Function() onPressed,
+    IconData? icon,
+  }) actionButton;
+  final Future<void> Function(Ride ride) onConfirmCash;
+
+  @override
+  Widget build(BuildContext context) {
+    final rideService = context.read<AppState>().rideService;
+    final isMatched = ride.status == RideStatus.matched;
+
+    return Column(
+      children: [
+        Expanded(
+          child: DriverRideMapPanel(
+            ride: ride,
+            driver: driver,
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            child: AppFloatingPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (isMatched)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: AppBanner(
+                        message: l10n.newRideRequest,
+                        icon: Icons.notifications_active_outlined,
+                        tone: AppBannerTone.warning,
+                      ),
+                    ),
+                  StreamBuilder<AppUser?>(
+                    stream: context
+                        .read<AppState>()
+                        .authService
+                        .watchUser(ride.customerId),
+                    builder: (context, customerSnapshot) {
+                      final customer = customerSnapshot.data;
+                      return Row(
+                        children: [
+                          ProfileAvatarCircle.customer(
+                            userId: ride.customerId,
+                            name: customer?.name ?? '',
+                            profilePhotoUrl: customer?.profilePhotoUrl ?? '',
+                            radius: 28,
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.newRideRequest,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: AppBrandAssets.brandNavy,
+                                      ),
+                                ),
+                                if (customer?.name.isNotEmpty == true)
+                                  Text(
+                                    customer!.name,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: AppBrandAssets.brandMuted,
+                                        ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppBrandAssets.brandGold
+                                  .withValues(alpha: 0.15),
+                              borderRadius:
+                                  BorderRadius.circular(AppRadii.pill),
+                            ),
+                            child: Text(
+                              fareService.formatIqd(
+                                ride.fareAmountIqd,
+                                locale: l10n.localeName,
+                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: AppBrandAssets.brandGoldDark,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _TripLocationTile(
+                    icon: Icons.trip_origin,
+                    iconColor: AppBrandAssets.brandSuccess,
+                    title: l10n.pickup,
+                    label: ride.pickupLabel,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _TripLocationTile(
+                    icon: Icons.flag_rounded,
+                    iconColor: AppBrandAssets.brandDanger,
+                    title: l10n.destination,
+                    label: ride.destinationLabel,
+                  ),
+                  if (ride.status == RideStatus.completed) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    RideEarningsSummary(
+                      ride: ride,
+                      showDriverNet: true,
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.lg),
+                  if (isMatched) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppSecondaryButton(
+                            label: l10n.rejectRide,
+                            destructive: true,
+                            onPressed: isActionPending(ride.id, 'reject')
+                                ? null
+                                : () => runRideAction(
+                                      rideId: ride.id,
+                                      action: 'reject',
+                                      task: () => rideService.rejectRide(
+                                        rideId: ride.id,
+                                        driverId: driver.uid,
+                                      ),
+                                    ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: actionButton(
+                            rideId: ride.id,
+                            action: 'accept',
+                            label: l10n.acceptRide,
+                            icon: Icons.check_rounded,
+                            onPressed: () async {
+                              try {
+                                await rideService.acceptRide(
+                                  rideId: ride.id,
+                                  driverId: driver.uid,
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                final isAr =
+                                    l10n.localeName.startsWith('ar');
+                                final message = error is StateError &&
+                                        error.message == 'wallet_blocked'
+                                    ? (isAr
+                                        ? 'رصيد المحفظة غير كافٍ — اشحن المحفظة أولاً'
+                                        : 'Wallet balance too low — recharge first')
+                                    : '$error';
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(message)),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (ride.status == RideStatus.accepted)
+                    actionButton(
+                      rideId: ride.id,
+                      action: 'start',
+                      label: l10n.startRide,
+                      icon: Icons.play_arrow_rounded,
+                      onPressed: () => rideService.startRide(ride.id),
+                    ),
+                  if (ride.status == RideStatus.inProgress)
+                    actionButton(
+                      rideId: ride.id,
+                      action: 'end',
+                      label: l10n.endRide,
+                      icon: Icons.flag_circle_outlined,
+                      onPressed: () =>
+                          rideService.endRideAwaitingCash(ride.id),
+                    ),
+                  if (ride.status == RideStatus.awaitingCashPayment &&
+                      !ride.cashCollectedByDriver)
+                    actionButton(
+                      rideId: ride.id,
+                      action: 'cash',
+                      label: l10n.cashCollected,
+                      icon: Icons.payments_outlined,
+                      onPressed: () => onConfirmCash(ride),
+                    ),
+                  const SizedBox(height: AppSpacing.md),
+                  AppSecondaryButton(
+                    label: l10n.openChat,
+                    icon: Icons.chat_bubble_outline,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RideChatScreen(
+                            rideId: ride.id,
+                            currentUserId: driver.uid,
+                            currentUserRole: UserRole.driver,
+                            currentUserName: driver.name,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -681,8 +862,15 @@ class _TripLocationTile extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: iconColor, size: 22),
-        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -690,12 +878,16 @@ class _TripLocationTile extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: AppBrandAssets.brandMuted,
+                      fontWeight: FontWeight.w600,
                     ),
               ),
               Text(
                 label,
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppBrandAssets.brandNavy,
+                    ),
               ),
             ],
           ),

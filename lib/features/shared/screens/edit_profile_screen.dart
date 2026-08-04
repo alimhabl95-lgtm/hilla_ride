@@ -5,6 +5,7 @@ import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/widgets/arabic_text_field.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/auth/widgets/password_text_field.dart';
 import 'package:hilla_ride/features/shared/widgets/photo_upload_tile.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
@@ -317,15 +318,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
           ],
           const SizedBox(height: 24),
-          FilledButton(
-            onPressed: _saving ? null : _saveProfile,
-            child: _saving
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(l10n.saveProfile),
+          AppPrimaryButton(
+            label: l10n.saveProfile,
+            onPressed: _saveProfile,
+            isLoading: _saving,
           ),
           const SizedBox(height: 32),
           Text(
@@ -348,9 +344,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             label: l10n.confirmNewPassword,
           ),
           const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: _saving ? null : _changePassword,
-            child: Text(l10n.changePasswordButton),
+          AppSecondaryButton(
+            label: l10n.changePasswordButton,
+            onPressed: _changePassword,
           ),
         ],
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/widgets/animated_tuk_tuk.dart';
 import 'package:hilla_ride/features/customer/screens/customer_splash_screen.dart';
@@ -35,7 +36,7 @@ class ModeChooserScreen extends StatelessWidget {
             Text(
               l10n.modeChooserSubtitle,
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: Colors.grey.shade700,
+                color: AppBrandAssets.brandMuted,
               ),
               textAlign: TextAlign.center,
             ),
@@ -89,48 +90,40 @@ class _ModeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 3,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            border: Border.all(color: color.withValues(alpha: 0.25)),
-            borderRadius: BorderRadius.circular(20),
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 32,
+            backgroundColor: color.withValues(alpha: 0.12),
+            child: leading ?? Icon(icon, size: 36, color: color),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Row(
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundColor: color.withValues(alpha: 0.12),
-                  child: leading ??
-                      Icon(icon, size: 36, color: color),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppBrandAssets.brandNavy,
                       ),
-                      const SizedBox(height: 4),
-                      Text(subtitle),
-                    ],
-                  ),
                 ),
-                Icon(Icons.arrow_forward_ios, color: color, size: 18),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppBrandAssets.brandMuted,
+                      ),
+                ),
               ],
             ),
           ),
-        ),
+          Icon(Icons.chevron_right, color: color, size: 22),
+        ],
       ),
     );
   }

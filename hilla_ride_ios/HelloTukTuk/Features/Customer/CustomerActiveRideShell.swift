@@ -40,12 +40,16 @@ struct CustomerActiveRideShell: View {
     }
 
     private var sessionEndedView: some View {
-        VStack {
-            Text(L10n.string(.rideCancelled, language: appState.language))
+        VStack(spacing: AppSpacing.xl) {
+            AppEmptyState(
+                title: L10n.string(.rideCancelled, language: appState.language),
+                systemImage: "xmark.circle"
+            )
             Button(L10n.string(.done, language: appState.language)) {
                 onSessionEnded?()
             }
             .buttonStyle(PrimaryButtonStyle())
+            .padding(.horizontal, AppSpacing.xxl)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
@@ -73,45 +77,62 @@ struct FindingDriverView: View {
     @State private var isRetrying = false
     @State private var waitingForDrivers = false
     @State private var retryTask: Task<Void, Never>?
+    @State private var pulseScale: CGFloat = 1
 
     var body: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.4)
-            Text(L10n.string(.findingDriver, language: appState.language))
-                .font(.title2.bold())
-            Text(
-                waitingForDrivers
-                    ? L10n.string(.noDriversInDistrict, language: appState.language)
-                    : L10n.string(.findingDriverHint, language: appState.language)
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal)
+        VStack(spacing: AppSpacing.xl) {
+            Spacer()
+
+            SearchingPulseView(scale: pulseScale)
+
+            VStack(spacing: AppSpacing.sm) {
+                Text(L10n.string(.findingDriver, language: appState.language))
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(BrandColors.navy)
+
+                Text(
+                    waitingForDrivers
+                        ? L10n.string(.noDriversInDistrict, language: appState.language)
+                        : L10n.string(.findingDriverHint, language: appState.language)
+                )
+                .font(.subheadline)
+                .foregroundStyle(BrandColors.muted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, AppSpacing.xxl)
+            }
 
             if waitingForDrivers {
-                Text(L10n.string(.retryDriverSearch, language: appState.language))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                AppBanner(
+                    message: L10n.string(.retryDriverSearch, language: appState.language),
+                    systemImage: "arrow.clockwise",
+                    tone: .warning
+                )
+                .padding(.horizontal, AppSpacing.xl)
             }
 
-            Button(L10n.string(.retryDriverSearch, language: appState.language)) {
-                Task { await retryAssignment() }
-            }
-            .buttonStyle(SecondaryButtonStyle())
-            .disabled(isRetrying)
+            Spacer()
 
-            Button(L10n.string(.cancelRide, language: appState.language)) {
-                Task { await cancelRide() }
+            VStack(spacing: AppSpacing.md) {
+                Button(L10n.string(.retryDriverSearch, language: appState.language)) {
+                    Task { await retryAssignment() }
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .disabled(isRetrying)
+
+                Button(L10n.string(.cancelRide, language: appState.language)) {
+                    Task { await cancelRide() }
+                }
+                .buttonStyle(SecondaryButtonStyle(destructive: true))
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .tint(.red)
+            .padding(.horizontal, AppSpacing.xl)
+            .padding(.bottom, AppSpacing.xl)
         }
-        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
         .onAppear {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                pulseScale = 1.15
+            }
             Task { await retryAssignment() }
         }
         .onDisappear {
@@ -162,47 +183,36 @@ struct DriverAssignedView: View {
     @State private var driverTask: Task<Void, Never>?
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppSpacing.lg) {
             Text(L10n.string(.driverAssignedTitle, language: appState.language))
-                .font(.title2.bold())
+                .font(.title2.weight(.bold))
                 .foregroundStyle(BrandColors.navy)
+                .padding(.top, AppSpacing.xl)
 
             if ride.driverId == nil {
                 Spacer()
-                ProgressView()
-                    .scaleEffect(1.4)
+                SearchingPulseView(scale: 1.1)
                 Text(L10n.string(.waitingDriverAccept, language: appState.language))
-                    .font(.title3)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(BrandColors.navy)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, AppSpacing.xxl)
                 Spacer()
             } else {
                 Spacer()
 
-                ProfileAvatarView(
-                    name: driver?.name ?? "",
-                    photoURL: driver?.profilePhotoUrl,
-                    size: 96
-                )
-
-                Text(driver?.name ?? L10n.string(.findingDriver, language: appState.language))
-                    .font(.title3.bold())
-                    .foregroundStyle(BrandColors.navy)
-
-                HStack(spacing: 4) {
-                    ForEach(0..<5, id: \.self) { index in
-                        Image(systemName: index < Int((driver?.rating ?? 5.0).rounded()) ? "star.fill" : "star")
-                            .foregroundStyle(.yellow)
-                    }
-                }
+                driverProfileCard
 
                 vehicleCard
 
-                Spacer()
+                AppBanner(
+                    message: L10n.string(.waitingDriverAccept, language: appState.language),
+                    systemImage: "clock.fill",
+                    tone: .info
+                )
+                .padding(.horizontal, AppSpacing.xl)
 
-                Text(L10n.string(.waitingDriverAccept, language: appState.language))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                Spacer()
             }
 
             Button(L10n.string(.cancelRide, language: appState.language)) {
@@ -212,10 +222,10 @@ struct DriverAssignedView: View {
                     onSessionEnded?()
                 }
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .tint(.red)
+            .buttonStyle(SecondaryButtonStyle(destructive: true))
+            .padding(.horizontal, AppSpacing.xl)
+            .padding(.bottom, AppSpacing.xl)
         }
-        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
         .onAppear { startWatchingDriver() }
@@ -226,20 +236,47 @@ struct DriverAssignedView: View {
         .onChange(of: ride.driverId) { _ in startWatchingDriver() }
     }
 
+    private var driverProfileCard: some View {
+        VStack(spacing: AppSpacing.md) {
+            ProfileAvatarView(
+                name: driver?.name ?? "",
+                photoURL: driver?.profilePhotoUrl,
+                size: 88
+            )
+
+            Text(driver?.name ?? L10n.string(.findingDriver, language: appState.language))
+                .font(.title3.weight(.bold))
+                .foregroundStyle(BrandColors.navy)
+
+            HStack(spacing: 4) {
+                ForEach(0..<5, id: \.self) { index in
+                    Image(systemName: index < Int((driver?.rating ?? 5.0).rounded()) ? "star.fill" : "star")
+                        .font(.subheadline)
+                        .foregroundStyle(BrandColors.gold)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .appCard()
+        .padding(.horizontal, AppSpacing.xl)
+    }
+
     private var vehicleCard: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 12) {
+        VStack(spacing: AppSpacing.md) {
+            HStack(spacing: AppSpacing.md) {
                 Image(systemName: "car.fill")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(BrandColors.tealDark)
-                    .frame(width: 28)
+                    .frame(width: 36, height: 36)
+                    .background(BrandColors.teal.opacity(0.12), in: RoundedRectangle(cornerRadius: AppRadii.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(driver?.vehicleType ?? "—")
-                        .font(.body.weight(.medium))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(BrandColors.navy)
                     if let color = driver?.vehicleColor, !color.isEmpty {
                         Text(color)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(BrandColors.muted)
                     }
                 }
                 Spacer()
@@ -247,28 +284,25 @@ struct DriverAssignedView: View {
 
             Divider()
 
-            HStack(spacing: 12) {
+            HStack(spacing: AppSpacing.md) {
                 Image(systemName: "number")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(BrandColors.tealDark)
-                    .frame(width: 28)
+                    .frame(width: 36, height: 36)
+                    .background(BrandColors.teal.opacity(0.12), in: RoundedRectangle(cornerRadius: AppRadii.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L10n.string(.vehiclePlate, language: appState.language))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(BrandColors.muted)
                     Text(driver?.vehiclePlate.isEmpty == false ? (driver?.vehiclePlate ?? "—") : "—")
-                        .font(.title3.weight(.semibold))
+                        .font(.title3.weight(.bold))
                         .foregroundStyle(BrandColors.navy)
                 }
                 Spacer()
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .background(.white, in: RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(BrandColors.teal.opacity(0.15), lineWidth: 1)
-        }
+        .appCard()
+        .padding(.horizontal, AppSpacing.xl)
     }
 
     private func startWatchingDriver() {
@@ -316,81 +350,101 @@ struct ActiveRideMapView: View {
                     .ignoresSafeArea()
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 12) {
-                        AsyncImage(url: URL(string: driverProfile?.profilePhotoUrl ?? "")) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image.resizable().scaledToFill()
-                            default:
-                                Image(systemName: "person.crop.circle.fill")
-                                    .resizable()
-                                    .foregroundStyle(BrandColors.teal)
+                VStack(spacing: 0) {
+                    AppSheetHandle()
+                        .padding(.top, AppSpacing.sm)
+
+                    VStack(alignment: .leading, spacing: AppSpacing.md) {
+                        HStack(spacing: AppSpacing.md) {
+                            AsyncImage(url: URL(string: driverProfile?.profilePhotoUrl ?? "")) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image.resizable().scaledToFill()
+                                default:
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .resizable()
+                                        .foregroundStyle(BrandColors.teal)
+                                }
+                            }
+                            .frame(width: 56, height: 56)
+                            .clipShape(Circle())
+                            .overlay {
+                                Circle()
+                                    .stroke(BrandColors.teal.opacity(0.2), lineWidth: 2)
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(statusTitle)
+                                    .font(.headline.weight(.bold))
+                                    .foregroundStyle(BrandColors.navy)
+                                Text(driverProfile?.name ?? "—")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(BrandColors.navy)
+                                HStack(spacing: 4) {
+                                    Image(systemName: "star.fill")
+                                        .foregroundStyle(BrandColors.gold)
+                                        .font(.caption)
+                                    Text(String(format: "%.1f", driverProfile?.rating ?? 5))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(BrandColors.muted)
+                                }
+                            }
+                            Spacer()
+
+                            if let etaMinutes, let distanceKm {
+                                etaBadge(minutes: etaMinutes, distanceKm: distanceKm)
                             }
                         }
-                        .frame(width: 52, height: 52)
-                        .clipShape(Circle())
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(statusTitle)
-                                .font(.headline)
-                            Text(driverProfile?.name ?? "—")
-                                .font(.subheadline)
+                        HStack {
+                            Text(formatIqd(ride.fareAmountIqd))
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(BrandColors.tealDark)
+                            Spacer()
                             Text(appState.language == .arabic ? "توك توك" : "Tuk-Tuk")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(BrandColors.gold)
-                                    .font(.caption)
-                                Text(String(format: "%.1f", driverProfile?.rating ?? 5))
-                                    .font(.caption)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(BrandColors.muted)
+                                .padding(.horizontal, AppSpacing.sm)
+                                .padding(.vertical, AppSpacing.xs)
+                                .background(BrandColors.surface, in: Capsule())
+                        }
+
+                        HStack(spacing: AppSpacing.sm) {
+                            Button {
+                                callDriver()
+                            } label: {
+                                Label(
+                                    appState.language == .arabic ? "اتصال" : "Call",
+                                    systemImage: "phone.fill"
+                                )
                             }
+                            .buttonStyle(SecondaryButtonStyle())
+
+                            Button {
+                                showChat = true
+                            } label: {
+                                Label(
+                                    appState.language == .arabic ? "محادثة" : "Chat",
+                                    systemImage: "message.fill"
+                                )
+                            }
+                            .buttonStyle(SecondaryButtonStyle())
                         }
-                        Spacer()
                     }
-
-                    if let etaMinutes, let distanceKm {
-                        Text(
-                            appState.language == .arabic
-                                ? "الوصول خلال \(etaMinutes) د • \(String(format: "%.1f", distanceKm)) كم"
-                                : "ETA \(etaMinutes) min • \(String(format: "%.1f", distanceKm)) km"
-                        )
-                        .font(.subheadline)
-                    }
-
-                    Text(formatIqd(ride.fareAmountIqd))
-                        .font(.title3.bold())
-                        .foregroundStyle(BrandColors.tealDark)
-
-                    HStack(spacing: 8) {
-                        Button {
-                            callDriver()
-                        } label: {
-                            Label(
-                                appState.language == .arabic ? "اتصال" : "Call",
-                                systemImage: "phone.fill"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button {
-                            showChat = true
-                        } label: {
-                            Label(
-                                appState.language == .arabic ? "محادثة" : "Chat",
-                                systemImage: "message.fill"
-                            )
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                    }
+                    .padding(.horizontal, AppSpacing.lg)
+                    .padding(.bottom, AppSpacing.lg)
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                .padding(12)
+                .background {
+                    RoundedRectangle(cornerRadius: AppRadii.xl, style: .continuous)
+                        .fill(.white)
+                        .shadow(color: BrandColors.navy.opacity(0.12), radius: 24, y: -4)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppRadii.xl, style: .continuous)
+                        .stroke(BrandColors.border, lineWidth: 1)
+                }
+                .padding(.horizontal, AppSpacing.md)
+                .padding(.bottom, AppSpacing.md)
             }
             .navigationDestination(isPresented: $showChat) {
                 RideChatView(rideId: ride.id)
@@ -424,6 +478,25 @@ struct ActiveRideMapView: View {
 
     private func formatIqd(_ amount: Int) -> String {
         appState.language == .arabic ? "\(amount) د.ع" : "\(amount) IQD"
+    }
+
+    private func etaBadge(minutes: Int, distanceKm: Double) -> some View {
+        VStack(spacing: 2) {
+            Text("\(minutes)")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(BrandColors.tealDark)
+            Text(appState.language == .arabic ? "دقيقة" : "min")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(BrandColors.muted)
+            Text(appState.language == .arabic
+                 ? "\(String(format: "%.1f", distanceKm)) كم"
+                 : "\(String(format: "%.1f", distanceKm)) km")
+                .font(.caption2)
+                .foregroundStyle(BrandColors.muted)
+        }
+        .padding(.horizontal, AppSpacing.md)
+        .padding(.vertical, AppSpacing.sm)
+        .background(BrandColors.teal.opacity(0.1), in: RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
     }
 
     private func callDriver() {
@@ -471,6 +544,29 @@ struct ActiveRideMapView: View {
                 }
             }
         }
+    }
+}
+
+private struct SearchingPulseView: View {
+    var scale: CGFloat = 1
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(BrandColors.teal.opacity(0.12))
+                .frame(width: 120, height: 120)
+                .scaleEffect(scale)
+
+            Circle()
+                .fill(BrandColors.teal.opacity(0.2))
+                .frame(width: 88, height: 88)
+                .scaleEffect(scale * 0.95)
+
+            Image(systemName: "car.fill")
+                .font(.system(size: 32, weight: .semibold))
+                .foregroundStyle(BrandColors.tealDark)
+        }
+        .frame(width: 120, height: 120)
     }
 }
 

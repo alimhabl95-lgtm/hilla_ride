@@ -15,69 +15,64 @@ struct DriverWalletView: View {
     @State private var ledgerTask: Task<Void, Never>?
 
     private var current: DriverProfile { liveDriver ?? driver }
+    private var isAr: Bool { appState.language == .arabic }
 
     var body: some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(appState.language == .arabic ? "الرصيد الحالي" : "Current balance")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text(formatIqd(current.walletBalanceIqd))
-                        .font(.largeTitle.bold())
-                        .foregroundStyle(BrandColors.tealDark)
-                    Text(statusText)
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(statusColor)
+        ScrollView {
+            VStack(spacing: AppSpacing.lg) {
+                AppWalletCard(
+                    title: isAr ? "الرصيد الحالي" : "Current balance",
+                    balance: formatIqd(current.walletBalanceIqd),
+                    subtitle: statusText,
+                    actionTitle: isAr ? "شحن المحفظة" : "Recharge wallet"
+                ) {
+                    showRecharge = true
                 }
-                .padding(.vertical, 4)
 
                 if isLow || isBlocked {
-                    Text(
-                        appState.language == .arabic
+                    AppBanner(
+                        message: isAr
                             ? "رصيد المحفظة منخفض. اشحن عبر سوبر كي لمتابعة استقبال الرحلات."
-                            : "Wallet balance is low. Recharge via SuperQi to keep receiving trips."
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
-                }
-
-                Button {
-                    showRecharge = true
-                } label: {
-                    Label(
-                        appState.language == .arabic ? "شحن المحفظة" : "Recharge wallet",
-                        systemImage: "creditcard"
+                            : "Wallet balance is low. Recharge via SuperQi to keep receiving trips.",
+                        systemImage: "exclamationmark.triangle.fill",
+                        tone: isBlocked ? .danger : .warning
                     )
                 }
-            }
 
-            Section(appState.language == .arabic ? "السجل" : "History") {
-                if ledger.isEmpty {
-                    Text(appState.language == .arabic ? "لا توجد عمليات بعد" : "No ledger entries yet")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(ledger) { entry in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(ledgerTypeLabel(entry.type, language: appState.language))
-                                    .font(.subheadline.weight(.semibold))
-                                if !entry.note.isEmpty {
-                                    Text(entry.note)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: AppSpacing.md) {
+                    Text(isAr ? "السجل" : "History")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(BrandColors.navy)
+                        .padding(.horizontal, AppSpacing.xs)
+
+                    if ledger.isEmpty {
+                        AppEmptyState(
+                            title: isAr ? "لا توجد عمليات بعد" : "No ledger entries yet",
+                            message: isAr
+                                ? "ستظهر عمليات الشحن والعمولات هنا"
+                                : "Recharges and commissions will appear here",
+                            systemImage: "list.bullet.rectangle"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .appCard()
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(ledger.enumerated()), id: \.element.id) { index, entry in
+                                ledgerRow(entry)
+                                if index < ledger.count - 1 {
+                                    Divider()
+                                        .padding(.leading, AppSpacing.lg)
                                 }
                             }
-                            Spacer()
-                            Text("\(entry.amountIqd >= 0 ? "+" : "")\(formatIqd(entry.amountIqd))")
-                                .foregroundStyle(entry.amountIqd >= 0 ? .green : .red)
-                                .fontWeight(.semibold)
                         }
+                        .appCard()
                     }
                 }
             }
+            .padding(AppSpacing.lg)
         }
-        .navigationTitle(appState.language == .arabic ? "المحفظة" : "Wallet")
+        .background(BrandColors.surface.ignoresSafeArea())
+        .navigationTitle(isAr ? "المحفظة" : "Wallet")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showRecharge) {
             DriverWalletRechargeView(driver: current, config: config)
@@ -87,6 +82,49 @@ struct DriverWalletView: View {
             driverTask?.cancel()
             configTask?.cancel()
             ledgerTask?.cancel()
+        }
+    }
+
+    private func ledgerRow(_ entry: WalletLedgerEntry) -> some View {
+        HStack(alignment: .top, spacing: AppSpacing.md) {
+            Image(systemName: ledgerIcon(for: entry.type))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(entry.amountIqd >= 0 ? BrandColors.success : BrandColors.danger)
+                .frame(width: 36, height: 36)
+                .background(
+                    (entry.amountIqd >= 0 ? BrandColors.success : BrandColors.danger).opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: AppRadii.sm, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(ledgerTypeLabel(entry.type, language: appState.language))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrandColors.navy)
+                if !entry.note.isEmpty {
+                    Text(entry.note)
+                        .font(.caption)
+                        .foregroundStyle(BrandColors.muted)
+                }
+            }
+
+            Spacer(minLength: AppSpacing.sm)
+
+            Text("\(entry.amountIqd >= 0 ? "+" : "")\(formatIqd(entry.amountIqd))")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(entry.amountIqd >= 0 ? BrandColors.success : BrandColors.danger)
+        }
+        .frame(minHeight: 48, alignment: .center)
+        .padding(.vertical, AppSpacing.sm)
+    }
+
+    private func ledgerIcon(for type: String) -> String {
+        switch type.lowercased() {
+        case "recharge": return "creditcard.fill"
+        case "commission": return "percent"
+        case "bonus", "reward": return "gift.fill"
+        case "refund": return "arrow.uturn.backward.circle.fill"
+        case "penalty": return "exclamationmark.circle.fill"
+        default: return "arrow.left.arrow.right"
         }
     }
 
@@ -100,24 +138,18 @@ struct DriverWalletView: View {
 
     private var statusText: String {
         if isBlocked {
-            return appState.language == .arabic
+            return isAr
                 ? "الحالة: محظور — اشحن المحفظة لاستقبال الرحلات"
                 : "Status: Blocked — recharge to receive trips"
         }
         if isLow {
-            return appState.language == .arabic ? "الحالة: رصيد منخفض" : "Status: Low balance"
+            return isAr ? "الحالة: رصيد منخفض" : "Status: Low balance"
         }
-        return appState.language == .arabic ? "الحالة: نشط" : "Status: Active"
-    }
-
-    private var statusColor: Color {
-        if isBlocked { return .red }
-        if isLow { return .orange }
-        return BrandColors.tealDark
+        return isAr ? "الحالة: نشط" : "Status: Active"
     }
 
     private func formatIqd(_ amount: Int) -> String {
-        appState.language == .arabic ? "\(amount) د.ع" : "\(amount) IQD"
+        isAr ? "\(amount) د.ع" : "\(amount) IQD"
     }
 
     private func ledgerTypeLabel(_ type: String, language: AppLanguage) -> String {
@@ -176,101 +208,187 @@ struct DriverWalletRechargeView: View {
     private var isAr: Bool { appState.language == .arabic }
 
     var body: some View {
-        Form {
-            Section {
-                Text(config.companySuperQiName)
-                    .font(.headline)
-                Text(
-                    config.companySuperQiNumber.isEmpty
-                        ? (isAr
-                            ? "لم يُضبط رقم سوبر كي بعد — تواصل مع الإدارة"
-                            : "SuperQi number not set yet — contact admin")
-                        : config.companySuperQiNumber
-                )
-                .font(.title2.bold())
-                .foregroundStyle(BrandColors.tealDark)
-                .textSelection(.enabled)
-                Text(config.instructions(language: appState.language))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: AppSpacing.lg) {
+                superQiInstructionsCard
+                paymentDetailsCard
 
-                if !config.managerWhatsappDigits.isEmpty {
-                    Divider().padding(.vertical, 4)
-                    Text(isAr ? "واتساب استلام الإيصال" : "Send receipt on WhatsApp")
-                        .font(.subheadline.weight(.semibold))
-                    Text(config.managerWhatsappNumber)
-                        .font(.headline)
-                        .textSelection(.enabled)
-                    Button {
-                        openWhatsAppReceipt()
-                    } label: {
-                        Label(
-                            isAr ? "فتح واتساب وإرسال الإيصال" : "Open WhatsApp & send receipt",
-                            systemImage: "message.fill"
-                        )
-                    }
-                    Text(
-                        isAr
-                            ? "أرفق صورة الإيصال داخل واتساب بعد فتح المحادثة."
-                            : "Attach the receipt photo inside WhatsApp after the chat opens."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let errorMessage {
+                    AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
                 }
-            }
 
-            Section {
-                Picker(isAr ? "طريقة الدفع" : "Payment method", selection: $method) {
-                    ForEach(config.enabledMethods, id: \.self) { value in
-                        Text(value).tag(value)
-                    }
-                }
-                TextField(isAr ? "المبلغ (د.ع)" : "Amount (IQD)", text: $amountText)
-                    .keyboardType(.numberPad)
-                TextField(isAr ? "رقم المرجع (اختياري)" : "Reference (optional)", text: $reference)
-                TextField(isAr ? "ملاحظات (اختياري)" : "Notes (optional)", text: $notes)
-                PhotosPicker(
-                    selection: $selectedItem,
-                    matching: .images
-                ) {
-                    Label(
-                        screenshotData == nil
-                            ? (isAr ? "إرفاق صورة الإيصال" : "Attach receipt screenshot")
-                            : (isAr ? "تم اختيار الصورة" : "Screenshot selected"),
-                        systemImage: "photo"
-                    )
-                }
-                .onChange(of: selectedItem) { newItem in
-                    Task {
-                        guard let newItem else { return }
-                        if let data = try? await newItem.loadTransferable(type: Data.self) {
-                            await MainActor.run { screenshotData = data }
-                        }
-                    }
-                }
-            }
-
-            if let errorMessage {
-                Section {
-                    Text(errorMessage).foregroundStyle(.red)
-                }
-            }
-
-            Section {
                 Button {
                     Task { await submit() }
                 } label: {
                     if isSubmitting {
                         ProgressView()
+                            .tint(.white)
                     } else {
                         Text(isAr ? "أتممت الدفع — إرسال للمراجعة" : "I completed payment — submit")
                     }
                 }
+                .buttonStyle(PrimaryButtonStyle())
                 .disabled(isSubmitting)
             }
+            .padding(AppSpacing.lg)
         }
+        .background(BrandColors.surface.ignoresSafeArea())
         .navigationTitle(isAr ? "شحن عبر سوبر كي" : "SuperQi recharge")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var superQiInstructionsCard: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            Text(config.companySuperQiName)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(BrandColors.navy)
+
+            Text(
+                config.companySuperQiNumber.isEmpty
+                    ? (isAr
+                        ? "لم يُضبط رقم سوبر كي بعد — تواصل مع الإدارة"
+                        : "SuperQi number not set yet — contact admin")
+                    : config.companySuperQiNumber
+            )
+            .font(.title2.weight(.bold))
+            .foregroundStyle(BrandColors.tealDark)
+            .textSelection(.enabled)
+
+            Text(config.instructions(language: appState.language))
+                .font(.footnote)
+                .foregroundStyle(BrandColors.muted)
+
+            if !config.managerWhatsappDigits.isEmpty {
+                Divider()
+                    .padding(.vertical, AppSpacing.xs)
+
+                Text(isAr ? "واتساب استلام الإيصال" : "Send receipt on WhatsApp")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrandColors.navy)
+
+                Text(config.managerWhatsappNumber)
+                    .font(.headline)
+                    .foregroundStyle(BrandColors.tealDark)
+                    .textSelection(.enabled)
+
+                Button {
+                    openWhatsAppReceipt()
+                } label: {
+                    Label(
+                        isAr ? "فتح واتساب وإرسال الإيصال" : "Open WhatsApp & send receipt",
+                        systemImage: "message.fill"
+                    )
+                }
+                .buttonStyle(SecondaryButtonStyle())
+
+                Text(
+                    isAr
+                        ? "أرفق صورة الإيصال داخل واتساب بعد فتح المحادثة."
+                        : "Attach the receipt photo inside WhatsApp after the chat opens."
+                )
+                .font(.caption)
+                .foregroundStyle(BrandColors.muted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard()
+    }
+
+    private var paymentDetailsCard: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            Text(isAr ? "تفاصيل الدفع" : "Payment details")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(BrandColors.navy)
+
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text(isAr ? "طريقة الدفع" : "Payment method")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(BrandColors.muted)
+
+                Picker(isAr ? "طريقة الدفع" : "Payment method", selection: $method) {
+                    ForEach(config.enabledMethods, id: \.self) { value in
+                        Text(value).tag(value)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(AppSpacing.md)
+                .background(.white, in: RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous)
+                        .stroke(BrandColors.border, lineWidth: 1)
+                }
+            }
+
+            rechargeField(
+                title: isAr ? "المبلغ (د.ع)" : "Amount (IQD)",
+                text: $amountText,
+                keyboard: .numberPad
+            )
+            rechargeField(
+                title: isAr ? "رقم المرجع (اختياري)" : "Reference (optional)",
+                text: $reference
+            )
+            rechargeField(
+                title: isAr ? "ملاحظات (اختياري)" : "Notes (optional)",
+                text: $notes
+            )
+
+            PhotosPicker(
+                selection: $selectedItem,
+                matching: .images
+            ) {
+                HStack(spacing: AppSpacing.md) {
+                    Image(systemName: screenshotData == nil ? "photo.badge.plus" : "checkmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(screenshotData == nil ? BrandColors.tealDark : BrandColors.success)
+                        .frame(width: 44, height: 44)
+                        .background(BrandColors.teal.opacity(0.12), in: RoundedRectangle(cornerRadius: AppRadii.sm, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(
+                            screenshotData == nil
+                                ? (isAr ? "إرفاق صورة الإيصال" : "Attach receipt screenshot")
+                                : (isAr ? "تم اختيار الصورة" : "Screenshot selected")
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(BrandColors.navy)
+                        Text(isAr ? "مطلوب للمراجعة" : "Required for review")
+                            .font(.caption)
+                            .foregroundStyle(BrandColors.muted)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(minHeight: 48, alignment: .center)
+                .padding(AppSpacing.md)
+                .background(.white, in: RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous)
+                        .stroke(BrandColors.border, lineWidth: 1)
+                }
+            }
+            .onChange(of: selectedItem) { newItem in
+                Task {
+                    guard let newItem else { return }
+                    if let data = try? await newItem.loadTransferable(type: Data.self) {
+                        await MainActor.run { screenshotData = data }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard()
+    }
+
+    private func rechargeField(title: String, text: Binding<String>, keyboard: UIKeyboardType = .default) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(BrandColors.muted)
+            TextField(title, text: text)
+                .keyboardType(keyboard)
+                .textFieldStyle(AppTextFieldStyle())
+        }
     }
 
     private func openWhatsAppReceipt() {

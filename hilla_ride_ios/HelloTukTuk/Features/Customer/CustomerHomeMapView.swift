@@ -69,29 +69,26 @@ struct CustomerHomeMapView: View {
 
                 rideSearchPanel
             }
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     LanguageToggle()
+                        .tint(BrandColors.tealDark)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         CurrentRideIconButton(role: .customer)
                         AnnouncementIconButton(showAnnouncements: $showAnnouncements)
                         LegalDocumentsMenu()
-                        Button {
+                        mapToolbarButton(systemImage: "list.bullet.rectangle") {
                             showHistory = true
-                        } label: {
-                            Image(systemName: "list.bullet.rectangle")
                         }
-                        Button {
+                        mapToolbarButton(systemImage: "headphones") {
                             showSupport = true
-                        } label: {
-                            Image(systemName: "headphones")
                         }
-                        Button {
+                        mapToolbarButton(systemImage: "person.circle.fill") {
                             showProfile = true
-                        } label: {
-                            Image(systemName: "person.circle")
                         }
                     }
                 }
@@ -206,113 +203,168 @@ struct CustomerHomeMapView: View {
     }
 
     private var rideSearchPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if user.hasPromoRemaining {
-                HStack(spacing: 8) {
-                    Image(systemName: "tag.fill")
-                        .foregroundStyle(BrandColors.gold)
-                    Text(L10n.customerPromoBanner(
-                        code: user.promoCode,
-                        remaining: user.promoRidesLimit - user.promoRidesUsed,
-                        language: appState.language
-                    ))
-                    .font(.footnote)
+        VStack(spacing: 0) {
+            AppSheetHandle()
+                .padding(.top, AppSpacing.sm)
+
+            VStack(alignment: .leading, spacing: AppSpacing.md) {
+                if user.hasPromoRemaining {
+                    AppBanner(
+                        message: L10n.customerPromoBanner(
+                            code: user.promoCode,
+                            remaining: user.promoRidesLimit - user.promoRidesUsed,
+                            language: appState.language
+                        ),
+                        systemImage: "tag.fill",
+                        tone: .info
+                    )
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(BrandColors.teal.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
-            }
 
-            Text(L10n.string(.customerHomeTitle, language: appState.language))
-                .font(.headline)
+                HStack {
+                    Text(L10n.string(.customerHomeTitle, language: appState.language))
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(BrandColors.navy)
+                    Spacer()
+                    Picker(L10n.string(.subDistrict, language: appState.language), selection: $selectedSubDistrictId) {
+                        Text(L10n.string(.selectSubDistrictHint, language: appState.language)).tag("")
+                        ForEach(BabilRegions.customerDistrict.subDistricts) { sub in
+                            Text(sub.displayName(language: appState.language)).tag(sub.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(BrandColors.tealDark)
+                    .onChange(of: selectedSubDistrictId) { _ in errorMessage = nil }
+                }
 
-            Picker(L10n.string(.subDistrict, language: appState.language), selection: $selectedSubDistrictId) {
-                Text(L10n.string(.selectSubDistrictHint, language: appState.language)).tag("")
-                ForEach(BabilRegions.customerDistrict.subDistricts) { sub in
-                    Text(sub.displayName(language: appState.language)).tag(sub.id)
+                SavedPlacesBar { place in
+                    if requireSubDistrict() { destination = place }
+                }
+
+                VStack(spacing: AppSpacing.sm) {
+                    locationCard(
+                        icon: "circle.fill",
+                        iconColor: BrandColors.success,
+                        title: L10n.string(.pickupLabel, language: appState.language),
+                        value: pickup?.label ?? L10n.string(.selectPickup, language: appState.language),
+                        onSearch: { if requireSubDistrict() { showPickupSearch = true } },
+                        onPickMap: { if requireSubDistrict() { showPickupPinPicker = true } }
+                    )
+
+                    locationConnector
+
+                    locationCard(
+                        icon: "mappin.circle.fill",
+                        iconColor: BrandColors.danger,
+                        title: L10n.string(.destinationLabel, language: appState.language),
+                        value: destination?.label ?? L10n.string(.selectDestination, language: appState.language),
+                        onSearch: { if requireSubDistrict() { showDestinationSearch = true } },
+                        onPickMap: { if requireSubDistrict() { showDestinationPinPicker = true } }
+                    )
+                }
+
+                if let errorMessage {
+                    AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
+                }
+
+                HStack(spacing: AppSpacing.md) {
+                    Button(L10n.string(.useMyLocation, language: appState.language)) {
+                        useMyLocation()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+
+                    Button(L10n.string(.bookRide, language: appState.language)) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            attemptBookRide()
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
                 }
             }
-            .pickerStyle(.menu)
-            .onChange(of: selectedSubDistrictId) { _ in errorMessage = nil }
-
-            SavedPlacesBar { place in
-                if requireSubDistrict() { destination = place }
-            }
-
-            Button {
-                if requireSubDistrict() { showPickupSearch = true }
-            } label: {
-                locationRow(
-                    icon: "circle.fill",
-                    color: .green,
-                    title: L10n.string(.pickupLabel, language: appState.language),
-                    value: pickup?.label ?? L10n.string(.selectPickup, language: appState.language)
-                )
-            }
-            .buttonStyle(.plain)
-            Button(L10n.string(.pickOnMap, language: appState.language)) {
-                if requireSubDistrict() { showPickupPinPicker = true }
-            }
-            .font(.caption)
-            .buttonStyle(.borderless)
-
-            Button {
-                if requireSubDistrict() { showDestinationSearch = true }
-            } label: {
-                locationRow(
-                    icon: "mappin.circle.fill",
-                    color: .red,
-                    title: L10n.string(.destinationLabel, language: appState.language),
-                    value: destination?.label ?? L10n.string(.selectDestination, language: appState.language)
-                )
-            }
-            .buttonStyle(.plain)
-            Button(L10n.string(.pickOnMap, language: appState.language)) {
-                if requireSubDistrict() { showDestinationPinPicker = true }
-            }
-            .font(.caption)
-            .buttonStyle(.borderless)
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
-
-            HStack(spacing: 12) {
-                Button(L10n.string(.useMyLocation, language: appState.language)) {
-                    useMyLocation()
-                }
-                .buttonStyle(SecondaryButtonStyle())
-
-                Button(L10n.string(.bookRide, language: appState.language)) {
-                    attemptBookRide()
-                }
-                .buttonStyle(PrimaryButtonStyle())
-            }
+            .padding(.horizontal, AppSpacing.lg)
+            .padding(.bottom, AppSpacing.lg)
         }
-        .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-        .padding(.horizontal, 12)
-        .padding(.bottom, 12)
+        .background {
+            RoundedRectangle(cornerRadius: AppRadii.xl, style: .continuous)
+                .fill(.white)
+                .shadow(color: BrandColors.navy.opacity(0.12), radius: 24, y: -4)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadii.xl, style: .continuous)
+                .stroke(BrandColors.border, lineWidth: 1)
+        }
+        .padding(.horizontal, AppSpacing.md)
+        .padding(.bottom, AppSpacing.md)
     }
 
-    private func locationRow(icon: String, color: Color, title: String, value: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .foregroundStyle(color)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.subheadline)
-                    .lineLimit(2)
-                    .foregroundStyle(BrandColors.navy)
-            }
+    private var locationConnector: some View {
+        HStack(spacing: AppSpacing.sm) {
+            Rectangle()
+                .fill(BrandColors.border)
+                .frame(width: 2, height: 16)
+                .padding(.leading, 21)
             Spacer()
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func mapToolbarButton(systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(BrandColors.tealDark)
+                .frame(width: 44, height: 44)
+        }
+    }
+
+    private func locationCard(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        value: String,
+        onSearch: @escaping () -> Void,
+        onPickMap: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: AppSpacing.xs) {
+            Button(action: onSearch) {
+                HStack(spacing: AppSpacing.md) {
+                    Image(systemName: icon)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(iconColor, in: Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(BrandColors.muted)
+                        Text(value)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(2)
+                            .foregroundStyle(BrandColors.navy)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Spacer(minLength: AppSpacing.sm)
+
+                    Image(systemName: "magnifyingglass")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(BrandColors.tealDark)
+                        .frame(width: 44, height: 44)
+                }
+                .padding(.horizontal, AppSpacing.md)
+                .padding(.vertical, AppSpacing.sm)
+                .background(BrandColors.surface, in: RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous)
+                        .stroke(BrandColors.border, lineWidth: 1)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button(L10n.string(.pickOnMap, language: appState.language), action: onPickMap)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(BrandColors.tealDark)
+                .frame(minHeight: 44, alignment: .leading)
+                .buttonStyle(.plain)
         }
     }
 

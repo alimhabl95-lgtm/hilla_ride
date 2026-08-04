@@ -18,35 +18,38 @@ struct ProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if let user = appState.currentUser {
-                    profileRow(
-                        title: L10n.string(.fullName, language: appState.language),
-                        value: user.name
-                    )
-                    profileRow(
-                        title: L10n.string(.phoneHint, language: appState.language),
-                        value: user.phone
-                    )
-                    profileRow(
-                        title: L10n.string(.accountType, language: appState.language),
-                        value: user.role == .driver
-                            ? L10n.string(.roleDriver, language: appState.language)
-                            : L10n.string(.roleCustomer, language: appState.language)
-                    )
-
-                    if let driver = appState.currentDriver, user.role == .driver {
+                    VStack(alignment: .leading, spacing: 12) {
                         profileRow(
-                            title: L10n.string(.driverStatus, language: appState.language),
-                            value: driver.approvalStatus.rawValue.capitalized
+                            title: L10n.string(.fullName, language: appState.language),
+                            value: user.name
                         )
+                        profileRow(
+                            title: L10n.string(.phoneHint, language: appState.language),
+                            value: user.phone
+                        )
+                        profileRow(
+                            title: L10n.string(.accountType, language: appState.language),
+                            value: user.role == .driver
+                                ? L10n.string(.roleDriver, language: appState.language)
+                                : L10n.string(.roleCustomer, language: appState.language)
+                        )
+
+                        if let driver = appState.currentDriver, user.role == .driver {
+                            profileRow(
+                                title: L10n.string(.driverStatus, language: appState.language),
+                                value: driver.approvalStatus.rawValue.capitalized
+                            )
+                        }
                     }
+                    .appCard()
 
                     NavigationLink {
                         EditProfileView()
                     } label: {
                         Text(L10n.string(.editProfileTitle, language: appState.language))
-                            .font(.subheadline.bold())
-                            .foregroundStyle(BrandColors.tealDark)
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(SecondaryButtonStyle())
 
                     accountDeletionSection
                 }
@@ -109,13 +112,13 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L10n.string(.deleteAccountSectionTitle, language: appState.language))
                 .font(.headline)
-                .foregroundStyle(.red)
+                .foregroundStyle(BrandColors.danger)
 
             Text(L10n.string(.deleteAccountMessage, language: appState.language))
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(BrandColors.muted)
 
-            Button(role: .destructive) {
+            Button {
                 showDeleteConfirm = true
             } label: {
                 if isDeleting {
@@ -123,33 +126,24 @@ struct ProfileView: View {
                         .frame(maxWidth: .infinity)
                 } else {
                     Text(L10n.string(.deleteAccount, language: appState.language))
-                        .font(.body.bold())
                         .frame(maxWidth: .infinity)
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
+            .buttonStyle(SecondaryButtonStyle(destructive: true))
             .disabled(isDeleting)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.red.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.red.opacity(0.35), lineWidth: 1)
-        )
+        .appCard()
         .padding(.top, 8)
     }
 
     private func profileRow(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(BrandColors.muted)
             Text(value)
                 .font(.body)
+                .foregroundStyle(BrandColors.navy)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

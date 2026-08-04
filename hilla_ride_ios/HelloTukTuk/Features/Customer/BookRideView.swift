@@ -18,69 +18,33 @@ struct BookRideView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(L10n.string(.bookRideTitle, language: appState.language))
-                    .font(.largeTitle.bold())
+            VStack(spacing: 0) {
+                AppSheetHandle()
+                    .padding(.top, AppSpacing.sm)
 
-                summaryRow(
-                    title: L10n.string(.pickupLabel, language: appState.language),
-                    value: pickup.label
-                )
-                summaryRow(
-                    title: L10n.string(.destinationLabel, language: appState.language),
-                    value: destination.label
-                )
+                VStack(alignment: .leading, spacing: AppSpacing.lg) {
+                    Text(L10n.string(.bookRideTitle, language: appState.language))
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(BrandColors.navy)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                if isLoadingQuote {
-                    ProgressView(L10n.string(.loading, language: appState.language))
-                } else if let quote {
-                    if quote.outOfService {
-                        Text(L10n.string(.outOfService, language: appState.language))
-                            .foregroundStyle(.red)
-                    } else {
-                        summaryRow(
-                            title: L10n.string(.distance, language: appState.language),
-                            value: String(format: "%.1f km", quote.distanceKm)
-                        )
-                        if let promo, promo.hasDiscount, let baseFare = quote.fareIqd {
-                            summaryRow(
-                                title: L10n.string(.estimatedFare, language: appState.language),
-                                value: formatIqd(baseFare)
-                            )
-                            .strikethrough()
-                            Text(L10n.promoDiscountApplied(
-                                code: promo.promoCode,
-                                amount: formatIqd(promo.discountIqd),
-                                language: appState.language
-                            ))
-                                .font(.footnote)
-                                .foregroundStyle(BrandColors.gold)
-                            summaryRow(
-                                title: L10n.string(.finalFare, language: appState.language),
-                                value: formatIqd(promo.finalFareIqd)
-                            )
-                        } else {
-                            summaryRow(
-                                title: L10n.string(.estimatedFare, language: appState.language),
-                                value: formatIqd(quote.fareIqd ?? 0)
-                            )
-                        }
+                    routeSummaryCard
+
+                    fareCard
+
+                    if let errorMessage {
+                        AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
                     }
-                }
 
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    Button(L10n.string(.confirmBooking, language: appState.language)) {
+                        Task { await bookRide() }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(isLoadingQuote || isBooking || quote?.canBook != true)
                 }
-
-                Button(L10n.string(.confirmBooking, language: appState.language)) {
-                    Task { await bookRide() }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(isLoadingQuote || isBooking || quote?.canBook != true)
+                .padding(.horizontal, AppSpacing.xl)
+                .padding(.bottom, AppSpacing.xxl)
             }
-            .padding(24)
         }
         .background(BrandColors.surface.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
@@ -92,15 +56,129 @@ struct BookRideView: View {
         }
     }
 
-    private func summaryRow(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.body)
+    private var routeSummaryCard: some View {
+        VStack(spacing: AppSpacing.md) {
+            routePoint(
+                icon: "circle.fill",
+                iconColor: BrandColors.success,
+                title: L10n.string(.pickupLabel, language: appState.language),
+                value: pickup.label
+            )
+
+            HStack {
+                Rectangle()
+                    .fill(BrandColors.border)
+                    .frame(width: 2, height: 20)
+                    .padding(.leading, 13)
+                Spacer()
+            }
+
+            routePoint(
+                icon: "mappin.circle.fill",
+                iconColor: BrandColors.danger,
+                title: L10n.string(.destinationLabel, language: appState.language),
+                value: destination.label
+            )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard()
+    }
+
+    private func routePoint(icon: String, iconColor: Color, title: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: AppSpacing.md) {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(iconColor, in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(BrandColors.muted)
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrandColors.navy)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private var fareCard: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            if isLoadingQuote {
+                HStack(spacing: AppSpacing.md) {
+                    ProgressView()
+                    Text(L10n.string(.loading, language: appState.language))
+                        .font(.subheadline)
+                        .foregroundStyle(BrandColors.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let quote {
+                if quote.outOfService {
+                    AppBanner(
+                        message: L10n.string(.outOfService, language: appState.language),
+                        systemImage: "xmark.octagon.fill",
+                        tone: .danger
+                    )
+                } else {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(L10n.string(.distance, language: appState.language))
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(BrandColors.muted)
+                            Text(String(format: "%.1f km", quote.distanceKm))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(BrandColors.navy)
+                        }
+                        Spacer()
+                    }
+
+                    Divider()
+
+                    if let promo, promo.hasDiscount, let baseFare = quote.fareIqd {
+                        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                            HStack {
+                                Text(L10n.string(.estimatedFare, language: appState.language))
+                                    .font(.caption)
+                                    .foregroundStyle(BrandColors.muted)
+                                Spacer()
+                                Text(formatIqd(baseFare))
+                                    .font(.subheadline)
+                                    .strikethrough()
+                                    .foregroundStyle(BrandColors.muted)
+                            }
+
+                            AppBanner(
+                                message: L10n.promoDiscountApplied(
+                                    code: promo.promoCode,
+                                    amount: formatIqd(promo.discountIqd),
+                                    language: appState.language
+                                ),
+                                systemImage: "tag.fill",
+                                tone: .warning
+                            )
+
+                            Text(L10n.string(.finalFare, language: appState.language))
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(BrandColors.muted)
+                            Text(formatIqd(promo.finalFareIqd))
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundStyle(BrandColors.tealDark)
+                        }
+                    } else {
+                        Text(L10n.string(.estimatedFare, language: appState.language))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(BrandColors.muted)
+                        Text(formatIqd(quote.fareIqd ?? 0))
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundStyle(BrandColors.tealDark)
+                    }
+                }
+            }
+        }
+        .appCard()
     }
 
     private func formatIqd(_ amount: Int) -> String {

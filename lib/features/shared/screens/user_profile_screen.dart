@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/shared/screens/edit_profile_screen.dart';
 import 'package:hilla_ride/features/shared/widgets/firebase_driver_photo_image.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
@@ -109,77 +110,73 @@ class _ProfileBody extends StatelessWidget {
           child: _ProfileAvatar(user: user, driver: driver, role: role),
         ),
         const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.accountInformation,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-                _InfoRow(label: l10n.fullName, value: user.name),
-                _InfoRow(label: l10n.phoneHint, value: user.phone),
-                if (user.email != null && user.email!.isNotEmpty)
-                  _InfoRow(label: l10n.recoveryEmailLabel, value: user.email!),
-                _InfoRow(
-                  label: l10n.accountTypeLabel,
-                  value: role == UserRole.driver
-                      ? l10n.roleDriver
-                      : l10n.roleCustomer,
-                ),
-                if (role == UserRole.customer) ...[
-                  _InfoRow(label: l10n.age, value: '${user.age}'),
-                  if (user.gender != null && user.gender!.isNotEmpty)
-                    _InfoRow(label: l10n.gender, value: user.gender!),
-                ],
-                _InfoRow(label: l10n.registeredAt, value: registeredLabel),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.accountInformation,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              _InfoRow(label: l10n.fullName, value: user.name),
+              _InfoRow(label: l10n.phoneHint, value: user.phone),
+              if (user.email != null && user.email!.isNotEmpty)
+                _InfoRow(label: l10n.recoveryEmailLabel, value: user.email!),
+              _InfoRow(
+                label: l10n.accountTypeLabel,
+                value: role == UserRole.driver
+                    ? l10n.roleDriver
+                    : l10n.roleCustomer,
+              ),
+              if (role == UserRole.customer) ...[
+                _InfoRow(label: l10n.age, value: '${user.age}'),
+                if (user.gender != null && user.gender!.isNotEmpty)
+                  _InfoRow(label: l10n.gender, value: user.gender!),
               ],
-            ),
+              _InfoRow(label: l10n.registeredAt, value: registeredLabel),
+            ],
           ),
         ),
         if (role == UserRole.driver && driver != null) ...[
           const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.driverRegistration,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  _InfoRow(
-                    label: l10n.vehicleType,
-                    value: driver!.vehicleType,
-                  ),
-                  _InfoRow(
-                    label: l10n.vehiclePlate,
-                    value: driver!.vehiclePlate,
-                  ),
-                  _InfoRow(
-                    label: l10n.licenseNumber,
-                    value: driver!.licenseNumber,
-                  ),
-                  _InfoRow(
-                    label: l10n.statusLabel,
-                    value: driver!.approvalStatus.name,
-                  ),
-                  _InfoRow(
-                    label: l10n.completedRidesCount,
-                    value: '${driver!.completedRidesCount}',
-                  ),
-                ],
-              ),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.driverRegistration,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  label: l10n.vehicleType,
+                  value: driver!.vehicleType,
+                ),
+                _InfoRow(
+                  label: l10n.vehiclePlate,
+                  value: driver!.vehiclePlate,
+                ),
+                _InfoRow(
+                  label: l10n.licenseNumber,
+                  value: driver!.licenseNumber,
+                ),
+                _InfoRow(
+                  label: l10n.statusLabel,
+                  value: driver!.approvalStatus.name,
+                ),
+                _InfoRow(
+                  label: l10n.completedRidesCount,
+                  value: '${driver!.completedRidesCount}',
+                ),
+              ],
             ),
           ),
         ],
         const SizedBox(height: 16),
-        OutlinedButton.icon(
+        AppSecondaryButton(
+          label: l10n.editProfileButton,
+          icon: Icons.edit_outlined,
           onPressed: () async {
             final driverService = context.read<AppState>().driverService;
             var driverProfile = driver;
@@ -198,17 +195,13 @@ class _ProfileBody extends StatelessWidget {
               ),
             );
           },
-          icon: const Icon(Icons.edit_outlined),
-          label: Text(l10n.editProfileButton),
         ),
         const SizedBox(height: 12),
-        OutlinedButton.icon(
+        AppSecondaryButton(
+          label: l10n.deleteAccount,
+          icon: Icons.delete_forever_outlined,
+          destructive: true,
           onPressed: () => _confirmDeleteAccount(context),
-          icon: const Icon(Icons.delete_forever_outlined, color: Colors.red),
-          label: Text(
-            l10n.deleteAccount,
-            style: const TextStyle(color: Colors.red),
-          ),
         ),
       ],
     );

@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
 import 'package:hilla_ride/core/config/legal_config.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/utils/legal_url_launcher.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/auth/widgets/password_text_field.dart';
 import 'package:hilla_ride/features/shared/widgets/photo_upload_tile.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
@@ -403,71 +405,62 @@ class _SignupScreenState extends State<SignupScreen> {
                       _pickPhoto(isIdPhoto: false, source: ImageSource.camera),
                 ),
                 const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.driverTermsTitle,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(l10n.driverTermsBody),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            TextButton(
-                              onPressed: () => _launchUrl(
-                                LegalConfig.termsOfServiceUrl(
-                                  languageCode: l10n.localeName.startsWith('ar')
-                                      ? 'ar'
-                                      : 'en',
-                                ),
+                AppCard(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.driverTermsTitle,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(l10n.driverTermsBody),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          TextButton(
+                            onPressed: () => _launchUrl(
+                              LegalConfig.termsOfServiceUrl(
+                                languageCode: l10n.localeName.startsWith('ar')
+                                    ? 'ar'
+                                    : 'en',
                               ),
-                              child: Text(l10n.termsOfService),
                             ),
-                            TextButton(
-                              onPressed: () => _launchUrl(
-                                LegalConfig.privacyPolicyUrl(
-                                  languageCode: l10n.localeName.startsWith('ar')
-                                      ? 'ar'
-                                      : 'en',
-                                ),
+                            child: Text(l10n.termsOfService),
+                          ),
+                          TextButton(
+                            onPressed: () => _launchUrl(
+                              LegalConfig.privacyPolicyUrl(
+                                languageCode: l10n.localeName.startsWith('ar')
+                                    ? 'ar'
+                                    : 'en',
                               ),
-                              child: Text(l10n.privacyPolicy),
                             ),
-                          ],
-                        ),
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          value: _acceptedTerms,
-                          onChanged: _isLoading
-                              ? null
-                              : (value) =>
-                                  setState(() => _acceptedTerms = value ?? false),
-                          title: Text(l10n.acceptDriverTerms),
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
-                      ],
-                    ),
+                            child: Text(l10n.privacyPolicy),
+                          ),
+                        ],
+                      ),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _acceptedTerms,
+                        onChanged: _isLoading
+                            ? null
+                            : (value) =>
+                                setState(() => _acceptedTerms = value ?? false),
+                        title: Text(l10n.acceptDriverTerms),
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+                    ],
                   ),
                 ),
               ],
               const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _isLoading ? null : _signup,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(
-                        _isDriver ? l10n.submitForApproval : l10n.createAccountButton,
-                      ),
+              AppPrimaryButton(
+                label: _isDriver ? l10n.submitForApproval : l10n.createAccountButton,
+                onPressed: _signup,
+                isLoading: _isLoading,
               ),
             ],
           ),

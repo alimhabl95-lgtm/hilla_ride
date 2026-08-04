@@ -15,29 +15,52 @@ struct SupportView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text(L10n.string(.supportTitle, language: appState.language))
                     .font(.largeTitle.bold())
+                    .foregroundStyle(BrandColors.navy)
 
-                contactRow(icon: "phone.fill", value: contact.phone)
-                contactRow(icon: "message.fill", value: contact.whatsapp)
-                contactRow(icon: "envelope.fill", value: contact.email)
+                VStack(alignment: .leading, spacing: 10) {
+                    contactButton(
+                        icon: "phone.fill",
+                        value: contact.phone,
+                        url: "tel:\(contact.phone)"
+                    )
+                    contactButton(
+                        icon: "message.fill",
+                        value: contact.whatsapp,
+                        url: "https://wa.me/\(contact.whatsapp.filter { $0.isNumber })"
+                    )
+                    contactButton(
+                        icon: "envelope.fill",
+                        value: contact.email,
+                        url: "mailto:\(contact.email)"
+                    )
+                }
+                .appCard()
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text(L10n.string(.legalDocumentsTitle, language: appState.language))
                         .font(.headline)
+                        .foregroundStyle(BrandColors.navy)
                     Link(L10n.string(.privacyPolicy, language: appState.language),
                          destination: LegalConfig.privacyPolicyURL(languageCode: appState.language.rawValue))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(BrandColors.tealDark)
                     Link(L10n.string(.termsOfService, language: appState.language),
                          destination: LegalConfig.termsOfServiceURL(languageCode: appState.language.rawValue))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(BrandColors.tealDark)
                 }
+                .appCard()
 
                 if !priorMessages.isEmpty {
                     Text(L10n.string(.supportPreviousMessages, language: appState.language))
                         .font(.headline)
+                        .foregroundStyle(BrandColors.navy)
                     ForEach(priorMessages) { item in
                         VStack(alignment: item.isFromManager ? .leading : .trailing, spacing: 4) {
                             Text(item.message)
                                 .padding(10)
-                                .background(item.isFromManager ? Color.gray.opacity(0.15) : BrandColors.teal.opacity(0.15))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .background(item.isFromManager ? BrandColors.border.opacity(0.5) : BrandColors.teal.opacity(0.15))
+                                .clipShape(RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
                         }
                         .frame(maxWidth: .infinity, alignment: item.isFromManager ? .leading : .trailing)
                     }
@@ -48,8 +71,11 @@ struct SupportView: View {
                     .lineLimit(4...8)
 
                 if sent {
-                    Text(L10n.string(.supportMessageSent, language: appState.language))
-                        .foregroundStyle(BrandColors.tealDark)
+                    AppBanner(
+                        message: L10n.string(.supportMessageSent, language: appState.language),
+                        systemImage: "checkmark.circle",
+                        tone: .success
+                    )
                 }
 
                 Button(L10n.string(.send, language: appState.language)) {
@@ -69,12 +95,27 @@ struct SupportView: View {
         .onDisappear { messagesTask?.cancel() }
     }
 
-    private func contactRow(icon: String, value: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(BrandColors.teal)
-            Text(value)
+    private func contactButton(icon: String, value: String, url: String) -> some View {
+        Button {
+            if let link = URL(string: url) {
+                UIApplication.shared.open(link)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundStyle(BrandColors.teal)
+                    .frame(width: 24)
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrandColors.navy)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.forward")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(BrandColors.tealDark)
+            }
+            .frame(minHeight: 48)
         }
+        .buttonStyle(.plain)
     }
 
     private func startWatchingMessages() {

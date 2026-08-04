@@ -25,6 +25,7 @@ struct DriverHomeView: View {
     @State private var customerTask: Task<Void, Never>?
     @State private var cancelledCount = 0
     @State private var cancelledTask: Task<Void, Never>?
+    @State private var onlinePulse = false
 
     private var currentDriver: DriverProfile {
         liveDriver ?? driver
@@ -134,26 +135,22 @@ struct DriverHomeView: View {
 
     private var idleDriverPanel: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                Image("AppLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 96, height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            VStack(spacing: AppSpacing.lg) {
+                driverHeader
 
-                Text(currentDriver.name)
-                    .font(.title2.bold())
-                    .foregroundStyle(BrandColors.navy)
+                walletCard
 
                 availabilityCard
-
-                DriverDeliveryOrdersPanel(driverId: currentDriver.uid)
 
                 if walletIsLow || walletIsBlocked {
                     walletBanner
                 }
 
+                todayStatsRow
+
                 tripsStatsRow
+
+                DriverDeliveryOrdersPanel(driverId: currentDriver.uid)
 
                 if let monthlyStats {
                     monthlyPrizeCard(stats: monthlyStats)
@@ -173,41 +170,90 @@ struct DriverHomeView: View {
                 earningsCard(driver: currentDriver)
 
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
+                    AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
                 }
             }
-            .padding(24)
+            .padding(AppSpacing.xxl)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
     }
 
-    private var availabilityCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.string(.driverAvailabilityTitle, language: appState.language))
-                .font(.headline)
-                .foregroundStyle(BrandColors.navy)
+    private var driverHeader: some View {
+        VStack(spacing: AppSpacing.sm) {
+            Image("AppLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72, height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous))
 
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
+            Text(currentDriver.name)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(BrandColors.navy)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var walletCard: some View {
+        AppWalletCard(
+            title: appState.language == .arabic ? "رصيد المحفظة" : "Wallet balance",
+            balance: formatIqd(currentDriver.walletBalanceIqd),
+            subtitle: walletCardSubtitle,
+            actionTitle: appState.language == .arabic ? "فتح المحفظة / شحن" : "Open wallet / recharge"
+        ) {
+            showWallet = true
+        }
+    }
+
+    private var walletCardSubtitle: String? {
+        if walletIsBlocked {
+            return appState.language == .arabic
+                ? "محظور — اشحن لاستقبال الرحلات"
+                : "Blocked — recharge to receive trips"
+        }
+        if walletIsLow {
+            return appState.language == .arabic ? "رصيد منخفض" : "Low balance"
+        }
+        return appState.language == .arabic ? "نشط" : "Active"
+    }
+
+    private var availabilityCard: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            HStack(spacing: AppSpacing.sm) {
+                Circle()
+                    .fill(currentDriver.isOnline ? BrandColors.success : BrandColors.muted)
+                    .frame(width: 10, height: 10)
+                    .overlay {
+                        if currentDriver.isOnline {
+                            Circle()
+                                .stroke(BrandColors.success.opacity(0.35), lineWidth: 3)
+                                .scaleEffect(onlinePulse ? 1.8 : 1)
+                                .opacity(onlinePulse ? 0 : 0.8)
+                        }
+                    }
+
+                Text(L10n.string(.driverAvailabilityTitle, language: appState.language))
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(BrandColors.navy)
+            }
+
+            HStack(alignment: .center, spacing: AppSpacing.md) {
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     Text(
                         currentDriver.isOnline
                             ? L10n.string(.goOnline, language: appState.language)
                             : L10n.string(.goOffline, language: appState.language)
                     )
-                    .font(.title3.bold())
-                    .foregroundStyle(currentDriver.isOnline ? BrandColors.tealDark : .secondary)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(currentDriver.isOnline ? BrandColors.tealDark : BrandColors.muted)
 
                     Text(availabilityHint)
                         .font(.footnote)
-                        .foregroundStyle(currentDriver.hasAssignedWorkArea ? Color.secondary : Color.red)
+                        .foregroundStyle(currentDriver.hasAssignedWorkArea ? BrandColors.muted : BrandColors.danger)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer()
+                Spacer(minLength: AppSpacing.sm)
 
                 Toggle(
                     "",
@@ -219,11 +265,32 @@ struct DriverHomeView: View {
                 .labelsHidden()
                 .tint(BrandColors.teal)
                 .disabled(isUpdatingOnline || !currentDriver.hasAssignedWorkArea)
+                .frame(minWidth: 51, minHeight: 48)
+            }
+            .padding(AppSpacing.md)
+            .background(
+                currentDriver.isOnline
+                    ? BrandColors.teal.opacity(0.08)
+                    : BrandColors.surface,
+                in: RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous)
+            )
+        }
+        .appCard()
+        .onAppear {
+            guard currentDriver.isOnline else { return }
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) {
+                onlinePulse = true
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .onChange(of: currentDriver.isOnline) { isOnline in
+            if isOnline {
+                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) {
+                    onlinePulse = true
+                }
+            } else {
+                onlinePulse = false
+            }
+        }
     }
 
     private var availabilityHint: String {
@@ -235,76 +302,70 @@ struct DriverHomeView: View {
             : L10n.string(.driverGoOnlineHint, language: appState.language)
     }
 
-    private var tripsStatsRow: some View {
-        HStack(spacing: 12) {
-            statCard(
-                title: L10n.string(.completedRidesCount, language: appState.language),
-                value: currentDriver.completedRidesCount,
-                icon: "checkmark.circle.fill",
-                color: BrandColors.tealDark
-            ) {
-                showCompletedHistory = true
-            }
+    private var todayStatsRow: some View {
+        HStack(spacing: AppSpacing.md) {
+            AppStatCard(
+                label: L10n.string(.monthlyRidesCount, language: appState.language),
+                value: "\(currentDriver.monthlyRideCount)",
+                systemImage: "car.fill"
+            )
 
-            statCard(
-                title: L10n.string(.cancelledRidesCount, language: appState.language),
-                value: cancelledCount,
-                icon: "xmark.circle.fill",
-                color: .red
-            ) {
-                showCancelledHistory = true
-            }
+            AppStatCard(
+                label: L10n.string(.driverNetEarnings, language: appState.language),
+                value: formatIqd(currentDriver.outstandingDriverEarningsIqd),
+                systemImage: "banknote.fill"
+            )
         }
     }
 
-    private func statCard(
-        title: String,
-        value: Int,
-        icon: String,
-        color: Color,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(color)
-                Text("\(value)")
-                    .font(.title.bold())
-                    .foregroundStyle(BrandColors.navy)
-                Text(title)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+    private var tripsStatsRow: some View {
+        HStack(spacing: AppSpacing.md) {
+            Button {
+                showCompletedHistory = true
+            } label: {
+                AppStatCard(
+                    label: L10n.string(.completedRidesCount, language: appState.language),
+                    value: "\(currentDriver.completedRidesCount)",
+                    systemImage: "checkmark.circle.fill"
+                )
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(.white, in: RoundedRectangle(cornerRadius: 16))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(color.opacity(0.2), lineWidth: 1)
+            .buttonStyle(.plain)
+
+            Button {
+                showCancelledHistory = true
+            } label: {
+                AppStatCard(
+                    label: L10n.string(.cancelledRidesCount, language: appState.language),
+                    value: "\(cancelledCount)",
+                    systemImage: "xmark.circle.fill"
+                )
             }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 
     private func monthlyPrizeCard(stats: DriverMonthlyStats) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Label(L10n.string(.driverMonthlyPrizeTitle, language: appState.language), systemImage: "trophy.fill")
-                .font(.headline)
+                .font(.headline.weight(.bold))
                 .foregroundStyle(BrandColors.gold)
             Text(L10n.driverMonthlyRideCount(stats.rideCount, language: appState.language))
-                .font(.title2.bold())
+                .font(.title2.weight(.bold))
+                .foregroundStyle(BrandColors.navy)
             Text(L10n.driverMonthlyRank(stats.rank, stats.totalDrivers, language: appState.language))
                 .font(.subheadline)
+                .foregroundStyle(BrandColors.muted)
             Text(L10n.driverMonthlyPrizeAmount(formatIqd(stats.prizeAmountIqd), language: appState.language))
-                .font(.subheadline)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(BrandColors.gold)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(BrandColors.teal.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+        .padding(AppSpacing.lg)
+        .background(BrandColors.gold.opacity(0.08), in: RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous)
+                .stroke(BrandColors.gold.opacity(0.25), lineWidth: 1)
+        }
     }
 
     private var walletIsBlocked: Bool {
@@ -319,145 +380,232 @@ struct DriverHomeView: View {
         Button {
             showWallet = true
         } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(walletIsBlocked ? Color.red : Color.orange)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(
-                        walletIsBlocked
-                            ? (appState.language == .arabic
-                                ? "المحفظة محظورة — اشحن لاستقبال الرحلات"
-                                : "Wallet blocked — recharge to receive trips")
-                            : (appState.language == .arabic
-                                ? "رصيد المحفظة منخفض"
-                                : "Wallet balance is low")
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(BrandColors.navy)
-                    Text(appState.language == .arabic ? "اضغط للشحن" : "Tap to recharge")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            .padding(14)
-            .background(
-                (walletIsBlocked ? Color.red : Color.orange).opacity(0.12),
-                in: RoundedRectangle(cornerRadius: 14)
+            AppBanner(
+                message: walletIsBlocked
+                    ? (appState.language == .arabic
+                        ? "المحفظة محظورة — اشحن لاستقبال الرحلات. اضغط للشحن."
+                        : "Wallet blocked — recharge to receive trips. Tap to recharge.")
+                    : (appState.language == .arabic
+                        ? "رصيد المحفظة منخفض. اضغط للشحن."
+                        : "Wallet balance is low. Tap to recharge."),
+                systemImage: "exclamationmark.triangle.fill",
+                tone: walletIsBlocked ? .danger : .warning
             )
         }
         .buttonStyle(.plain)
     }
 
     private func earningsCard(driver: DriverProfile) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text(L10n.string(.yourEarningsTitle, language: appState.language))
-                .font(.headline)
-            Text("\(L10n.string(.monthlyRidesCount, language: appState.language)): \(driver.monthlyRideCount)")
-                .font(.subheadline.bold())
-            Text("\(L10n.string(.completedRidesCount, language: appState.language)): \(driver.completedRidesCount)")
-            Text("\(L10n.string(.driverNetEarnings, language: appState.language)): \(formatIqd(driver.outstandingDriverEarningsIqd))")
-            Text("\(L10n.string(.owedToPlatformLabel, language: appState.language)): \(formatIqd(driver.outstandingPlatformCommissionIqd))")
-            if driver.pendingBonusIqd > 0 {
-                Text("\(L10n.string(.pendingBonusLabel, language: appState.language)): \(formatIqd(driver.pendingBonusIqd))")
-            }
-            Text(
-                "\(appState.language == .arabic ? "رصيد المحفظة" : "Wallet balance"): \(formatIqd(driver.walletBalanceIqd))"
+                .font(.headline.weight(.bold))
+                .foregroundStyle(BrandColors.navy)
+
+            earningsRow(
+                L10n.string(.monthlyRidesCount, language: appState.language),
+                value: "\(driver.monthlyRideCount)",
+                emphasized: true
             )
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(BrandColors.tealDark)
-            Button {
-                showWallet = true
-            } label: {
-                Text(appState.language == .arabic ? "فتح المحفظة / شحن" : "Open wallet / recharge")
+            earningsRow(
+                L10n.string(.completedRidesCount, language: appState.language),
+                value: "\(driver.completedRidesCount)"
+            )
+            earningsRow(
+                L10n.string(.driverNetEarnings, language: appState.language),
+                value: formatIqd(driver.outstandingDriverEarningsIqd)
+            )
+            earningsRow(
+                L10n.string(.owedToPlatformLabel, language: appState.language),
+                value: formatIqd(driver.outstandingPlatformCommissionIqd)
+            )
+            if driver.pendingBonusIqd > 0 {
+                earningsRow(
+                    L10n.string(.pendingBonusLabel, language: appState.language),
+                    value: formatIqd(driver.pendingBonusIqd)
+                )
             }
-            .buttonStyle(SecondaryButtonStyle())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .appCard()
+    }
+
+    private func earningsRow(_ label: String, value: String, emphasized: Bool = false) -> some View {
+        HStack {
+            Text(label)
+                .font(emphasized ? .subheadline.weight(.semibold) : .subheadline)
+                .foregroundStyle(BrandColors.muted)
+            Spacer()
+            Text(value)
+                .font(emphasized ? .subheadline.weight(.bold) : .subheadline.weight(.medium))
+                .foregroundStyle(BrandColors.navy)
+        }
     }
 
     @ViewBuilder
     private func driverRidePanel(ride: Ride) -> some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                if MapsConfig.isConfigured {
-                    GoogleMapView(
-                        cameraTarget: ride.pickupCoordinate,
-                        zoom: 14,
-                        pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
-                        destination: MapPlace(label: ride.destinationLabel, coordinate: ride.destinationCoordinate)
-                    )
-                    .frame(height: 240)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .padding(.horizontal)
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        ProfileAvatarView(
-                            name: activeCustomer?.name ?? "",
-                            photoURL: activeCustomer?.profilePhotoUrl,
-                            size: 56
-                        )
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(rideStatusTitle(ride.status))
-                                .font(.headline)
-                            if let name = activeCustomer?.name, !name.isEmpty {
-                                Text(name)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                    }
-                    Text("\(ride.pickupLabel) → \(ride.destinationLabel)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text(formatIqd(ride.fareAmountIqd))
-                        .font(.title2.bold())
-                        .foregroundStyle(BrandColors.tealDark)
-
-                    Button {
-                        showChat = true
-                    } label: {
-                        Label(L10n.string(.messageCustomer, language: appState.language), systemImage: "message.fill")
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-                }
-                .padding(.horizontal, 24)
-
-                rideActions(for: ride)
-                    .padding(.horizontal, 24)
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal)
-                }
+        ZStack(alignment: .bottom) {
+            if MapsConfig.isConfigured {
+                GoogleMapView(
+                    cameraTarget: ride.pickupCoordinate,
+                    zoom: 14,
+                    pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
+                    destination: MapPlace(label: ride.destinationLabel, coordinate: ride.destinationCoordinate)
+                )
+                .ignoresSafeArea()
+            } else {
+                BrandColors.surface.ignoresSafeArea()
             }
-            .padding(.vertical, 16)
+
+            driverRideBottomPanel(ride: ride)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
     }
 
     @ViewBuilder
+    private func driverRideBottomPanel(ride: Ride) -> some View {
+        VStack(spacing: 0) {
+            AppSheetHandle()
+                .padding(.top, AppSpacing.sm)
+
+            VStack(alignment: .leading, spacing: AppSpacing.md) {
+                HStack(spacing: AppSpacing.md) {
+                    ProfileAvatarView(
+                        name: activeCustomer?.name ?? "",
+                        photoURL: activeCustomer?.profilePhotoUrl,
+                        size: 56
+                    )
+                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                        Text(rideStatusTitle(ride.status))
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(BrandColors.navy)
+                        if let name = activeCustomer?.name, !name.isEmpty {
+                            Text(name)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(BrandColors.muted)
+                        }
+                    }
+                    Spacer(minLength: AppSpacing.sm)
+
+                    Text(formatIqd(ride.fareAmountIqd))
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(BrandColors.tealDark)
+                }
+
+                tripLocationRow(
+                    icon: "circle.fill",
+                    iconColor: BrandColors.success,
+                    title: appState.language == .arabic ? "من" : "Pickup",
+                    label: ride.pickupLabel
+                )
+                tripLocationRow(
+                    icon: "flag.fill",
+                    iconColor: BrandColors.danger,
+                    title: appState.language == .arabic ? "إلى" : "Destination",
+                    label: ride.destinationLabel
+                )
+
+                if ride.status == .matched {
+                    offerUrgencyBanner
+                }
+
+                Button {
+                    showChat = true
+                } label: {
+                    Label(L10n.string(.messageCustomer, language: appState.language), systemImage: "message.fill")
+                }
+                .buttonStyle(SecondaryButtonStyle())
+
+                rideActions(for: ride)
+
+                if let errorMessage {
+                    AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
+                }
+            }
+            .padding(.horizontal, AppSpacing.lg)
+            .padding(.bottom, AppSpacing.lg)
+        }
+        .background {
+            RoundedRectangle(cornerRadius: AppRadii.xl, style: .continuous)
+                .fill(.white)
+                .shadow(color: BrandColors.navy.opacity(0.12), radius: 24, y: -4)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadii.xl, style: .continuous)
+                .stroke(BrandColors.border, lineWidth: 1)
+        }
+        .padding(.horizontal, AppSpacing.md)
+        .padding(.bottom, AppSpacing.md)
+    }
+
+    private var offerUrgencyBanner: some View {
+        HStack(spacing: AppSpacing.md) {
+            ZStack {
+                Circle()
+                    .stroke(BrandColors.teal.opacity(0.2), lineWidth: 3)
+                    .frame(width: 44, height: 44)
+                Image(systemName: "clock.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(BrandColors.tealDark)
+            }
+
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                Text(appState.language == .arabic ? "عرض جديد" : "New offer")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(BrandColors.navy)
+                Text(
+                    appState.language == .arabic
+                        ? "اقبل أو ارفض قبل انتهاء المهلة"
+                        : "Accept or reject before time runs out"
+                )
+                .font(.caption)
+                .foregroundStyle(BrandColors.muted)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(AppSpacing.md)
+        .background(BrandColors.teal.opacity(0.08), in: RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous)
+                .stroke(BrandColors.teal.opacity(0.2), lineWidth: 1)
+        }
+    }
+
+    private func tripLocationRow(icon: String, iconColor: Color, title: String, label: String) -> some View {
+        HStack(alignment: .top, spacing: AppSpacing.md) {
+            Image(systemName: icon)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(iconColor)
+                .frame(width: 24, height: 24)
+                .background(iconColor.opacity(0.12), in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(BrandColors.muted)
+                Text(label)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(BrandColors.navy)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
     private func rideActions(for ride: Ride) -> some View {
         switch ride.status {
         case .matched:
-            HStack(spacing: 12) {
+            HStack(spacing: AppSpacing.md) {
+                Button(L10n.string(.rejectRide, language: appState.language)) {
+                    Task { await reject(ride) }
+                }
+                .buttonStyle(SecondaryButtonStyle(destructive: true))
+
                 Button(L10n.string(.acceptRide, language: appState.language)) {
                     Task { await accept(ride) }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-
-                Button(L10n.string(.rejectRide, language: appState.language)) {
-                    Task { await reject(ride) }
-                }
-                .buttonStyle(SecondaryButtonStyle())
             }
         case .accepted:
             Button(L10n.string(.startRide, language: appState.language)) {

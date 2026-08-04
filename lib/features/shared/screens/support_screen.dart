@@ -4,6 +4,7 @@ import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/chat_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/utils/legal_url_launcher.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -97,81 +98,75 @@ class _SupportScreenState extends State<SupportScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          l10n.contactManagement,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: () => _launch('tel:${contact.phone}'),
-                          icon: const Icon(Icons.phone),
-                          label: Text('${l10n.callSupport}: ${contact.phone}'),
-                        ),
-                        const SizedBox(height: 8),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            final digits =
-                                contact.whatsapp.replaceAll(RegExp(r'[^0-9]'), '');
-                            _launch('https://wa.me/$digits');
-                          },
-                          icon: const Icon(Icons.chat),
-                          label: Text(l10n.whatsappSupport),
-                        ),
-                        const SizedBox(height: 8),
-                        OutlinedButton.icon(
-                          onPressed: () => _launch('mailto:${contact.email}'),
-                          icon: const Icon(Icons.email_outlined),
-                          label: Text('${l10n.emailSupport}: ${contact.email}'),
-                        ),
-                      ],
-                    ),
+                child: AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        l10n.contactManagement,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      AppSecondaryButton(
+                        label: '${l10n.callSupport}: ${contact.phone}',
+                        icon: Icons.phone,
+                        onPressed: () => _launch('tel:${contact.phone}'),
+                      ),
+                      const SizedBox(height: 8),
+                      AppSecondaryButton(
+                        label: l10n.whatsappSupport,
+                        icon: Icons.chat,
+                        onPressed: () {
+                          final digits =
+                              contact.whatsapp.replaceAll(RegExp(r'[^0-9]'), '');
+                          _launch('https://wa.me/$digits');
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      AppSecondaryButton(
+                        label: '${l10n.emailSupport}: ${contact.email}',
+                        icon: Icons.email_outlined,
+                        onPressed: () => _launch('mailto:${contact.email}'),
+                      ),
+                    ],
                   ),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          l10n.legalDocuments,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: () => _launch(
-                            LegalConfig.privacyPolicyUrl(
-                              languageCode: l10n.localeName.startsWith('ar')
-                                  ? 'ar'
-                                  : 'en',
-                            ),
+                child: AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        l10n.legalDocuments,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      AppSecondaryButton(
+                        label: l10n.privacyPolicy,
+                        icon: Icons.privacy_tip_outlined,
+                        onPressed: () => _launch(
+                          LegalConfig.privacyPolicyUrl(
+                            languageCode: l10n.localeName.startsWith('ar')
+                                ? 'ar'
+                                : 'en',
                           ),
-                          icon: const Icon(Icons.privacy_tip_outlined),
-                          label: Text(l10n.privacyPolicy),
                         ),
-                        const SizedBox(height: 8),
-                        OutlinedButton.icon(
-                          onPressed: () => _launch(
-                            LegalConfig.termsOfServiceUrl(
-                              languageCode: l10n.localeName.startsWith('ar')
-                                  ? 'ar'
-                                  : 'en',
-                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      AppSecondaryButton(
+                        label: l10n.termsOfService,
+                        icon: Icons.description_outlined,
+                        onPressed: () => _launch(
+                          LegalConfig.termsOfServiceUrl(
+                            languageCode: l10n.localeName.startsWith('ar')
+                                ? 'ar'
+                                : 'en',
                           ),
-                          icon: const Icon(Icons.description_outlined),
-                          label: Text(l10n.termsOfService),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -259,6 +254,9 @@ class _SupportScreenState extends State<SupportScreen> {
                       ),
                       const SizedBox(width: 8),
                       IconButton.filled(
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                        ),
                         onPressed: _sending ? null : () => _send(profile),
                         icon: _sending
                             ? const SizedBox(

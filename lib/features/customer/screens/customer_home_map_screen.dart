@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/constants/map_presence_config.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/map_presence.dart';
@@ -12,6 +13,7 @@ import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/nearby_providers_service.dart';
 import 'package:hilla_ride/core/utils/ride_location_utils.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/core/widgets/map_camera_helper.dart';
 import 'package:hilla_ride/core/widgets/driver_marker_cluster.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
@@ -584,29 +586,58 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
             },
           ),
           Positioned(
-            right: 16,
+            right: AppSpacing.lg,
             bottom: 340,
             child: SafeArea(
               top: false,
-              child: FloatingActionButton.small(
-                heroTag: 'customer_my_location',
-                onPressed: _pickupLoading ? null : _useCurrentLocation,
-                child: _pickupLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.my_location),
+              child: Material(
+                elevation: 4,
+                shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(AppRadii.md),
+                color: Colors.white,
+                child: InkWell(
+                  onTap: _pickupLoading ? null : _useCurrentLocation,
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Center(
+                      child: _pickupLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppBrandAssets.brandTeal,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.my_location,
+                              color: AppBrandAssets.brandTealDark,
+                              size: 22,
+                            ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
           Align(
             alignment: Alignment.bottomCenter,
-            child: Material(
-              elevation: 16,
-              shadowColor: Colors.black38,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadii.xl),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppBrandAssets.brandNavy.withValues(alpha: 0.12),
+                    blurRadius: 24,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
+              ),
               clipBehavior: Clip.antiAlias,
               child: SafeArea(
                 top: false,
@@ -614,30 +645,21 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (widget.user.hasActivePromo)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          AppSpacing.md,
+                          AppSpacing.lg,
+                          0,
                         ),
-                        color: const Color(0xFF0F766E).withValues(alpha: 0.12),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.local_offer_outlined,
-                              color: Color(0xFFD97706),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                l10n.customerPromoBanner(
-                                  widget.user.promoCode,
-                                  widget.user.promoRidesLimit -
-                                      widget.user.promoRidesUsed,
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: AppBanner(
+                          message: l10n.customerPromoBanner(
+                            widget.user.promoCode,
+                            widget.user.promoRidesLimit -
+                                widget.user.promoRidesUsed,
+                          ),
+                          icon: Icons.local_offer_outlined,
+                          tone: AppBannerTone.warning,
                         ),
                       ),
                     RideSearchPanel(

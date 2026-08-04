@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/region_search_context.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/customer/screens/place_search_screen.dart';
 import 'package:hilla_ride/features/customer/widgets/saved_places_bar.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
@@ -170,14 +172,21 @@ class RideSearchPanel extends StatelessWidget {
 
     final theme = Theme.of(context);
 
-    return Material(
-      elevation: 6,
-      shadowColor: Colors.black26,
-      borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: AppBrandAssets.brandBorder),
+        boxShadow: AppShadows.card,
+      ),
       clipBehavior: Clip.antiAlias,
-      color: theme.colorScheme.surface,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.sm,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -281,22 +290,18 @@ class _BottomSheetSearch extends StatelessWidget {
         destinationText != null && destinationText.isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
+          const AppSheetHandle(),
+          const SizedBox(height: AppSpacing.sm),
           if (customerOnly)
             _CustomerRegionFields(
               districtId: districtId,
@@ -383,14 +388,11 @@ class _BottomSheetSearch extends StatelessWidget {
             onPlaceSelected: onSavedPlaceSelected,
           ),
           if (onBookRide != null) ...[
-            const SizedBox(height: 12),
-            FilledButton.icon(
+            const SizedBox(height: AppSpacing.md),
+            AppPrimaryButton(
+              label: l10n.bookRideButton,
+              icon: Icons.local_taxi,
               onPressed: onBookRide,
-              icon: const Icon(Icons.local_taxi),
-              label: Text(l10n.bookRideButton),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-              ),
             ),
           ],
         ],
@@ -402,8 +404,8 @@ class _BottomSheetSearch extends StatelessWidget {
 class MapMarkerColors {
   MapMarkerColors._();
 
-  static const Color pickup = Color(0xFFFF9500);
-  static const Color destination = Color(0xFF007AFF);
+  static const Color pickup = AppBrandAssets.brandGold;
+  static const Color destination = AppBrandAssets.brandTeal;
 }
 
 class _TripSearchField extends StatelessWidget {
@@ -426,25 +428,29 @@ class _TripSearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      elevation: 2,
-      shadowColor: Colors.black12,
-      borderRadius: BorderRadius.circular(14),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(14),
+            color: AppBrandAssets.brandSurface,
+            borderRadius: BorderRadius.circular(AppRadii.md),
             border: Border.all(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              color: emphasized
+                  ? AppBrandAssets.brandTeal.withValues(alpha: 0.35)
+                  : AppBrandAssets.brandBorder,
             ),
+            boxShadow: AppShadows.soft,
           ),
           child: Row(
             children: [
               leading,
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
                   text,
@@ -452,10 +458,10 @@ class _TripSearchField extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight:
-                        emphasized ? FontWeight.w600 : FontWeight.w500,
+                        emphasized ? FontWeight.w700 : FontWeight.w500,
                     color: emphasized
-                        ? theme.colorScheme.onSurface
-                        : theme.colorScheme.outline,
+                        ? AppBrandAssets.brandNavy
+                        : AppBrandAssets.brandMuted,
                   ),
                 ),
               ),
@@ -639,11 +645,10 @@ class _LocationFields extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
-        ),
+        color: AppBrandAssets.brandSurface,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: AppBrandAssets.brandBorder),
+        boxShadow: AppShadows.soft,
       ),
       child: Column(
         children: [
@@ -739,19 +744,25 @@ class _RegionChip extends StatelessWidget {
     if (!expanded) {
       return InkWell(
         onTap: onToggle,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(999),
+            color: AppBrandAssets.brandTeal.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+            border: Border.all(
+              color: AppBrandAssets.brandTeal.withValues(alpha: 0.2),
+            ),
           ),
           child: Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.place_outlined,
                 size: 16,
-                color: Theme.of(context).colorScheme.primary,
+                color: AppBrandAssets.brandTealDark,
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -913,20 +924,20 @@ class _MiniAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: tooltip,
-      visualDensity: VisualDensity.compact,
+      visualDensity: VisualDensity.standard,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
       onPressed: onPressed,
       icon: loading
-          ? SizedBox(
-              width: 16,
-              height: 16,
+          ? const SizedBox(
+              width: 18,
+              height: 18,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Theme.of(context).colorScheme.primary,
+                color: AppBrandAssets.brandTeal,
               ),
             )
-          : Icon(icon, size: 18),
+          : Icon(icon, size: 20, color: AppBrandAssets.brandTealDark),
     );
   }
 }

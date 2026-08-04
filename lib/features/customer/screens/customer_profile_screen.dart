@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/widgets/arabic_text_field.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -92,15 +93,10 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               onChanged: (value) => setState(() => _gender = value),
             ),
             const Spacer(),
-            FilledButton(
-              onPressed: _isSaving ? null : _save,
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(l10n.save),
+            AppPrimaryButton(
+              label: l10n.save,
+              onPressed: _save,
+              isLoading: _isSaving,
             ),
           ],
         ),

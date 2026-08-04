@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/business_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/customer/screens/business_store_screen.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -80,12 +82,12 @@ class _MarketplaceHomeScreenState extends State<MarketplaceHomeScreen> {
                     }
                     final items = snap.data ?? const [];
                     if (items.isEmpty) {
-                      return Center(
-                        child: Text(
-                          isAr
-                              ? 'لا متاجر مباشرة حالياً — ستظهر تلقائياً عند موافقة الإدارة'
-                              : 'No live businesses yet — they appear automatically when approved',
-                        ),
+                      return AppEmptyState(
+                        title: isAr ? 'لا متاجر مباشرة حالياً' : 'No live businesses yet',
+                        message: isAr
+                            ? 'ستظهر تلقائياً عند موافقة الإدارة'
+                            : 'They appear automatically when approved',
+                        icon: Icons.storefront_outlined,
                       );
                     }
                     return ListView.builder(
@@ -93,24 +95,9 @@ class _MarketplaceHomeScreenState extends State<MarketplaceHomeScreen> {
                       itemCount: items.length,
                       itemBuilder: (context, i) {
                         final b = items[i];
-                        return Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundImage: b.logoUrl.isNotEmpty
-                                  ? NetworkImage(b.logoUrl)
-                                  : null,
-                              child: b.logoUrl.isEmpty
-                                  ? const Icon(Icons.storefront)
-                                  : null,
-                            ),
-                            title: Text(b.nameForLocale(isAr)),
-                            subtitle: Text(
-                              [
-                                typeNames[b.typeId] ?? b.typeId,
-                                if (b.address.isNotEmpty) b.address,
-                                '★ ${b.rating.toStringAsFixed(1)}',
-                              ].join(' • '),
-                            ),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: AppCard(
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -121,6 +108,45 @@ class _MarketplaceHomeScreenState extends State<MarketplaceHomeScreen> {
                                 ),
                               );
                             },
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 24,
+                                  backgroundImage: b.logoUrl.isNotEmpty
+                                      ? NetworkImage(b.logoUrl)
+                                      : null,
+                                  child: b.logoUrl.isEmpty
+                                      ? const Icon(Icons.storefront)
+                                      : null,
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        b.nameForLocale(isAr),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(fontWeight: FontWeight.w600),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        [
+                                          typeNames[b.typeId] ?? b.typeId,
+                                          if (b.address.isNotEmpty) b.address,
+                                          '★ ${b.rating.toStringAsFixed(1)}',
+                                        ].join(' • '),
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right, size: 22),
+                              ],
+                            ),
                           ),
                         );
                       },

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/shared/widgets/ride_earnings_summary.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
@@ -107,7 +109,10 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
               : rides.where((r) => r.status == RideStatus.completed).length;
 
           if (allRides.isEmpty) {
-            return Center(child: Text(l10n.noRideHistory));
+            return AppEmptyState(
+              title: l10n.noRideHistory,
+              icon: Icons.history,
+            );
           }
 
           final grouped = _groupByMonth(rides);
@@ -138,34 +143,17 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
               ),
               const SizedBox(height: 16),
               if (rides.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Text(l10n.noRideHistory),
-                  ),
+                AppEmptyState(
+                  title: l10n.noRideHistory,
+                  icon: Icons.filter_alt_outlined,
                 )
               else ...[
                 if (widget.statusFilter == null ||
                     widget.statusFilter == RideStatus.completed)
-                  Card(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.totalTripsCount(completedCount),
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.tripHistoryHint,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    ),
+                  AppStatCard(
+                    label: l10n.tripHistoryHint,
+                    value: l10n.totalTripsCount(completedCount),
+                    icon: Icons.check_circle_outline,
                   ),
                 if (widget.statusFilter == null ||
                     widget.statusFilter == RideStatus.completed)
@@ -198,37 +186,53 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Card(
-                        child: ListTile(
-                          leading: Icon(
-                            ride.status == RideStatus.completed
-                                ? Icons.check_circle_outline
-                                : Icons.cancel_outlined,
-                            color: ride.status == RideStatus.completed
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.error,
-                          ),
-                          title: Text(
-                            ride.rideNumber.isNotEmpty
-                                ? '${l10n.rideNumberLabel(ride.rideNumber)} • ${ride.pickupLabel} → ${ride.destinationLabel}'
-                                : '${ride.pickupLabel} → ${ride.destinationLabel}',
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${l10n.tripDateTime}: $dateLabel'),
-                              Text(
-                                '${l10n.statusLabel}: ${ride.status.name} • ${fareService.formatIqd(ride.fareAmountIqd, locale: l10n.localeName)}',
+                      child: AppCard(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              ride.status == RideStatus.completed
+                                  ? Icons.check_circle_outline
+                                  : Icons.cancel_outlined,
+                              color: ride.status == RideStatus.completed
+                                  ? AppBrandAssets.brandTeal
+                                  : AppBrandAssets.brandDanger,
+                              size: 24,
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    ride.rideNumber.isNotEmpty
+                                        ? '${l10n.rideNumberLabel(ride.rideNumber)} • ${ride.pickupLabel} → ${ride.destinationLabel}'
+                                        : '${ride.pickupLabel} → ${ride.destinationLabel}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${l10n.tripDateTime}: $dateLabel',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  Text(
+                                    '${l10n.statusLabel}: ${ride.status.name} • ${fareService.formatIqd(ride.fareAmountIqd, locale: l10n.localeName)}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  if (widget.driverId != null &&
+                                      ride.status == RideStatus.completed)
+                                    RideEarningsSummary(
+                                      ride: ride,
+                                      showDriverNet: true,
+                                    ),
+                                ],
                               ),
-                              if (widget.driverId != null &&
-                                  ride.status == RideStatus.completed)
-                                RideEarningsSummary(
-                                  ride: ride,
-                                  showDriverNet: true,
-                                ),
-                            ],
-                          ),
-                          isThreeLine: true,
+                            ),
+                          ],
                         ),
                       ),
                     );

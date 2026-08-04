@@ -81,22 +81,22 @@ struct ModeChooserView: View {
                         .foregroundStyle(BrandColors.navy)
                     Text(subtitle)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(BrandColors.muted)
                         .multilineTextAlignment(.leading)
                 }
 
-                Spacer()
+                Spacer(minLength: 8)
                 Image(systemName: "chevron.forward")
                     .foregroundStyle(color)
             }
-            .padding(24)
-            .background(.white, in: RoundedRectangle(cornerRadius: 20))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(color.opacity(0.25), lineWidth: 1)
-            }
+            .frame(minHeight: 48)
         }
         .buttonStyle(.plain)
+        .appCard()
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous)
+                .stroke(color.opacity(0.25), lineWidth: 1)
+        }
     }
 
     @ViewBuilder

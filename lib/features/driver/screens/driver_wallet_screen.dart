@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/wallet_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -36,6 +38,22 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
     super.dispose();
   }
 
+  String _statusSubtitle({
+    required bool blocked,
+    required bool low,
+    required bool isAr,
+  }) {
+    if (blocked) {
+      return isAr
+          ? 'الحالة: محظور — اشحن المحفظة لاستقبال الرحلات'
+          : 'Status: Blocked — recharge to receive trips';
+    }
+    if (low) {
+      return isAr ? 'الحالة: رصيد منخفض' : 'Status: Low balance';
+    }
+    return isAr ? 'الحالة: نشط' : 'Status: Active';
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -44,10 +62,14 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
     final driverService = context.watch<AppState>().driverService;
 
     return Scaffold(
+      backgroundColor: AppBrandAssets.brandSurface,
       appBar: AppBar(
         title: Text(isAr ? 'المحفظة' : 'Wallet'),
         bottom: TabBar(
           controller: _tabs,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
           tabs: [
             Tab(text: isAr ? 'الرصيد' : 'Balance'),
             Tab(text: isAr ? 'السجل' : 'History'),
@@ -62,7 +84,8 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
             stream: wallet.watchConfig(),
             builder: (context, configSnap) {
               final config = configSnap.data ?? const WalletConfig();
-              final low = driver.walletBalanceIqd <= config.lowBalanceWarningIqd;
+              final low =
+                  driver.walletBalanceIqd <= config.lowBalanceWarningIqd;
               final blocked = driver.walletStatus == 'blocked' ||
                   driver.walletBalanceIqd < config.minBalanceIqd;
 
@@ -70,76 +93,36 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
                 controller: _tabs,
                 children: [
                   ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     children: [
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isAr ? 'الرصيد الحالي' : 'Current balance',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _fare.formatIqd(
-                                  driver.walletBalanceIqd,
-                                  locale: l10n.localeName,
-                                ),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineMedium
-                                    ?.copyWith(
-                                      color: const Color(0xFF0F766E),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                blocked
-                                    ? (isAr
-                                        ? 'الحالة: محظور — اشحن المحفظة لاستقبال الرحلات'
-                                        : 'Status: Blocked — recharge to receive trips')
-                                    : low
-                                        ? (isAr
-                                            ? 'الحالة: رصيد منخفض'
-                                            : 'Status: Low balance')
-                                        : (isAr
-                                            ? 'الحالة: نشط'
-                                            : 'Status: Active'),
-                                style: TextStyle(
-                                  color: blocked
-                                      ? Colors.red
-                                      : low
-                                          ? const Color(0xFFD97706)
-                                          : const Color(0xFF0F766E),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
+                      AppWalletCard(
+                        title: isAr ? 'الرصيد الحالي' : 'Current balance',
+                        balanceLabel: _fare.formatIqd(
+                          driver.walletBalanceIqd,
+                          locale: l10n.localeName,
+                        ),
+                        subtitle: _statusSubtitle(
+                          blocked: blocked,
+                          low: low,
+                          isAr: isAr,
                         ),
                       ),
                       if (low || blocked) ...[
-                        const SizedBox(height: 12),
-                        MaterialBanner(
-                          content: Text(
-                            isAr
-                                ? 'رصيد المحفظة منخفض. اشحن عبر سوبر كي لمتابعة استقبال الرحلات.'
-                                : 'Wallet balance is low. Recharge via SuperQi to keep receiving trips.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () {},
-                              child: const SizedBox.shrink(),
-                            ),
-                          ],
+                        const SizedBox(height: AppSpacing.md),
+                        AppBanner(
+                          message: isAr
+                              ? 'رصيد المحفظة منخفض. اشحن عبر سوبر كي لمتابعة استقبال الرحلات.'
+                              : 'Wallet balance is low. Recharge via SuperQi to keep receiving trips.',
+                          icon: Icons.warning_amber_rounded,
+                          tone: blocked
+                              ? AppBannerTone.danger
+                              : AppBannerTone.warning,
                         ),
                       ],
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
+                      const SizedBox(height: AppSpacing.lg),
+                      AppPrimaryButton(
+                        label: isAr ? 'شحن المحفظة' : 'Recharge wallet',
+                        icon: Icons.add_card,
                         onPressed: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -150,15 +133,15 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
                             ),
                           );
                         },
-                        icon: const Icon(Icons.add_card),
-                        label: Text(isAr ? 'شحن المحفظة' : 'Recharge wallet'),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       Text(
                         isAr
                             ? 'هذه محفظة داخلية لعمولة الشركة فقط وليست محفظة سوبر كي.'
                             : 'This is an internal Hello Tuk-Tuk wallet for company commission only — not a SuperQi wallet.',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppBrandAssets.brandMuted,
+                            ),
                       ),
                     ],
                   ),
@@ -167,36 +150,98 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
                     builder: (context, snap) {
                       final entries = snap.data ?? const [];
                       if (entries.isEmpty) {
-                        return Center(
-                          child: Text(isAr ? 'لا توجد عمليات بعد' : 'No ledger entries yet'),
+                        return AppEmptyState(
+                          title: isAr
+                              ? 'لا توجد عمليات بعد'
+                              : 'No ledger entries yet',
+                          message: isAr
+                              ? 'ستظهر عمليات الشحن والعمولة هنا'
+                              : 'Recharges and commissions will appear here',
+                          icon: Icons.receipt_long_outlined,
                         );
                       }
                       return ListView.separated(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(AppSpacing.lg),
                         itemCount: entries.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, _index) =>
+                            const SizedBox(height: AppSpacing.sm),
                         itemBuilder: (context, index) {
                           final e = entries[index];
                           final credit = e.amountIqd >= 0;
-                          return ListTile(
-                            leading: Icon(
-                              credit ? Icons.arrow_downward : Icons.arrow_upward,
-                              color: credit ? Colors.green : Colors.red,
-                            ),
-                            title: Text(_ledgerTypeLabel(e.type, isAr)),
-                            subtitle: Text(
-                              [
-                                if (e.note.isNotEmpty) e.note,
-                                if (e.createdAt != null)
-                                  e.createdAt!.toLocal().toString().substring(0, 16),
-                              ].where((s) => s.isNotEmpty).join('\n'),
-                            ),
-                            trailing: Text(
-                              '${credit ? '+' : ''}${_fare.formatIqd(e.amountIqd, locale: l10n.localeName)}',
-                              style: TextStyle(
-                                color: credit ? Colors.green : Colors.red,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          return AppCard(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: (credit
+                                            ? AppBrandAssets.brandSuccess
+                                            : AppBrandAssets.brandDanger)
+                                        .withValues(alpha: 0.12),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.sm),
+                                  ),
+                                  child: Icon(
+                                    credit
+                                        ? Icons.arrow_downward
+                                        : Icons.arrow_upward,
+                                    color: credit
+                                        ? AppBrandAssets.brandSuccess
+                                        : AppBrandAssets.brandDanger,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _ledgerTypeLabel(e.type, isAr),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                              color: AppBrandAssets.brandNavy,
+                                            ),
+                                      ),
+                                      if (e.note.isNotEmpty ||
+                                          e.createdAt != null) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          [
+                                            if (e.note.isNotEmpty) e.note,
+                                            if (e.createdAt != null)
+                                              e.createdAt!
+                                                  .toLocal()
+                                                  .toString()
+                                                  .substring(0, 16),
+                                          ].join('\n'),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color:
+                                                    AppBrandAssets.brandMuted,
+                                              ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '${credit ? '+' : ''}${_fare.formatIqd(e.amountIqd, locale: l10n.localeName)}',
+                                  style: TextStyle(
+                                    color: credit
+                                        ? AppBrandAssets.brandSuccess
+                                        : AppBrandAssets.brandDanger,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
                           );
                         },
@@ -380,145 +425,172 @@ class _DriverWalletRechargeScreenState extends State<DriverWalletRechargeScreen>
     final config = widget.config;
 
     return Scaffold(
+      backgroundColor: AppBrandAssets.brandSurface,
       appBar: AppBar(title: Text(isAr ? 'شحن عبر سوبر كي' : 'SuperQi recharge')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  config.companySuperQiName,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppBrandAssets.brandNavy,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                SelectableText(
+                  config.companySuperQiNumber.isEmpty
+                      ? (isAr
+                          ? 'لم يُضبط رقم سوبر كي بعد — تواصل مع الإدارة'
+                          : 'SuperQi number not set yet — contact admin')
+                      : config.companySuperQiNumber,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: AppBrandAssets.brandTealDark,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  config.instructionsForLocale(l10n.localeName),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppBrandAssets.brandMuted,
+                      ),
+                ),
+                if (config.managerWhatsappDigits.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.lg),
                   Text(
-                    config.companySuperQiName,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  SelectableText(
-                    config.companySuperQiNumber.isEmpty
-                        ? (isAr
-                            ? 'لم يُضبط رقم سوبر كي بعد — تواصل مع الإدارة'
-                            : 'SuperQi number not set yet — contact admin')
-                        : config.companySuperQiNumber,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: const Color(0xFF0F766E),
-                          fontWeight: FontWeight.bold,
+                    isAr ? 'واتساب استلام الإيصال' : 'Send receipt on WhatsApp',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppBrandAssets.brandNavy,
                         ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(config.instructionsForLocale(l10n.localeName)),
-                  if (config.managerWhatsappDigits.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      isAr ? 'واتساب استلام الإيصال' : 'Send receipt on WhatsApp',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 4),
-                    SelectableText(
-                      config.managerWhatsappNumber,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    FilledButton.tonalIcon(
-                      onPressed: _sendReceiptWhatsApp,
-                      icon: const Icon(Icons.chat),
-                      label: Text(
-                        isAr
-                            ? 'فتح واتساب وإرسال الإيصال'
-                            : 'Open WhatsApp & send receipt',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isAr
-                          ? 'أرفق صورة الإيصال داخل واتساب بعد فتح المحادثة.'
-                          : 'Attach the receipt photo inside WhatsApp after the chat opens.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.black54,
-                          ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<WalletRechargeMethod>(
-            // ignore: deprecated_member_use
-            value: _method,
-            decoration: InputDecoration(
-              labelText: isAr ? 'طريقة الدفع' : 'Payment method',
-            ),
-            items: [
-              for (final m in [
-                WalletRechargeMethod.superQi,
-                WalletRechargeMethod.cash,
-                WalletRechargeMethod.bankTransfer,
-              ])
-                if (config.enabledMethods.contains(m.value))
-                  DropdownMenuItem(value: m, child: Text(m.value)),
-            ],
-            onChanged: (v) => setState(() => _method = v ?? _method),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _amountCtrl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: isAr ? 'المبلغ (د.ع)' : 'Amount (IQD)',
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _refCtrl,
-            decoration: InputDecoration(
-              labelText: isAr
-                  ? 'رقم المرجع (اختياري)'
-                  : 'Reference number (optional)',
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _notesCtrl,
-            maxLines: 2,
-            decoration: InputDecoration(
-              labelText: isAr ? 'ملاحظات (اختياري)' : 'Notes (optional)',
-            ),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _submitting ? null : _pickScreenshot,
-            icon: const Icon(Icons.image),
-            label: Text(
-              _screenshotBytes == null
-                  ? (isAr ? 'إرفاق صورة الإيصال' : 'Attach receipt screenshot')
-                  : (isAr ? 'تم اختيار الصورة' : 'Screenshot selected'),
-            ),
-          ),
-          if (_screenshotBytes != null) ...[
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.memory(_screenshotBytes!, height: 180, fit: BoxFit.cover),
-            ),
-          ],
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: _submitting ? null : _submit,
-            child: _submitting
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    isAr
-                        ? 'أتممت الدفع — إرسال للمراجعة'
-                        : 'I completed payment — submit',
+                  const SizedBox(height: AppSpacing.xs),
+                  SelectableText(
+                    config.managerWhatsappNumber,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppBrandAssets.brandTealDark,
+                        ),
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  AppPrimaryButton(
+                    label: isAr
+                        ? 'فتح واتساب وإرسال الإيصال'
+                        : 'Open WhatsApp & send receipt',
+                    icon: Icons.chat,
+                    onPressed: _sendReceiptWhatsApp,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    isAr
+                        ? 'أرفق صورة الإيصال داخل واتساب بعد فتح المحادثة.'
+                        : 'Attach the receipt photo inside WhatsApp after the chat opens.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppBrandAssets.brandMuted,
+                        ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DropdownButtonFormField<WalletRechargeMethod>(
+                  // ignore: deprecated_member_use
+                  value: _method,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'طريقة الدفع' : 'Payment method',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                    ),
+                  ),
+                  items: [
+                    for (final m in [
+                      WalletRechargeMethod.superQi,
+                      WalletRechargeMethod.cash,
+                      WalletRechargeMethod.bankTransfer,
+                    ])
+                      if (config.enabledMethods.contains(m.value))
+                        DropdownMenuItem(value: m, child: Text(m.value)),
+                  ],
+                  onChanged: (v) => setState(() => _method = v ?? _method),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _amountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'المبلغ (د.ع)' : 'Amount (IQD)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _refCtrl,
+                  decoration: InputDecoration(
+                    labelText: isAr
+                        ? 'رقم المرجع (اختياري)'
+                        : 'Reference number (optional)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _notesCtrl,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText:
+                        isAr ? 'ملاحظات (اختياري)' : 'Notes (optional)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppSecondaryButton(
+                  label: _screenshotBytes == null
+                      ? (isAr
+                          ? 'إرفاق صورة الإيصال'
+                          : 'Attach receipt screenshot')
+                      : (isAr ? 'تم اختيار الصورة' : 'Screenshot selected'),
+                  icon: Icons.image_outlined,
+                  onPressed: _submitting ? null : _pickScreenshot,
+                ),
+                if (_screenshotBytes != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    child: Image.memory(
+                      _screenshotBytes!,
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          AppPrimaryButton(
+            label: isAr
+                ? 'أتممت الدفع — إرسال للمراجعة'
+                : 'I completed payment — submit',
+            icon: Icons.send_rounded,
+            isLoading: _submitting,
+            onPressed: _submitting ? null : _submit,
           ),
         ],
       ),

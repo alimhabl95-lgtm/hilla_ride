@@ -17,37 +17,63 @@ struct CustomerHomeShellView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            HStack(spacing: 0) {
-                tabButton(
-                    index: 0,
-                    title: appState.language == .arabic ? "رحلة" : "Ride",
-                    systemImage: "car.fill"
-                )
-                tabButton(
-                    index: 1,
-                    title: appState.language == .arabic ? "متاجر" : "Stores",
-                    systemImage: "storefront.fill"
-                )
-            }
-            .padding(.top, 8)
-            .padding(.bottom, 4)
-            .background(.ultraThinMaterial)
+            tabBar
+        }
+    }
+
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            tabButton(
+                index: 0,
+                title: appState.language == .arabic ? "رحلة" : "Ride",
+                systemImage: "car.fill"
+            )
+            tabButton(
+                index: 1,
+                title: appState.language == .arabic ? "متاجر" : "Stores",
+                systemImage: "storefront.fill"
+            )
+        }
+        .padding(.horizontal, AppSpacing.lg)
+        .padding(.top, AppSpacing.sm)
+        .padding(.bottom, AppSpacing.sm)
+        .background {
+            Rectangle()
+                .fill(.white)
+                .shadow(color: BrandColors.navy.opacity(0.08), radius: 12, y: -4)
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(BrandColors.border)
+                .frame(height: 1)
         }
     }
 
     private func tabButton(index: Int, title: String, systemImage: String) -> some View {
-        Button {
-            selectedTab = index
+        let isSelected = selectedTab == index
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedTab = index
+            }
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 20, weight: .semibold))
+            VStack(spacing: AppSpacing.xs) {
+                ZStack {
+                    if isSelected {
+                        Capsule()
+                            .fill(BrandColors.teal.opacity(0.12))
+                            .frame(width: 56, height: 32)
+                    }
+                    Image(systemName: systemImage)
+                        .font(.system(size: 20, weight: .semibold))
+                }
                 Text(title)
                     .font(.caption.weight(.semibold))
             }
-            .foregroundStyle(selectedTab == index ? BrandColors.tealDark : Color.secondary)
+            .foregroundStyle(isSelected ? BrandColors.tealDark : BrandColors.muted)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .frame(minHeight: 48)
         }
         .buttonStyle(.plain)
     }

@@ -6,6 +6,7 @@ import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/features/auth/screens/forgot_password_screen.dart';
 import 'package:hilla_ride/features/auth/screens/signup_screen.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/auth/widgets/password_text_field.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -120,18 +121,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _isLoading ? null : _login,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.loginButton),
+              AppPrimaryButton(
+                label: l10n.loginButton,
+                onPressed: _login,
+                isLoading: _isLoading,
               ),
               const SizedBox(height: 12),
-              OutlinedButton(
+              AppSecondaryButton(
+                label: l10n.createAccountButton,
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -139,7 +136,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   );
                 },
-                child: Text(l10n.createAccountButton),
               ),
             ],
           ),

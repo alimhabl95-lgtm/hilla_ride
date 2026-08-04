@@ -13,44 +13,38 @@ struct TripCompletedView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 72))
-                    .foregroundStyle(.green)
+            VStack(spacing: 0) {
+                AppSheetHandle()
+                    .padding(.top, AppSpacing.sm)
 
-                Text(L10n.string(.tripCompletedTitle, language: appState.language))
-                    .font(.title.bold())
+                VStack(spacing: AppSpacing.xl) {
+                    completionHeader
 
-                if let ride {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("\(L10n.string(.pickupLabel, language: appState.language)): \(ride.pickupLabel)")
-                        Text("\(L10n.string(.destinationLabel, language: appState.language)): \(ride.destinationLabel)")
-                        Divider()
-                        Text(formatIqd(ride.fareAmountIqd))
-                            .font(.title.bold())
-                        Text(L10n.string(.paymentMethodCash, language: appState.language))
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                    if let ride {
+                        tripSummaryCard(ride: ride)
 
-                    if ride.driverRating != nil {
-                        Text(L10n.string(.ratingSubmitted, language: appState.language))
-                            .foregroundStyle(BrandColors.tealDark)
+                        if ride.driverRating != nil {
+                            AppBanner(
+                                message: L10n.string(.ratingSubmitted, language: appState.language),
+                                systemImage: "checkmark.circle.fill",
+                                tone: .success
+                            )
+                        } else {
+                            ratingSection
+                        }
                     } else {
-                        ratingSection
+                        ProgressView(L10n.string(.loading, language: appState.language))
+                            .padding(AppSpacing.xxl)
                     }
-                } else {
-                    ProgressView(L10n.string(.loading, language: appState.language))
-                }
 
-                Button(L10n.string(.done, language: appState.language)) {
-                    onFinished?()
+                    Button(L10n.string(.done, language: appState.language)) {
+                        onFinished?()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
                 }
-                .buttonStyle(SecondaryButtonStyle())
+                .padding(.horizontal, AppSpacing.xl)
+                .padding(.bottom, AppSpacing.xxl)
             }
-            .padding(24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.surface.ignoresSafeArea())
@@ -60,25 +54,103 @@ struct TripCompletedView: View {
         }
     }
 
+    private var completionHeader: some View {
+        VStack(spacing: AppSpacing.md) {
+            ZStack {
+                Circle()
+                    .fill(BrandColors.success.opacity(0.12))
+                    .frame(width: 96, height: 96)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 56))
+                    .foregroundStyle(BrandColors.success)
+            }
+
+            Text(L10n.string(.tripCompletedTitle, language: appState.language))
+                .font(.title2.weight(.bold))
+                .foregroundStyle(BrandColors.navy)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, AppSpacing.md)
+    }
+
+    private func tripSummaryCard(ride: Ride) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            summaryRow(
+                icon: "circle.fill",
+                iconColor: BrandColors.success,
+                label: L10n.string(.pickupLabel, language: appState.language),
+                value: ride.pickupLabel
+            )
+
+            summaryRow(
+                icon: "mappin.circle.fill",
+                iconColor: BrandColors.danger,
+                label: L10n.string(.destinationLabel, language: appState.language),
+                value: ride.destinationLabel
+            )
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(formatIqd(ride.fareAmountIqd))
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundStyle(BrandColors.tealDark)
+                Text(L10n.string(.paymentMethodCash, language: appState.language))
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(BrandColors.muted)
+            }
+        }
+        .appCard()
+    }
+
+    private func summaryRow(icon: String, iconColor: Color, label: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: AppSpacing.md) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(iconColor, in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(BrandColors.muted)
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrandColors.navy)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var ratingSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: AppSpacing.lg) {
             Text(L10n.string(.rateYourDriver, language: appState.language))
                 .font(.headline)
+                .foregroundStyle(BrandColors.navy)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 8) {
+            HStack(spacing: AppSpacing.sm) {
                 ForEach(1...5, id: \.self) { star in
                     Button {
-                        selectedRating = star
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            selectedRating = star
+                        }
                     } label: {
                         Image(systemName: star <= selectedRating ? "star.fill" : "star")
-                            .font(.title)
+                            .font(.title2)
                             .foregroundStyle(BrandColors.gold)
+                            .frame(width: 48, height: 48)
                     }
+                    .buttonStyle(.plain)
                 }
             }
+            .frame(maxWidth: .infinity)
 
             TextField(L10n.string(.feedbackOptional, language: appState.language), text: $feedback, axis: .vertical)
                 .textFieldStyle(AppTextFieldStyle())
+                .lineLimit(3...6)
 
             Button(L10n.string(.submitRating, language: appState.language)) {
                 Task { await submitRating() }
@@ -86,6 +158,7 @@ struct TripCompletedView: View {
             .buttonStyle(PrimaryButtonStyle())
             .disabled(selectedRating < 1 || isSubmitting)
         }
+        .appCard()
     }
 
     private func formatIqd(_ amount: Int) -> String {

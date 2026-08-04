@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/customer/screens/customer_home_map_screen.dart';
 import 'package:hilla_ride/features/customer/screens/driver_assigned_screen.dart';
 import 'package:hilla_ride/features/customer/screens/finding_driver_screen.dart';
@@ -30,7 +31,7 @@ class CustomerActiveRideShell extends StatelessWidget {
         if (ride == null) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: AppLoadingState(),
             );
           }
           return CustomerHomeMapScreen(user: user);

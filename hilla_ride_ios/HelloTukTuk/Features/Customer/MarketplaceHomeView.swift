@@ -76,52 +76,51 @@ struct MarketplaceHomeView: View {
     @ViewBuilder
     private var businessesList: some View {
         if businesses.isEmpty {
-            VStack(spacing: 10) {
-                Spacer()
-                Image(systemName: "storefront")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.secondary)
-                Text(isAr ? "لا متاجر مباشرة حالياً" : "No live businesses yet")
-                    .font(.headline)
-                Text(
-                    isAr
-                        ? "ستظهر تلقائياً عند موافقة الإدارة"
-                        : "They appear automatically when approved"
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-                Spacer()
-            }
+            AppEmptyState(
+                title: isAr ? "لا متاجر مباشرة حالياً" : "No live businesses yet",
+                message: isAr
+                    ? "ستظهر تلقائياً عند موافقة الإدارة"
+                    : "They appear automatically when approved",
+                systemImage: "storefront"
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List(businesses) { business in
-                NavigationLink(value: business.id) {
-                    HStack(spacing: 12) {
-                        asyncLogo(url: business.logoUrl)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(business.name(language: appState.language))
-                                .font(.headline)
-                                .foregroundStyle(BrandColors.navy)
-                            Text(
-                                [
-                                    business.typeId,
-                                    business.address,
-                                    String(format: "★ %.1f", business.rating)
-                                ]
-                                .filter { !$0.isEmpty }
-                                .joined(separator: " • ")
-                            )
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(businesses) { business in
+                        NavigationLink(value: business.id) {
+                            HStack(spacing: 12) {
+                                asyncLogo(url: business.logoUrl)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(business.name(language: appState.language))
+                                        .font(.headline)
+                                        .foregroundStyle(BrandColors.navy)
+                                    Text(
+                                        [
+                                            business.typeId,
+                                            business.address,
+                                            String(format: "★ %.1f", business.rating)
+                                        ]
+                                        .filter { !$0.isEmpty }
+                                        .joined(separator: " • ")
+                                    )
+                                    .font(.footnote)
+                                    .foregroundStyle(BrandColors.muted)
+                                    .lineLimit(2)
+                                }
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.forward")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(BrandColors.tealDark)
+                            }
+                            .frame(minHeight: 48)
                         }
+                        .buttonStyle(.plain)
+                        .appCard()
                     }
-                    .padding(.vertical, 4)
                 }
+                .padding(12)
             }
-            .listStyle(.plain)
         }
     }
 
