@@ -560,7 +560,7 @@ class _ActiveRidesPanelState extends State<_ActiveRidesPanel> {
                         value: null,
                         child: Text(l10n.allCities),
                       ),
-                      for (final district in BabilRegions.districts)
+                      for (final district in BabilRegions.districtsForFilters)
                         DropdownMenuItem<String?>(
                           value: district.id,
                           child: Text(
@@ -750,7 +750,7 @@ class _AdminDriverDistrictFilter extends StatelessWidget {
               value: null,
               child: Text(l10n.allCities),
             ),
-            for (final district in BabilRegions.districts)
+            for (final district in BabilRegions.districtsForFilters)
               DropdownMenuItem<String?>(
                 value: district.id,
                 child: Text(_districtLabel(district)),
@@ -876,7 +876,7 @@ class _RideHistoryPanelState extends State<_RideHistoryPanel> {
                         value: null,
                         child: Text(l10n.allCities),
                       ),
-                      for (final district in BabilRegions.districts)
+                      for (final district in BabilRegions.districtsForFilters)
                         DropdownMenuItem<String?>(
                           value: district.id,
                           child: Text(

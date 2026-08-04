@@ -269,7 +269,7 @@ class _PendingRechargesTabState extends State<_PendingRechargesTab> {
                         value: null,
                         child: Text(isAr ? 'كل المدن' : 'All cities'),
                       ),
-                      for (final district in BabilRegions.districts)
+                      for (final district in BabilRegions.districtsForFilters)
                         DropdownMenuItem<String?>(
                           value: district.id,
                           child: Text(

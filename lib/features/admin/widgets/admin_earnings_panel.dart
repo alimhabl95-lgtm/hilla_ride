@@ -245,7 +245,7 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
                       value: null,
                       child: Text(l10n.allCities),
                     ),
-                    for (final district in BabilRegions.districts)
+                    for (final district in BabilRegions.districtsForFilters)
                       DropdownMenuItem<String?>(
                         value: district.id,
                         child: Text(

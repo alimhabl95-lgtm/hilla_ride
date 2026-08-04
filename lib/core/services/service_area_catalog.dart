@@ -11,6 +11,8 @@ class ServiceAreaCatalog {
   static final ServiceAreaCatalog instance = ServiceAreaCatalog._();
 
   List<ServiceDistrictNode>? _liveDistricts;
+  /// All districts (active + inactive) for admin filters / labels.
+  List<ServiceDistrictNode>? _allDistricts;
   Map<String, ServiceSubDistrict> _subById = {};
   Map<String, ServiceProvince> _provincesById = {};
   Map<String, ServiceCountry> _countriesById = {};
@@ -77,15 +79,31 @@ class ServiceAreaCatalog {
           ],
         ),
     ].where((d) => d.subDistricts.isNotEmpty).toList();
+
+    _allDistricts = [
+      for (final d in districts)
+        ServiceDistrictNode(
+          id: d.id,
+          nameAr: d.nameAr,
+          nameEn: d.nameEn,
+          customerVisible: d.customerVisible,
+          subDistricts: [
+            for (final s in subs.where((x) => x.districtId == d.id))
+              ServiceSubDistrictNode(
+                id: s.id,
+                nameAr: s.nameAr,
+                nameEn: s.nameEn,
+                center: s.center,
+                searchRadiusKm: s.searchRadiusKm,
+              ),
+          ],
+        ),
+    ];
   }
 
-  List<BabilDistrict> get districtsAsBabil {
-    if (!_synced) {
-      return BabilRegions.seedDistricts;
-    }
-    final live = _liveDistricts ?? const <ServiceDistrictNode>[];
+  List<BabilDistrict> _nodesToBabil(List<ServiceDistrictNode> nodes) {
     return [
-      for (final d in live)
+      for (final d in nodes)
         BabilDistrict(
           id: d.id,
           nameAr: d.nameAr,
@@ -102,6 +120,25 @@ class ServiceAreaCatalog {
           ],
         ),
     ];
+  }
+
+  List<BabilDistrict> get districtsAsBabil {
+    if (!_synced) {
+      return BabilRegions.seedDistricts;
+    }
+    return _nodesToBabil(_liveDistricts ?? const <ServiceDistrictNode>[]);
+  }
+
+  /// Admin city filters: prefer all configured districts; never return empty.
+  List<BabilDistrict> get districtsForAdminFilters {
+    if (!_synced) {
+      return BabilRegions.seedDistricts;
+    }
+    final all = _nodesToBabil(_allDistricts ?? const <ServiceDistrictNode>[]);
+    if (all.isNotEmpty) return all;
+    final live = districtsAsBabil;
+    if (live.isNotEmpty) return live;
+    return BabilRegions.seedDistricts;
   }
 
   List<BabilDistrict> get customerDistrictsAsBabil {

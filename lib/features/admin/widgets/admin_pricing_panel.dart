@@ -22,7 +22,7 @@ class _AdminPricingPanelState extends State<AdminPricingPanel> {
   var _isLoading = true;
   var _showLoadWarning = false;
   String? _appliedFingerprint;
-  String _selectedDistrictId = BabilRegions.districts.first.id;
+  String _selectedDistrictId = BabilRegions.districtsForFilters.first.id;
   String? _selectedSubDistrictId;
   StreamSubscription<PricingConfig>? _pricingSubscription;
 
@@ -250,7 +250,7 @@ class _AdminPricingPanelState extends State<AdminPricingPanel> {
         DropdownButtonFormField<String>(
           value: _selectedDistrictId,
           decoration: InputDecoration(labelText: l10n.cityPricingLabel),
-          items: BabilRegions.districts
+          items: BabilRegions.districtsForFilters
               .map(
                 (item) => DropdownMenuItem(
                   value: item.id,

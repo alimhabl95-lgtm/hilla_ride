@@ -149,7 +149,7 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
               value: null,
               child: Text(isAr ? 'كل المدن' : 'All cities'),
             ),
-            for (final district in BabilRegions.districts)
+            for (final district in BabilRegions.districtsForFilters)
               DropdownMenuItem<String?>(
                 value: district.id,
                 child: Text(isAr ? district.nameAr : district.nameEn),

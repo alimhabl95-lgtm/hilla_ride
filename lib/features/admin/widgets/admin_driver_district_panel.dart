@@ -117,7 +117,7 @@ class _AdminDriverDistrictPanelState extends State<AdminDriverDistrictPanel> {
                 labelText: l10n.districtLabel,
                 isDense: true,
               ),
-              items: BabilRegions.districts
+              items: BabilRegions.districtsForFilters
                   .map(
                     (d) => DropdownMenuItem(
                       value: d.id,

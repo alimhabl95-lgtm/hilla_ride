@@ -61,6 +61,10 @@ class BabilRegions {
   static List<BabilDistrict> get districts =>
       ServiceAreaCatalog.instance.districtsAsBabil;
 
+  /// Admin dropdowns: all configured cities, with seed fallback (never empty).
+  static List<BabilDistrict> get districtsForFilters =>
+      ServiceAreaCatalog.instance.districtsForAdminFilters;
+
   static List<BabilDistrict> get customerDistricts =>
       ServiceAreaCatalog.instance.customerDistrictsAsBabil;
 
@@ -169,8 +173,16 @@ class BabilRegions {
   ];
 
   static BabilDistrict districtById(String id) {
-    final list = districts;
-    return list.firstWhere((d) => d.id == id, orElse: () => list.first);
+    for (final d in districts) {
+      if (d.id == id) return d;
+    }
+    for (final d in districtsForFilters) {
+      if (d.id == id) return d;
+    }
+    for (final d in seedDistricts) {
+      if (d.id == id) return d;
+    }
+    return seedDistricts.first;
   }
 
   static BabilSubDistrict subDistrictById(String districtId, String subId) {
