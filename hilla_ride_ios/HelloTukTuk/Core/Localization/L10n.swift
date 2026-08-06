@@ -206,15 +206,6 @@ enum L10nKey {
     case owedToPlatformLabel
     case pendingBonusLabel
     case supportPreviousMessages
-    case helpSupportTitle
-    case faqTitle
-    case contactUsTitle
-    case supportChatTitle
-    case reportProblemTitle
-    case reportGeneral
-    case reportDriver
-    case reportCustomer
-    case reportBusiness
     case reportSubmittedTitle
     case reportSubmittedMessage
     case reportFailedTitle
@@ -581,15 +572,6 @@ enum L10n {
         .owedToPlatformLabel: [.english: "Owed to platform", .arabic: "المستحق للمنصة"],
         .pendingBonusLabel: [.english: "Pending bonus", .arabic: "مكافأة معلّقة"],
         .supportPreviousMessages: [.english: "Previous messages", .arabic: "الرسائل السابقة"],
-        .helpSupportTitle: [.english: "Help & Support", .arabic: "المساعدة والدعم"],
-        .faqTitle: [.english: "FAQ", .arabic: "الأسئلة الشائعة"],
-        .contactUsTitle: [.english: "Contact us", .arabic: "تواصل معنا"],
-        .supportChatTitle: [.english: "Support chat", .arabic: "محادثة الدعم"],
-        .reportProblemTitle: [.english: "Report a problem", .arabic: "الإبلاغ عن مشكلة"],
-        .reportGeneral: [.english: "Report a problem", .arabic: "بلّغ عن مشكلة عامة"],
-        .reportDriver: [.english: "Report a driver", .arabic: "بلّغ عن سائق"],
-        .reportCustomer: [.english: "Report a customer", .arabic: "بلّغ عن راكب"],
-        .reportBusiness: [.english: "Report a business", .arabic: "بلّغ عن متجر"],
         .reportSubmittedTitle: [.english: "Report submitted", .arabic: "تم إرسال البلاغ"],
         .reportSubmittedMessage: [.english: "We received your report and will review it.", .arabic: "استلمنا بلاغك وسنراجعه."],
         .reportFailedTitle: [.english: "Could not submit", .arabic: "تعذر الإرسال"],
