@@ -33,11 +33,14 @@ struct DriverHomeView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if let ride = activeRide {
-                    driverRidePanel(ride: ride)
-                } else {
-                    idleDriverPanel
+            VStack(spacing: 0) {
+                AnnouncementBannerView(audience: "drivers")
+                Group {
+                    if let ride = activeRide {
+                        driverRidePanel(ride: ride)
+                    } else {
+                        idleDriverPanel
+                    }
                 }
             }
             .navigationTitle(L10n.string(.driverHomeTitle, language: appState.language))

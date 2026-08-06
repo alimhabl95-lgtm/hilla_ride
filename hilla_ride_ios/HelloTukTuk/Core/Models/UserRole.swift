@@ -29,6 +29,7 @@ struct AppUser: Identifiable, Equatable {
     let promoCode: String
     let promoRidesUsed: Int
     let promoRidesLimit: Int
+    let referralCode: String
 
     var id: String { uid }
     var hasPromoRemaining: Bool {
@@ -50,7 +51,8 @@ struct AppUser: Identifiable, Equatable {
         isBlocked: Bool = false,
         promoCode: String = "",
         promoRidesUsed: Int = 0,
-        promoRidesLimit: Int = 0
+        promoRidesLimit: Int = 0,
+        referralCode: String = ""
     ) {
         self.uid = uid
         self.phone = phone
@@ -64,6 +66,7 @@ struct AppUser: Identifiable, Equatable {
         self.promoCode = promoCode
         self.promoRidesUsed = promoRidesUsed
         self.promoRidesLimit = promoRidesLimit
+        self.referralCode = referralCode
     }
 
     init?(documentID: String, data: [String: Any]) {
@@ -80,5 +83,6 @@ struct AppUser: Identifiable, Equatable {
         promoCode = data["promoCode"] as? String ?? ""
         promoRidesUsed = (data["promoRidesUsed"] as? NSNumber)?.intValue ?? 0
         promoRidesLimit = (data["promoRidesLimit"] as? NSNumber)?.intValue ?? 0
+        referralCode = data["referralCode"] as? String ?? ""
     }
 }

@@ -51,6 +51,18 @@ struct ProfileView: View {
                     }
                     .buttonStyle(SecondaryButtonStyle())
 
+                    NavigationLink {
+                        SupportView()
+                    } label: {
+                        Text(L10n.string(.helpSupportTitle, language: appState.language))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+
+                    if user.role == .customer {
+                        referralSection(for: user)
+                    }
+
                     accountDeletionSection
                 }
 
@@ -106,6 +118,33 @@ struct ProfileView: View {
         } message: {
             Text(L10n.string(.deleteAccountMessage, language: appState.language))
         }
+    }
+
+    private func referralSection(for user: AppUser) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(appState.language == .arabic ? "برنامج الإحالة" : "Referral program")
+                .font(.headline)
+            if user.referralCode.isEmpty {
+                Text(appState.language == .arabic
+                     ? "سيظهر رمز الإحالة بعد تحديث الحساب."
+                     : "Your referral code will appear after account sync.")
+                    .font(.footnote)
+                    .foregroundStyle(BrandColors.muted)
+            } else {
+                profileRow(
+                    title: appState.language == .arabic ? "رمزك" : "Your code",
+                    value: user.referralCode
+                )
+                Button {
+                    UIPasteboard.general.string = user.referralCode
+                } label: {
+                    Text(appState.language == .arabic ? "نسخ الرمز" : "Copy code")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SecondaryButtonStyle())
+            }
+        }
+        .appCard()
     }
 
     private var accountDeletionSection: some View {

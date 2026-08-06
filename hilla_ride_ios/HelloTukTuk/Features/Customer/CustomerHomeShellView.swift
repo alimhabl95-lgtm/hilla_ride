@@ -8,6 +8,7 @@ struct CustomerHomeShellView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            AnnouncementBannerView(audience: "customers")
             Group {
                 if selectedTab == 0 {
                     CustomerHomeMapView(user: user)

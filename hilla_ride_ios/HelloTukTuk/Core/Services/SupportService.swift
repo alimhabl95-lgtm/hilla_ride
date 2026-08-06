@@ -1,4 +1,6 @@
+import FirebaseAuth
 import FirebaseFirestore
+import FirebaseFunctions
 import Foundation
 
 struct SupportContactInfo {
@@ -46,6 +48,8 @@ struct SupportMessage: Identifiable, Equatable {
 
 final class SupportService {
     private let firestore = Firestore.firestore()
+    private let functions = Functions.functions(region: "us-central1")
+    private let auth = Auth.auth()
 
     func getContactInfo() async -> SupportContactInfo {
         do {
@@ -99,6 +103,64 @@ final class SupportService {
                     continuation.yield(messages)
                 }
             continuation.onTermination = { _ in listener.remove() }
+        }
+    }
+
+    @discardableResult
+    func createComplaint(
+        userId: String,
+        userRole: UserRole,
+        userName: String,
+        subject: String,
+        body: String,
+        category: String = "",
+        targetUserId: String = "",
+        targetRole: String = "",
+        targetName: String = "",
+        relatedRideId: String = ""
+    ) async throws -> String {
+        let trimmedSubject = subject.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSubject.isEmpty, !trimmedBody.isEmpty else { return "" }
+
+        var payload: [String: Any] = [
+            "userId": userId,
+            "userRole": userRole.rawValue,
+            "userName": userName,
+            "subject": trimmedSubject,
+            "body": trimmedBody,
+        ]
+        if !category.isEmpty { payload["category"] = category }
+        if !targetUserId.isEmpty { payload["targetUserId"] = targetUserId }
+        if !targetRole.isEmpty { payload["targetRole"] = targetRole }
+        if !targetName.isEmpty { payload["targetName"] = targetName }
+        if !relatedRideId.isEmpty { payload["relatedRideId"] = relatedRideId }
+
+        do {
+            let result = try await functions.httpsCallable("createComplaint").call(payload)
+            let data = result.data as? [String: Any] ?? [:]
+            return data["complaintId"] as? String ?? ""
+        } catch {
+            let ref = firestore.collection("complaints").document()
+            var doc: [String: Any] = [
+                "userId": userId,
+                "userRole": userRole.rawValue,
+                "userName": userName,
+                "subject": trimmedSubject,
+                "body": trimmedBody,
+                "status": "open",
+                "adminReply": "",
+                "createdAt": FieldValue.serverTimestamp(),
+                "updatedAt": FieldValue.serverTimestamp(),
+                "createdBy": auth.currentUser?.uid ?? userId,
+            ]
+            if !category.isEmpty { doc["category"] = category }
+            if !targetUserId.isEmpty { doc["targetUserId"] = targetUserId }
+            if !targetRole.isEmpty { doc["targetRole"] = targetRole }
+            if !targetName.isEmpty { doc["targetName"] = targetName }
+            if !relatedRideId.isEmpty { doc["relatedRideId"] = relatedRideId }
+            try await ref.setData(doc)
+            return ref.documentID
         }
     }
 }

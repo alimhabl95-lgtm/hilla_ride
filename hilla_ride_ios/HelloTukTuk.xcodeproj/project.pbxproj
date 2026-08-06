@@ -98,6 +98,8 @@
 		A10000000000000000000082 /* CustomerProfileOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000082 /* CustomerProfileOnboardingView.swift */; };
 		A10000000000000000000083 /* MissingProfileRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000083 /* MissingProfileRecoveryView.swift */; };
 		A10000000000000000000084 /* ProfileAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000084 /* ProfileAvatarView.swift */; };
+		A10000000000000000000085 /* ComplaintRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000085 /* ComplaintRepository.swift */; };
+		A10000000000000000000086 /* AnnouncementBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000086 /* AnnouncementBannerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -188,6 +190,8 @@
 		A20000000000000000000082 /* CustomerProfileOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerProfileOnboardingView.swift; sourceTree = "<group>"; };
 		A20000000000000000000083 /* MissingProfileRecoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissingProfileRecoveryView.swift; sourceTree = "<group>"; };
 		A20000000000000000000084 /* ProfileAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAvatarView.swift; sourceTree = "<group>"; };
+		A20000000000000000000085 /* ComplaintRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplaintRepository.swift; sourceTree = "<group>"; };
+		A20000000000000000000086 /* AnnouncementBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementBannerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -340,6 +344,7 @@
 				A20000000000000000000052 /* GooglePlacesService.swift */,
 				A20000000000000000000053 /* ChatService.swift */,
 				A20000000000000000000054 /* SupportService.swift */,
+				A20000000000000000000085 /* ComplaintRepository.swift */,
 				A20000000000000000000070 /* RideAlertService.swift */,
 				A20000000000000000000072 /* SavedPlacesService.swift */,
 				A20000000000000000000074 /* AnnouncementService.swift */,
@@ -436,6 +441,7 @@
 				A20000000000000000000059 /* RideHistoryView.swift */,
 				A20000000000000000000076 /* RideAlertOverlay.swift */,
 				A20000000000000000000077 /* AppToolbarActions.swift */,
+				A20000000000000000000086 /* AnnouncementBannerView.swift */,
 				A20000000000000000000078 /* WelcomeSplashView.swift */,
 				A20000000000000000000084 /* ProfileAvatarView.swift */,
 			);
@@ -619,6 +625,7 @@
 				A10000000000000000000082 /* CustomerProfileOnboardingView.swift in Sources */,
 				A10000000000000000000083 /* MissingProfileRecoveryView.swift in Sources */,
 				A10000000000000000000084 /* ProfileAvatarView.swift in Sources */,
+				A10000000000000000000086 /* AnnouncementBannerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -668,7 +675,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 95;
+				CURRENT_PROJECT_VERSION = 96;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -701,7 +708,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 95;
+				CURRENT_PROJECT_VERSION = 96;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
