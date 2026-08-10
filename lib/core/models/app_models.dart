@@ -78,6 +78,11 @@ class AppUser {
     this.profilePhotoUrl = '',
     this.approvalStatus = '',
     this.businessId = '',
+    this.referralCode = '',
+    this.referralAppliedAt,
+    this.referralReferrerId = '',
+    this.completedRidesCount = 0,
+    this.roleTemplate = '',
   });
 
   final String uid;
@@ -98,6 +103,11 @@ class AppUser {
   final String profilePhotoUrl;
   final String approvalStatus;
   final String businessId;
+  final String referralCode;
+  final DateTime? referralAppliedAt;
+  final String referralReferrerId;
+  final int completedRidesCount;
+  final String roleTemplate;
 
   bool get hasActivePromo =>
       promoCode.isNotEmpty && promoRidesUsed < promoRidesLimit;
@@ -141,6 +151,12 @@ class AppUser {
       profilePhotoUrl: data['profilePhotoUrl'] as String? ?? '',
       approvalStatus: data['approvalStatus'] as String? ?? '',
       businessId: data['businessId'] as String? ?? '',
+      referralCode: data['referralCode'] as String? ?? '',
+      referralAppliedAt:
+          (data['referralAppliedAt'] as dynamic)?.toDate() as DateTime?,
+      referralReferrerId: data['referralReferrerId'] as String? ?? '',
+      completedRidesCount: (data['completedRidesCount'] as num?)?.toInt() ?? 0,
+      roleTemplate: data['roleTemplate'] as String? ?? '',
     );
   }
 
@@ -163,6 +179,11 @@ class AppUser {
       if (promoRidesLimit > 0) 'promoRidesLimit': promoRidesLimit,
       if (profilePhotoUrl.isNotEmpty) 'profilePhotoUrl': profilePhotoUrl,
       if (approvalStatus.isNotEmpty) 'approvalStatus': approvalStatus,
+      if (referralCode.isNotEmpty) 'referralCode': referralCode,
+      if (referralAppliedAt != null) 'referralAppliedAt': referralAppliedAt,
+      if (referralReferrerId.isNotEmpty) 'referralReferrerId': referralReferrerId,
+      'completedRidesCount': completedRidesCount,
+      if (roleTemplate.isNotEmpty) 'roleTemplate': roleTemplate,
     };
   }
 }
@@ -211,6 +232,13 @@ class DriverProfile {
     this.walletStatus = 'active',
     this.assignedDistrictId = '',
     this.assignedSubDistrictId = '',
+    this.statsOffersReceived = 0,
+    this.statsOffersAccepted = 0,
+    this.statsOffersRejected = 0,
+    this.onlineSecondsTotal = 0,
+    this.totalRewardsEarnedIqd = 0,
+    this.warningCount = 0,
+    this.lastWarningAt,
   });
 
   final String uid;
@@ -255,6 +283,13 @@ class DriverProfile {
   final String geohash;
   final String assignedDistrictId;
   final String assignedSubDistrictId;
+  final int statsOffersReceived;
+  final int statsOffersAccepted;
+  final int statsOffersRejected;
+  final int onlineSecondsTotal;
+  final int totalRewardsEarnedIqd;
+  final int warningCount;
+  final DateTime? lastWarningAt;
 
   bool get isApproved => approvalStatus == DriverApprovalStatus.approved;
   bool get canDrive => isApproved && !isBlocked && !isRemoved;
@@ -346,6 +381,16 @@ class DriverProfile {
               : 'blocked'),
       assignedDistrictId: data['assignedDistrictId'] as String? ?? '',
       assignedSubDistrictId: data['assignedSubDistrictId'] as String? ?? '',
+      statsOffersReceived:
+          (data['statsOffersReceived'] as num?)?.toInt() ?? 0,
+      statsOffersAccepted: (data['statsOffersAccepted'] as num?)?.toInt() ?? 0,
+      statsOffersRejected: (data['statsOffersRejected'] as num?)?.toInt() ?? 0,
+      onlineSecondsTotal: (data['onlineSecondsTotal'] as num?)?.toInt() ?? 0,
+      totalRewardsEarnedIqd:
+          (data['totalRewardsEarnedIqd'] as num?)?.toInt() ?? 0,
+      warningCount: (data['warningCount'] as num?)?.toInt() ?? 0,
+      lastWarningAt:
+          (data['lastWarningAt'] as dynamic)?.toDate() as DateTime?,
     );
   }
 
@@ -392,6 +437,11 @@ class DriverProfile {
       if (monthlyMonthKey.isNotEmpty) 'monthlyMonthKey': monthlyMonthKey,
       if (isFakeDriver) 'isFakeDriver': true,
       if (autoAcceptRides) 'autoAcceptRides': true,
+      'statsOffersReceived': statsOffersReceived,
+      'statsOffersAccepted': statsOffersAccepted,
+      'statsOffersRejected': statsOffersRejected,
+      'onlineSecondsTotal': onlineSecondsTotal,
+      'totalRewardsEarnedIqd': totalRewardsEarnedIqd,
     };
   }
 }
@@ -602,6 +652,7 @@ class SavedPlace {
     required this.latitude,
     required this.longitude,
     this.createdAt,
+    this.placeType = SavedPlaceType.other,
   });
 
   final String id;
@@ -609,6 +660,10 @@ class SavedPlace {
   final double latitude;
   final double longitude;
   final DateTime? createdAt;
+  final SavedPlaceType placeType;
+
+  bool get isHome => placeType == SavedPlaceType.home;
+  bool get isWork => placeType == SavedPlaceType.work;
 
   PlaceResult toPlaceResult() => PlaceResult(
         label: label,
@@ -623,6 +678,7 @@ class SavedPlace {
       latitude: (data['latitude'] as num?)?.toDouble() ?? 0,
       longitude: (data['longitude'] as num?)?.toDouble() ?? 0,
       createdAt: (data['createdAt'] as dynamic)?.toDate() as DateTime?,
+      placeType: SavedPlaceTypeX.fromString(data['placeType'] as String?),
     );
   }
 
@@ -632,6 +688,20 @@ class SavedPlace {
       'latitude': latitude,
       'longitude': longitude,
       'createdAt': createdAt,
+      'placeType': placeType.value,
     };
+  }
+}
+
+enum SavedPlaceType { home, work, other }
+
+extension SavedPlaceTypeX on SavedPlaceType {
+  String get value => name;
+
+  static SavedPlaceType fromString(String? raw) {
+    return SavedPlaceType.values.firstWhere(
+      (e) => e.name == raw,
+      orElse: () => SavedPlaceType.other,
+    );
   }
 }

@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/constants/map_presence_config.dart';
+import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
+import 'package:hilla_ride/core/models/business_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/core/widgets/animated_tuk_tuk.dart';
 import 'package:hilla_ride/core/widgets/app_map.dart';
 import 'package:hilla_ride/features/admin/screens/admin_driver_detail_screen.dart';
 import 'package:hilla_ride/features/admin/screens/admin_driver_wallet_screen.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -30,12 +34,23 @@ class _AdminLiveMapPanelState extends State<AdminLiveMapPanel> {
   String? _lastFitKey;
   DriverProfile? _selectedDriver;
   Ride? _selectedRide;
-  _DriverFilter _driverFilter = _DriverFilter.all;
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
+  var _showAvailable = true;
+  var _showBusy = true;
+  var _showWaitingCustomers = true;
+  var _showActiveTrips = true;
+  var _showDeliveryDrivers = true;
+  var _showRestaurants = true;
+  var _showSupermarkets = true;
+  var _showPharmacies = true;
 
   static const _green = Color(0xFF16A34A);
   static const _orange = Color(0xFFEA580C);
   static const _blue = Color(0xFF2563EB);
   static const _red = Color(0xFFDC2626);
+  static const _restaurant = Color(0xFFDC2626);
+  static const _supermarket = Color(0xFF2563EB);
+  static const _pharmacy = Color(0xFF16A34A);
   static const _pickupPin = Color(0xFF0F766E);
   static const _destPin = Color(0xFF7C3AED);
 
@@ -45,181 +60,288 @@ class _AdminLiveMapPanelState extends State<AdminLiveMapPanel> {
   @override
   Widget build(BuildContext context) {
     final adminService = context.read<AppState>().adminService;
+    final businessService = context.read<AppState>().businessService;
     final isWide = MediaQuery.sizeOf(context).width >= 900;
     final l10n = AppLocalizations.of(context)!;
     final isAr = l10n.localeName.startsWith('ar');
+    final catalog = ServiceAreaCatalog.instance;
 
-    return StreamBuilder<List<DriverProfile>>(
-      stream: adminService.watchAllDrivers(),
-      builder: (context, driversSnap) {
-        return StreamBuilder<List<Ride>>(
-          stream: adminService.watchActiveRides(),
-          builder: (context, ridesSnap) {
-            final allDrivers = driversSnap.data ?? const [];
-            final driversById = {
-              for (final d in allDrivers) d.uid: d,
-            };
-            final rides = ridesSnap.data ?? const [];
-            final requests = rides
-                .where(
-                  (r) =>
-                      r.status == RideStatus.searching ||
-                      r.status == RideStatus.matched,
-                )
-                .toList();
-            final activeTrips = rides
-                .where(
-                  (r) =>
-                      r.status == RideStatus.accepted ||
-                      r.status == RideStatus.inProgress ||
-                      r.status == RideStatus.awaitingCashPayment,
-                )
-                .toList();
+    return StreamBuilder<List<BusinessPartner>>(
+      stream: businessService.watchBusinesses(limit: 300),
+      builder: (context, businessesSnap) {
+        return StreamBuilder<List<DriverProfile>>(
+          stream: adminService.watchAllDrivers(),
+          builder: (context, driversSnap) {
+            return StreamBuilder<List<Ride>>(
+              stream: adminService.watchActiveRides(),
+              builder: (context, ridesSnap) {
+                final allDrivers = driversSnap.data ?? const [];
+                final allBusinesses = businessesSnap.data ?? const [];
+                final driversById = {
+                  for (final d in allDrivers) d.uid: d,
+                };
+                final rides = ridesSnap.data ?? const [];
 
-            final mappableDrivers = allDrivers.where((d) {
-              if (!d.canDrive) return false;
-              return d.latitude != null && d.longitude != null;
-            }).toList();
+                bool rideMatchesGeo(Ride r) => _filters.matchesGeo(
+                      provinceId: catalog.provinceIdForDistrict(r.districtId),
+                      districtId: r.districtId,
+                      subDistrictId: r.subDistrictId,
+                    );
 
-            final filteredDrivers = mappableDrivers.where((d) {
-              final bucket = _driverBucket(d);
-              return switch (_driverFilter) {
-                _DriverFilter.all => true,
-                _DriverFilter.available => bucket == _DriverFilter.available,
-                _DriverFilter.enRoute => bucket == _DriverFilter.enRoute,
-                _DriverFilter.onTrip => bucket == _DriverFilter.onTrip,
-                _DriverFilter.offline => bucket == _DriverFilter.offline,
-              };
-            }).toList();
+                bool driverMatchesGeo(DriverProfile d) => _filters.matchesGeo(
+                      provinceId:
+                          catalog.provinceIdForDistrict(d.assignedDistrictId),
+                      districtId: d.assignedDistrictId,
+                      subDistrictId: d.assignedSubDistrictId,
+                    );
 
-            final markers = _buildMarkers(
-              requests: requests,
-              activeTrips: activeTrips,
-              drivers: filteredDrivers,
-              driversById: driversById,
-              isAr: isAr,
-            );
-            final polylines = _buildPolylines(
-              activeTrips: activeTrips,
-              driversById: driversById,
-            );
-            final center = _mapCenter(
-              rides: [...requests, ...activeTrips],
-              drivers: filteredDrivers,
-            );
-            _scheduleMapFit(markers: markers, center: center);
+                bool businessMatchesGeo(BusinessPartner b) =>
+                    _filters.matchesGeo(
+                      provinceId: b.provinceId,
+                      districtId: b.districtId,
+                      subDistrictId: b.subDistrictId,
+                    );
 
-            final mapStack = Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(isWide ? 12 : 0),
-                  child: AppMap(
-                    mapController: _mapController,
-                    center: center,
-                    zoom: 13,
-                    markers: markers,
-                    polylines: polylines,
-                  ),
-                ),
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  right: 12,
-                  child: _OpsLegend(isAr: isAr),
-                ),
-                if (_selectedDriver != null)
-                  Positioned(
-                    left: 12,
-                    right: isWide ? null : 12,
-                    bottom: 12,
-                    width: isWide ? 340 : null,
-                    child: _DriverDetailCard(
-                      driver: _selectedDriver!,
-                      ride: _selectedRide,
-                      fare: _fare,
-                      isAr: isAr,
-                      locale: l10n.localeName,
-                      onClose: () => setState(() {
-                        _selectedDriver = null;
-                        _selectedRide = null;
-                      }),
-                      onOpenProfile: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => AdminDriverDetailScreen(
-                              driver: _selectedDriver!,
-                            ),
-                          ),
-                        );
-                      },
-                      onOpenWallet: () {
-                        final d = _selectedDriver!;
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => AdminDriverWalletScreen(
-                              driverId: d.uid,
-                              driverName: d.name,
-                              driverPhone: d.phone,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            );
+                final geoRides = rides.where(rideMatchesGeo).toList();
+                final requests = geoRides
+                    .where(
+                      (r) =>
+                          r.status == RideStatus.searching ||
+                          r.status == RideStatus.matched,
+                    )
+                    .toList();
+                final activeTrips = geoRides
+                    .where(
+                      (r) =>
+                          r.status == RideStatus.accepted ||
+                          r.status == RideStatus.inProgress ||
+                          r.status == RideStatus.awaitingCashPayment,
+                    )
+                    .toList();
 
-            final list = _OpsSideList(
-              isAr: isAr,
-              requests: requests,
-              activeTrips: activeTrips,
-              drivers: filteredDrivers,
-              allMappableCount: mappableDrivers.length,
-              driverFilter: _driverFilter,
-              onFilterChanged: (f) => setState(() => _driverFilter = f),
-              onFocusRide: (ride) {
-                final driver = ride.driverId == null
-                    ? null
-                    : driversById[ride.driverId!];
-                setState(() {
-                  _selectedRide = ride;
-                  _selectedDriver = driver;
-                });
-                _focusOnRide(ride, driver);
-              },
-              onFocusDriver: (driver) {
-                final ride = _activeRideForDriver(driver.uid, rides);
-                setState(() {
-                  _selectedDriver = driver;
-                  _selectedRide = ride;
-                });
-                _focusOnDriver(driver);
-              },
-            );
+                final mappableDrivers = allDrivers.where((d) {
+                  if (!d.canDrive) return false;
+                  if (!driverMatchesGeo(d)) return false;
+                  return d.latitude != null && d.longitude != null;
+                }).toList();
 
-            if (isWide) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
+                final filteredDrivers =
+                    mappableDrivers.where(_driverVisible).toList();
+
+                final visibleRequests =
+                    _showWaitingCustomers ? requests : const <Ride>[];
+                final visibleActiveTrips =
+                    _showActiveTrips ? activeTrips : const <Ride>[];
+
+                final businessMarkers = allBusinesses.where((b) {
+                  if (!b.isLive || b.latitude == 0 || b.longitude == 0) {
+                    return false;
+                  }
+                  if (!businessMatchesGeo(b)) return false;
+                  return switch (b.typeId) {
+                    'restaurant' => _showRestaurants,
+                    'supermarket' => _showSupermarkets,
+                    'pharmacy' => _showPharmacies,
+                    _ => false,
+                  };
+                }).toList();
+
+                final markers = _buildMarkers(
+                  requests: visibleRequests,
+                  activeTrips: visibleActiveTrips,
+                  drivers: filteredDrivers,
+                  businesses: businessMarkers,
+                  driversById: driversById,
+                  isAr: isAr,
+                );
+                final polylines = _buildPolylines(
+                  activeTrips: visibleActiveTrips,
+                  driversById: driversById,
+                );
+                final center = _mapCenter(
+                  rides: [...visibleRequests, ...visibleActiveTrips],
+                  drivers: filteredDrivers,
+                  businesses: businessMarkers,
+                );
+                _scheduleMapFit(markers: markers, center: center);
+
+                final mapStack = Stack(
                   children: [
-                    Expanded(flex: 3, child: mapStack),
-                    const SizedBox(width: 16),
-                    Expanded(flex: 2, child: list),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(isWide ? 12 : 0),
+                      child: AppMap(
+                        mapController: _mapController,
+                        center: center,
+                        zoom: 13,
+                        markers: markers,
+                        polylines: polylines,
+                      ),
+                    ),
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      right: 12,
+                      child: _OpsLegend(isAr: isAr),
+                    ),
+                    if (_selectedDriver != null)
+                      Positioned(
+                        left: 12,
+                        right: isWide ? null : 12,
+                        bottom: 12,
+                        width: isWide ? 340 : null,
+                        child: _DriverDetailCard(
+                          driver: _selectedDriver!,
+                          ride: _selectedRide,
+                          fare: _fare,
+                          isAr: isAr,
+                          locale: l10n.localeName,
+                          onClose: () => setState(() {
+                            _selectedDriver = null;
+                            _selectedRide = null;
+                          }),
+                          onOpenProfile: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AdminDriverDetailScreen(
+                                  driver: _selectedDriver!,
+                                ),
+                              ),
+                            );
+                          },
+                          onOpenWallet: () {
+                            final d = _selectedDriver!;
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AdminDriverWalletScreen(
+                                  driverId: d.uid,
+                                  driverName: d.name,
+                                  driverPhone: d.phone,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                   ],
-                ),
-              );
-            }
+                );
 
-            return Column(
-              children: [
-                Expanded(flex: 3, child: mapStack),
-                Expanded(flex: 2, child: Material(elevation: 4, child: list)),
-              ],
+                final list = _OpsSideList(
+                  isAr: isAr,
+                  requests: visibleRequests,
+                  activeTrips: visibleActiveTrips,
+                  drivers: filteredDrivers,
+                  allMappableCount: mappableDrivers.length,
+                  showAvailable: _showAvailable,
+                  showBusy: _showBusy,
+                  showWaitingCustomers: _showWaitingCustomers,
+                  showActiveTrips: _showActiveTrips,
+                  showDeliveryDrivers: _showDeliveryDrivers,
+                  showRestaurants: _showRestaurants,
+                  showSupermarkets: _showSupermarkets,
+                  showPharmacies: _showPharmacies,
+                  onToggleLayer: (layer, value) => setState(() {
+                    switch (layer) {
+                      case 'available':
+                        _showAvailable = value;
+                      case 'busy':
+                        _showBusy = value;
+                      case 'waiting':
+                        _showWaitingCustomers = value;
+                      case 'trips':
+                        _showActiveTrips = value;
+                      case 'delivery':
+                        _showDeliveryDrivers = value;
+                      case 'restaurant':
+                        _showRestaurants = value;
+                      case 'supermarket':
+                        _showSupermarkets = value;
+                      case 'pharmacy':
+                        _showPharmacies = value;
+                    }
+                  }),
+                  onFocusRide: (ride) {
+                    final driver = ride.driverId == null
+                        ? null
+                        : driversById[ride.driverId!];
+                    setState(() {
+                      _selectedRide = ride;
+                      _selectedDriver = driver;
+                    });
+                    _focusOnRide(ride, driver);
+                  },
+                  onFocusDriver: (driver) {
+                    final ride = _activeRideForDriver(driver.uid, rides);
+                    setState(() {
+                      _selectedDriver = driver;
+                      _selectedRide = ride;
+                    });
+                    _focusOnDriver(driver);
+                  },
+                );
+
+                final content = isWide
+                    ? Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Expanded(flex: 3, child: mapStack),
+                            const SizedBox(width: 16),
+                            Expanded(flex: 2, child: list),
+                          ],
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          Expanded(flex: 3, child: mapStack),
+                          Expanded(
+                            flex: 2,
+                            child: Material(elevation: 4, child: list),
+                          ),
+                        ],
+                      );
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AdminFilterBar(
+                      value: _filters,
+                      onChanged: (v) => setState(() => _filters = v),
+                      fields: const [
+                        AdminFilterField.province,
+                        AdminFilterField.district,
+                        AdminFilterField.subDistrict,
+                      ],
+                    ),
+                    Expanded(child: content),
+                  ],
+                );
+              },
             );
           },
         );
       },
     );
+  }
+
+  bool _driverVisible(DriverProfile driver) {
+    final bucket = _driverBucket(driver);
+    if (bucket == _DriverFilter.offline) {
+      return _showAvailable;
+    }
+    if (bucket == _DriverFilter.available && _showAvailable) return true;
+    if ((bucket == _DriverFilter.enRoute || bucket == _DriverFilter.onTrip) &&
+        _showBusy) {
+      return true;
+    }
+    if (_showDeliveryDrivers &&
+        (driver.hasActiveRide ||
+            driver.operationalStatus == 'onTrip' ||
+            driver.operationalStatus == 'arrivingPickup' ||
+            driver.operationalStatus == 'rideAccepted' ||
+            driver.operationalStatus == 'rideOffered')) {
+      return true;
+    }
+    return false;
   }
 
   Ride? _activeRideForDriver(String driverId, List<Ride> rides) {
@@ -266,7 +388,7 @@ class _AdminLiveMapPanelState extends State<AdminLiveMapPanel> {
     required LatLng center,
   }) {
     final fitKey =
-        '${markers.length}|${center.latitude.toStringAsFixed(4)}|${center.longitude.toStringAsFixed(4)}|$_driverFilter';
+        '${markers.length}|${center.latitude.toStringAsFixed(4)}|${center.longitude.toStringAsFixed(4)}|$_showAvailable|$_showBusy';
     if (_lastFitKey == fitKey) return;
     _lastFitKey = fitKey;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -317,6 +439,7 @@ class _AdminLiveMapPanelState extends State<AdminLiveMapPanel> {
   LatLng _mapCenter({
     required List<Ride> rides,
     required List<DriverProfile> drivers,
+    required List<BusinessPartner> businesses,
   }) {
     final points = <LatLng>[];
     for (final d in drivers) {
@@ -327,6 +450,11 @@ class _AdminLiveMapPanelState extends State<AdminLiveMapPanel> {
     for (final ride in rides) {
       if (ride.pickupLat != 0 && ride.pickupLng != 0) {
         points.add(LatLng(ride.pickupLat, ride.pickupLng));
+      }
+    }
+    for (final b in businesses) {
+      if (b.latitude != 0 && b.longitude != 0) {
+        points.add(LatLng(b.latitude, b.longitude));
       }
     }
     if (points.isEmpty) return _defaultCenter;
@@ -341,6 +469,7 @@ class _AdminLiveMapPanelState extends State<AdminLiveMapPanel> {
     required List<Ride> requests,
     required List<Ride> activeTrips,
     required List<DriverProfile> drivers,
+    required List<BusinessPartner> businesses,
     required Map<String, DriverProfile> driversById,
     required bool isAr,
   }) {
@@ -427,7 +556,55 @@ class _AdminLiveMapPanelState extends State<AdminLiveMapPanel> {
         ),
       );
     }
+    for (final business in businesses) {
+      markers.add(
+        _businessMarker(
+          business: business,
+          isAr: isAr,
+        ),
+      );
+    }
     return markers;
+  }
+
+  fm.Marker _businessMarker({
+    required BusinessPartner business,
+    required bool isAr,
+  }) {
+    final color = switch (business.typeId) {
+      'restaurant' => _restaurant,
+      'supermarket' => _supermarket,
+      'pharmacy' => _pharmacy,
+      _ => const Color(0xFF64748B),
+    };
+    final icon = switch (business.typeId) {
+      'restaurant' => Icons.restaurant,
+      'supermarket' => Icons.local_grocery_store,
+      'pharmacy' => Icons.local_pharmacy,
+      _ => Icons.storefront,
+    };
+    final label = business.nameForLocale(isAr);
+    final short = label.length > 14 ? '${label.substring(0, 12)}…' : label;
+    return fm.Marker(
+      point: LatLng(business.latitude, business.longitude),
+      width: 110,
+      height: 52,
+      alignment: Alignment.bottomCenter,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            short,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Icon(icon, color: color, size: 28),
+        ],
+      ),
+    );
   }
 
   fm.Marker _driverMarker({
@@ -576,6 +753,9 @@ class _OpsLegend extends StatelessWidget {
             _item(const Color(0xFFDC2626), isAr ? 'غير متصل' : 'Offline'),
             _item(const Color(0xFF0F766E), isAr ? 'انطلاق' : 'Pickup'),
             _item(const Color(0xFF7C3AED), isAr ? 'وجهة' : 'Destination'),
+            _item(const Color(0xFFDC2626), isAr ? 'مطعم' : 'Restaurant'),
+            _item(const Color(0xFF2563EB), isAr ? 'سوبرماركت' : 'Supermarket'),
+            _item(const Color(0xFF16A34A), isAr ? 'صيدلية' : 'Pharmacy'),
           ],
         ),
       ),
@@ -722,8 +902,15 @@ class _OpsSideList extends StatelessWidget {
     required this.activeTrips,
     required this.drivers,
     required this.allMappableCount,
-    required this.driverFilter,
-    required this.onFilterChanged,
+    required this.showAvailable,
+    required this.showBusy,
+    required this.showWaitingCustomers,
+    required this.showActiveTrips,
+    required this.showDeliveryDrivers,
+    required this.showRestaurants,
+    required this.showSupermarkets,
+    required this.showPharmacies,
+    required this.onToggleLayer,
     required this.onFocusRide,
     required this.onFocusDriver,
   });
@@ -733,8 +920,15 @@ class _OpsSideList extends StatelessWidget {
   final List<Ride> activeTrips;
   final List<DriverProfile> drivers;
   final int allMappableCount;
-  final _DriverFilter driverFilter;
-  final ValueChanged<_DriverFilter> onFilterChanged;
+  final bool showAvailable;
+  final bool showBusy;
+  final bool showWaitingCustomers;
+  final bool showActiveTrips;
+  final bool showDeliveryDrivers;
+  final bool showRestaurants;
+  final bool showSupermarkets;
+  final bool showPharmacies;
+  final void Function(String layer, bool value) onToggleLayer;
   final ValueChanged<Ride> onFocusRide;
   final ValueChanged<DriverProfile> onFocusDriver;
 
@@ -757,13 +951,34 @@ class _OpsSideList extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
             children: [
-              for (final f in _DriverFilter.values)
+              for (final entry in [
+                ('available', showAvailable, isAr ? 'متاح' : 'Available'),
+                ('busy', showBusy, isAr ? 'مشغول' : 'Busy'),
+                (
+                  'waiting',
+                  showWaitingCustomers,
+                  isAr ? 'زبائن ينتظرون' : 'Waiting customers',
+                ),
+                ('trips', showActiveTrips, isAr ? 'رحلات نشطة' : 'Active trips'),
+                (
+                  'delivery',
+                  showDeliveryDrivers,
+                  isAr ? 'سائقو توصيل' : 'Delivery drivers',
+                ),
+                ('restaurant', showRestaurants, isAr ? 'مطاعم' : 'Restaurants'),
+                (
+                  'supermarket',
+                  showSupermarkets,
+                  isAr ? 'سوبرماركت' : 'Supermarkets',
+                ),
+                ('pharmacy', showPharmacies, isAr ? 'صيدليات' : 'Pharmacies'),
+              ])
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: FilterChip(
-                    selected: driverFilter == f,
-                    label: Text(_filterLabel(f)),
-                    onSelected: (_) => onFilterChanged(f),
+                    selected: entry.$2,
+                    label: Text(entry.$3),
+                    onSelected: (v) => onToggleLayer(entry.$1, v),
                   ),
                 ),
             ],
@@ -842,25 +1057,6 @@ class _OpsSideList extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  String _filterLabel(_DriverFilter f) {
-    if (isAr) {
-      return switch (f) {
-        _DriverFilter.all => 'الكل',
-        _DriverFilter.available => 'متاح',
-        _DriverFilter.enRoute => 'إلى الالتقاط',
-        _DriverFilter.onTrip => 'مع الراكب',
-        _DriverFilter.offline => 'غير متصل',
-      };
-    }
-    return switch (f) {
-      _DriverFilter.all => 'All',
-      _DriverFilter.available => 'Available',
-      _DriverFilter.enRoute => 'En route',
-      _DriverFilter.onTrip => 'On trip',
-      _DriverFilter.offline => 'Offline',
-    };
   }
 
   Widget _sectionTitle(BuildContext context, String text) {

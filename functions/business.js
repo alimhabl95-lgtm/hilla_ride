@@ -10,6 +10,8 @@ const DEFAULT_BUSINESS_TYPES = {
   flower_shop: { nameEn: "Flower Shop", nameAr: "محل زهور", icon: "local_florist", sortOrder: 50, active: true },
   grocery: { nameEn: "Grocery Store", nameAr: "بقالة", icon: "shopping_basket", sortOrder: 60, active: true },
   electronics: { nameEn: "Electronics", nameAr: "إلكترونيات", icon: "devices", sortOrder: 70, active: true },
+  water_delivery: { nameEn: "Water Delivery", nameAr: "توصيل ماء", icon: "water_drop", sortOrder: 75, active: true },
+  gas_cylinder: { nameEn: "Gas Cylinder Delivery", nameAr: "توصيل اسطوانة غاز", icon: "propane_tank", sortOrder: 78, active: true },
   pet_shop: { nameEn: "Pet Shop", nameAr: "مستلزمات حيوانات", icon: "pets", sortOrder: 80, active: true },
   laundry: { nameEn: "Laundry", nameAr: "مغسلة", icon: "local_laundry_service", sortOrder: 90, active: true },
   courier: { nameEn: "Courier Services", nameAr: "خدمات توصيل", icon: "local_shipping", sortOrder: 100, active: true },
@@ -42,6 +44,7 @@ function createBusinessModule({
   assertAdminPermissionAny,
   sendToToken,
   authAdminCallable,
+  writeAdminAuditLog,
 }) {
   const db = () => admin.firestore();
 
@@ -224,6 +227,15 @@ function createBusinessModule({
       `Your business is now: ${status}`,
       { type: "business_status", businessId, status },
     );
+    if (typeof writeAdminAuditLog === "function") {
+      await writeAdminAuditLog({
+        adminId: context.auth.uid,
+        action: `business.${status}`,
+        entityType: "business",
+        entityId: businessId,
+        details: { status, rejectionReason },
+      });
+    }
     return { ok: true };
   });
 
@@ -537,9 +549,9 @@ function createBusinessModule({
 
     await notifyOwner(
       businessId,
-      "New order",
-      `Order total ${totalIqd} IQD`,
-      { type: "business_order_new", orderId: orderRef.id },
+      "New order received",
+      `${String(customer.name || "Customer")} placed an order for ${totalIqd} IQD`,
+      { type: "business_order_new", orderId: orderRef.id, totalIqd: String(totalIqd) },
     );
 
     return { ok: true, orderId: orderRef.id };
@@ -598,17 +610,61 @@ function createBusinessModule({
     }
     await orderRef.set(update, { merge: true });
 
+    const customerStatusMessages = {
+      accepted: {
+        title: "Order accepted",
+        body: "Your order has been accepted and is being prepared.",
+      },
+      preparing: {
+        title: "Order preparing",
+        body: "Your order is being prepared.",
+      },
+      ready: {
+        title: "Order ready",
+        body: "Your order is ready for pickup or delivery.",
+      },
+      outForDelivery: {
+        title: "Out for delivery",
+        body: "Your order is on the way.",
+      },
+      delivered: {
+        title: "Order delivered",
+        body: "Your order has been delivered. Enjoy!",
+      },
+      cancelled: {
+        title: "Order cancelled",
+        body: "Your order was cancelled.",
+      },
+      rejected: {
+        title: "Order rejected",
+        body: "Your order was rejected by the store.",
+      },
+    };
+    const statusMessage = customerStatusMessages[status] || {
+      title: "Order update",
+      body: `Your order is now: ${status}`,
+    };
+
     // Notify customer
     try {
       const cust = await db().collection("users").doc(String(order.customerId)).get();
       await sendToToken(
         cust.data()?.fcmToken,
-        "Order update",
-        `Your order is now: ${status}`,
+        statusMessage.title,
+        statusMessage.body,
         { type: "business_order_status", orderId, status },
         "default",
       );
     } catch (_) {}
+
+    if (status === "cancelled") {
+      await notifyOwner(
+        String(order.businessId),
+        "Order cancelled",
+        `Order #${orderId.slice(-6)} was cancelled`,
+        { type: "business_order_cancelled", orderId, status },
+      );
+    }
 
     return { ok: true };
   });

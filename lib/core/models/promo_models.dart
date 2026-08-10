@@ -7,6 +7,12 @@ class PromoCodeConfig {
     required this.maxDiscountIqd,
     required this.maxRides,
     this.description = '',
+    this.expiresAt,
+    this.maxTotalRedemptions,
+    this.currentRedemptions = 0,
+    this.districtIds = const [],
+    this.minCompletedRidesForEligibility = 0,
+    this.kind = 'both',
   });
 
   final String code;
@@ -16,6 +22,21 @@ class PromoCodeConfig {
   final int maxDiscountIqd;
   final int maxRides;
   final String description;
+  final DateTime? expiresAt;
+  final int? maxTotalRedemptions;
+  final int currentRedemptions;
+  final List<String> districtIds;
+  final int minCompletedRidesForEligibility;
+  /// `ride`, `delivery`, or `both`
+  final String kind;
+
+  bool get isExpired =>
+      expiresAt != null && DateTime.now().isAfter(expiresAt!);
+
+  bool get isRedemptionLimitReached {
+    if (maxTotalRedemptions == null) return false;
+    return currentRedemptions >= maxTotalRedemptions!;
+  }
 
   static const free3Defaults = PromoCodeConfig(
     code: 'FREE3',
@@ -25,6 +46,7 @@ class PromoCodeConfig {
     maxDiscountIqd: 1000,
     maxRides: 2,
     description: '50% off first 2 rides (max 1,000 IQD each)',
+    kind: 'ride',
   );
 
   factory PromoCodeConfig.fromMap(Map<String, dynamic>? data) {
@@ -39,6 +61,16 @@ class PromoCodeConfig {
           free3Defaults.maxDiscountIqd,
       maxRides: (data['maxRides'] as num?)?.toInt() ?? free3Defaults.maxRides,
       description: data['description'] as String? ?? '',
+      expiresAt: (data['expiresAt'] as dynamic)?.toDate() as DateTime?,
+      maxTotalRedemptions: (data['maxTotalRedemptions'] as num?)?.toInt(),
+      currentRedemptions: (data['currentRedemptions'] as num?)?.toInt() ?? 0,
+      districtIds: (data['districtIds'] as List<dynamic>?)
+              ?.map((value) => value.toString())
+              .toList() ??
+          const [],
+      minCompletedRidesForEligibility:
+          (data['minCompletedRidesForEligibility'] as num?)?.toInt() ?? 0,
+      kind: data['kind'] as String? ?? 'both',
     );
   }
 
@@ -51,6 +83,13 @@ class PromoCodeConfig {
       'maxDiscountIqd': maxDiscountIqd,
       'maxRides': maxRides,
       'description': description,
+      if (expiresAt != null) 'expiresAt': expiresAt,
+      if (maxTotalRedemptions != null)
+        'maxTotalRedemptions': maxTotalRedemptions,
+      'currentRedemptions': currentRedemptions,
+      'districtIds': districtIds,
+      'minCompletedRidesForEligibility': minCompletedRidesForEligibility,
+      'kind': kind,
     };
   }
 }

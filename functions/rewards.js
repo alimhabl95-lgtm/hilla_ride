@@ -267,6 +267,7 @@ function createRewardsModule({
   applyWalletDelta,
   sendToToken,
   assertAdminPermissionAny,
+  writeAdminAuditLog,
 }) {
   const db = () => admin.firestore();
 
@@ -807,6 +808,15 @@ function createRewardsModule({
       campaignId: ref.id,
       details: { status: payload.status, titleEn: payload.titleEn },
     });
+    if (typeof writeAdminAuditLog === "function") {
+      await writeAdminAuditLog({
+        adminId: context.auth.uid,
+        action: isCreate ? "reward.created" : "reward.updated",
+        entityType: "rewardCampaign",
+        entityId: ref.id,
+        details: { status: payload.status, titleEn: payload.titleEn },
+      });
+    }
     return { ok: true, id: ref.id };
   });
 

@@ -98,6 +98,17 @@ class WalletService {
     });
   }
 
+  Stream<List<WalletLedgerEntry>> watchRecentLedger({int limit = 500}) {
+    return _firestore
+        .collection('walletLedger')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs.map(WalletLedgerEntry.fromDoc).toList(),
+        );
+  }
+
   Future<void> reviewRechargeRequest({
     required String requestId,
     required bool approve,

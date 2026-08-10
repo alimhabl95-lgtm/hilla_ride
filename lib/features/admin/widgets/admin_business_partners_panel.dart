@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/business_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -18,11 +20,15 @@ class _AdminBusinessPartnersPanelState extends State<AdminBusinessPartnersPanel>
   late final TabController _tabs;
   String? _selectedId;
   var _seeding = false;
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
+    _tabs.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -114,6 +120,32 @@ class _AdminBusinessPartnersPanelState extends State<AdminBusinessPartnersPanel>
             Tab(text: isAr ? 'الأنواع' : 'Types'),
           ],
         ),
+        if (_tabs.index == 0)
+          AdminFilterBar(
+            value: _filters,
+            onChanged: (v) => setState(() => _filters = v),
+            fields: const [
+              AdminFilterField.businessType,
+              AdminFilterField.province,
+              AdminFilterField.district,
+              AdminFilterField.subDistrict,
+              AdminFilterField.search,
+            ],
+          )
+        else if (_tabs.index == 1)
+          AdminFilterBar(
+            value: _filters,
+            onChanged: (v) => setState(() => _filters = v),
+            fields: const [
+              AdminFilterField.businessType,
+              AdminFilterField.province,
+              AdminFilterField.district,
+              AdminFilterField.subDistrict,
+              AdminFilterField.orderStatus,
+              AdminFilterField.dateRange,
+              AdminFilterField.search,
+            ],
+          ),
         Expanded(
           child: TabBarView(
             controller: _tabs,
@@ -124,7 +156,27 @@ class _AdminBusinessPartnersPanelState extends State<AdminBusinessPartnersPanel>
                   if (snap.hasError) {
                     return Center(child: Text('${snap.error}'));
                   }
-                  final items = snap.data ?? const [];
+                  final items = (snap.data ?? const []).where((b) {
+                    if (_filters.businessTypeId != null &&
+                        b.typeId != _filters.businessTypeId) {
+                      return false;
+                    }
+                    if (!_filters.matchesGeo(
+                      provinceId: b.provinceId,
+                      districtId: b.districtId,
+                      subDistrictId: b.subDistrictId,
+                    )) {
+                      return false;
+                    }
+                    final q = _filters.query.trim().toLowerCase();
+                    if (q.isNotEmpty) {
+                      final haystack =
+                          '${b.nameEn} ${b.nameAr} ${b.ownerEmail} ${b.phone} ${b.typeId}'
+                              .toLowerCase();
+                      if (!haystack.contains(q)) return false;
+                    }
+                    return true;
+                  }).toList();
                   if (items.isEmpty) {
                     return Center(
                       child: ConstrainedBox(
@@ -249,7 +301,27 @@ class _AdminBusinessPartnersPanelState extends State<AdminBusinessPartnersPanel>
               StreamBuilder<List<BusinessOrder>>(
                 stream: biz.watchAllOrders(),
                 builder: (context, snap) {
-                  final items = snap.data ?? const [];
+                  final items = (snap.data ?? const []).where((o) {
+                    if (_filters.orderStatus != null &&
+                        o.status.value != _filters.orderStatus) {
+                      return false;
+                    }
+                    if (!_filters.matchesGeo(
+                      districtId: o.districtId,
+                      subDistrictId: o.subDistrictId,
+                    )) {
+                      return false;
+                    }
+                    if (!_filters.matchesDate(o.createdAt)) return false;
+                    final q = _filters.query.trim().toLowerCase();
+                    if (q.isNotEmpty) {
+                      final haystack =
+                          '${o.businessName} ${o.customerName} ${o.customerPhone} ${o.id}'
+                              .toLowerCase();
+                      if (!haystack.contains(q)) return false;
+                    }
+                    return true;
+                  }).toList();
                   if (items.isEmpty) {
                     return Center(
                       child: Text(isAr ? 'لا طلبات بعد' : 'No orders yet'),

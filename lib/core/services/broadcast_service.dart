@@ -20,6 +20,10 @@ class BroadcastService {
     required String audience,
     required String title,
     required String message,
+    String? provinceId,
+    String? districtId,
+    String? subDistrictId,
+    String? targetUserId,
   }) async {
     final trimmedTitle = title.trim();
     final trimmedMessage = message.trim();
@@ -32,6 +36,10 @@ class BroadcastService {
         audience: audience,
         title: trimmedTitle,
         message: trimmedMessage,
+        provinceId: provinceId,
+        districtId: districtId,
+        subDistrictId: subDistrictId,
+        targetUserId: targetUserId,
       );
     } on FirebaseFunctionsException catch (error) {
       if (kDebugMode) {
@@ -43,6 +51,10 @@ class BroadcastService {
         audience: audience,
         title: trimmedTitle,
         message: trimmedMessage,
+        provinceId: provinceId,
+        districtId: districtId,
+        subDistrictId: subDistrictId,
+        targetUserId: targetUserId,
       );
     } catch (error) {
       if (kDebugMode) {
@@ -52,6 +64,10 @@ class BroadcastService {
         audience: audience,
         title: trimmedTitle,
         message: trimmedMessage,
+        provinceId: provinceId,
+        districtId: districtId,
+        subDistrictId: subDistrictId,
+        targetUserId: targetUserId,
       );
     }
   }
@@ -60,13 +76,24 @@ class BroadcastService {
     required String audience,
     required String title,
     required String message,
+    String? provinceId,
+    String? districtId,
+    String? subDistrictId,
+    String? targetUserId,
   }) async {
     final callable = _functions.httpsCallable('sendBroadcast');
-    final result = await callable.call({
+    final payload = <String, dynamic>{
       'audience': audience,
       'title': title,
       'message': message,
-    });
+      if (provinceId != null && provinceId.isNotEmpty) 'provinceId': provinceId,
+      if (districtId != null && districtId.isNotEmpty) 'districtId': districtId,
+      if (subDistrictId != null && subDistrictId.isNotEmpty)
+        'subDistrictId': subDistrictId,
+      if (targetUserId != null && targetUserId.isNotEmpty)
+        'targetUserId': targetUserId,
+    };
+    final result = await callable.call(payload);
     final data = Map<String, dynamic>.from(result.data as Map);
     return BroadcastResult(
       sent: (data['sent'] as num?)?.toInt() ?? 0,
@@ -80,13 +107,23 @@ class BroadcastService {
     required String audience,
     required String title,
     required String message,
+    String? provinceId,
+    String? districtId,
+    String? subDistrictId,
+    String? targetUserId,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
       throw StateError('Sign in required.');
     }
 
-    final total = await _countAudience(audience);
+    final total = await _countAudience(
+      audience,
+      provinceId: provinceId,
+      districtId: districtId,
+      subDistrictId: subDistrictId,
+      targetUserId: targetUserId,
+    );
 
     await _firestore.collection('announcements').add({
       'audience': audience,
@@ -97,6 +134,12 @@ class BroadcastService {
       'delivery': 'firestore',
       'createdBy': uid,
       'createdAt': FieldValue.serverTimestamp(),
+      if (provinceId != null && provinceId.isNotEmpty) 'provinceId': provinceId,
+      if (districtId != null && districtId.isNotEmpty) 'districtId': districtId,
+      if (subDistrictId != null && subDistrictId.isNotEmpty)
+        'subDistrictId': subDistrictId,
+      if (targetUserId != null && targetUserId.isNotEmpty)
+        'targetUserId': targetUserId,
     });
 
     return BroadcastResult(
@@ -107,22 +150,130 @@ class BroadcastService {
     );
   }
 
-  Future<int> _countAudience(String audience) async {
-    if (audience == 'drivers') {
+  Future<int> _countAudience(
+    String audience, {
+    String? provinceId,
+    String? districtId,
+    String? subDistrictId,
+    String? targetUserId,
+  }) async {
+    if (targetUserId != null && targetUserId.isNotEmpty) return 1;
+
+    if (audience == 'businesses') {
+      final snapshot = await _firestore
+          .collection('businesses')
+          .where('status', isEqualTo: 'live')
+          .get();
+      return snapshot.docs.length;
+    }
+
+    if (audience == 'allDrivers' || audience == 'drivers') {
       final snapshot = await _firestore.collection('drivers').get();
       return snapshot.docs.where((doc) {
         final data = doc.data();
         if (data['isBlocked'] == true || data['isRemoved'] == true) return false;
         if (data['isFakeDriver'] == true) return false;
-        return data['approvalStatus'] == 'approved';
+        if (data['approvalStatus'] != 'approved') return false;
+        if (districtId != null &&
+            districtId.isNotEmpty &&
+            data['assignedDistrictId'] != districtId) {
+          return false;
+        }
+        if (subDistrictId != null &&
+            subDistrictId.isNotEmpty &&
+            data['assignedSubDistrictId'] != subDistrictId) {
+          return false;
+        }
+        return true;
       }).length;
     }
 
-    final snapshot = await _firestore
-        .collection('users')
-        .where('role', isEqualTo: 'customer')
-        .get();
-    return snapshot.docs.where((doc) => doc.data()['isBlocked'] != true).length;
+    if (audience == 'allCustomers' ||
+        audience == 'customers' ||
+        audience == 'province' ||
+        audience == 'district' ||
+        audience == 'subDistrict') {
+      final snapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'customer')
+          .get();
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        if (data['isBlocked'] == true) return false;
+        if (districtId != null &&
+            districtId.isNotEmpty &&
+            data['districtId'] != districtId) {
+          return false;
+        }
+        if (subDistrictId != null &&
+            subDistrictId.isNotEmpty &&
+            data['subDistrictId'] != subDistrictId) {
+          return false;
+        }
+        if (provinceId != null &&
+            provinceId.isNotEmpty &&
+            data['provinceId'] != provinceId) {
+          return false;
+        }
+        return true;
+      }).length;
+    }
+
+    return 0;
+  }
+
+  Stream<List<AnnouncementRecord>> watchRecentAnnouncements({int limit = 40}) {
+    return _firestore
+        .collection('announcements')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => AnnouncementRecord.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+}
+
+class AnnouncementRecord {
+  const AnnouncementRecord({
+    required this.id,
+    required this.audience,
+    required this.title,
+    required this.body,
+    this.sentCount = 0,
+    this.createdAt,
+    this.provinceId,
+    this.districtId,
+    this.subDistrictId,
+    this.targetUserId,
+  });
+
+  final String id;
+  final String audience;
+  final String title;
+  final String body;
+  final int sentCount;
+  final DateTime? createdAt;
+  final String? provinceId;
+  final String? districtId;
+  final String? subDistrictId;
+  final String? targetUserId;
+
+  factory AnnouncementRecord.fromMap(String id, Map<String, dynamic> data) {
+    return AnnouncementRecord(
+      id: id,
+      audience: data['audience'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      body: data['body'] as String? ?? '',
+      sentCount: (data['sentCount'] as num?)?.toInt() ?? 0,
+      createdAt: (data['createdAt'] as dynamic)?.toDate() as DateTime?,
+      provinceId: data['provinceId'] as String?,
+      districtId: data['districtId'] as String?,
+      subDistrictId: data['subDistrictId'] as String?,
+      targetUserId: data['targetUserId'] as String?,
+    );
   }
 }
 

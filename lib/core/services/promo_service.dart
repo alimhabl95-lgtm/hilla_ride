@@ -23,6 +23,24 @@ class PromoService {
         );
   }
 
+  Stream<List<PromoCodeConfig>> watchAllPromoCodes() {
+    return _firestore.collection('config').snapshots().map((snapshot) {
+      final configs = snapshot.docs
+          .where((doc) => doc.id.startsWith('promo_'))
+          .map((doc) {
+            final data = Map<String, dynamic>.from(doc.data());
+            data.putIfAbsent(
+              'code',
+              () => doc.id.replaceFirst('promo_', ''),
+            );
+            return PromoCodeConfig.fromMap(data);
+          })
+          .toList();
+      configs.sort((a, b) => a.code.compareTo(b.code));
+      return configs;
+    });
+  }
+
   Future<PromoCodeConfig> getPromoCode(String code) async {
     try {
       final snapshot = await _promoRef(code).get();
@@ -86,6 +104,7 @@ class PromoService {
 
   Map<String, dynamic> signupPromoFields(PromoCodeConfig config) {
     if (!config.enabled || !config.autoAssignOnSignup) return const {};
+    if (config.isExpired || config.isRedemptionLimitReached) return const {};
     return {
       'promoCode': config.code,
       'promoRidesUsed': 0,
@@ -97,6 +116,9 @@ class PromoService {
     required AppUser user,
     required PromoCodeConfig config,
     required int baseFareIqd,
+    String districtId = '',
+    String promoKind = 'ride',
+    int customerCompletedRides = 0,
   }) {
     if (baseFareIqd <= 0) {
       return PromoApplication(
@@ -106,7 +128,18 @@ class PromoService {
       );
     }
 
+    final kindAllowed = config.kind == 'both' || config.kind == promoKind;
+    final districtAllowed = config.districtIds.isEmpty ||
+        (districtId.isNotEmpty && config.districtIds.contains(districtId));
+    final eligibilityOk =
+        customerCompletedRides >= config.minCompletedRidesForEligibility;
+
     if (!config.enabled ||
+        config.isExpired ||
+        config.isRedemptionLimitReached ||
+        !kindAllowed ||
+        !districtAllowed ||
+        !eligibilityOk ||
         user.promoCode != config.code ||
         user.promoRidesUsed >= user.promoRidesLimit) {
       return PromoApplication(
@@ -143,5 +176,10 @@ class PromoService {
     await userRef.update({
       'promoRidesUsed': FieldValue.increment(1),
     });
+
+    await _promoRef(promoCode).set(
+      {'currentRedemptions': FieldValue.increment(1)},
+      SetOptions(merge: true),
+    );
   }
 }

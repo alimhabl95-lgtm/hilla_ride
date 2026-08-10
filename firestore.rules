@@ -179,7 +179,19 @@ service cloud.firestore {
       allow create, update: if isSelf(userId);
 
       allow delete: if isManager()
+        || (isAssistant() && hasPermission('customers'))
+        || isSelf(userId);
+
+    }
+
+    match /users/{userId}/favorite_businesses/{businessId} {
+
+      allow read: if isSelf(userId) || isManager()
         || (isAssistant() && hasPermission('customers'));
+
+      allow create, delete: if isSelf(userId);
+
+      allow update: if false;
 
     }
 
@@ -296,6 +308,12 @@ service cloud.firestore {
     match /config/wallet {
       allow read: if signedIn();
       allow write: if false; // Cloud Functions only
+    }
+
+    match /config/app {
+      // Public remote config (maintenance / force-update gates run before sign-in).
+      allow read: if true;
+      allow write: if isManager() || hasPermission('appSettings');
     }
 
     match /walletLedger/{entryId} {
@@ -523,7 +541,7 @@ service cloud.firestore {
 
         || (
 
-          resource.data.audience == 'customers'
+          resource.data.audience in ['customers', 'allCustomers']
 
           && userDoc().role == 'customer'
 
@@ -531,17 +549,23 @@ service cloud.firestore {
 
         || (
 
-          resource.data.audience == 'drivers'
+          resource.data.audience in ['drivers', 'allDrivers', 'province', 'district', 'subDistrict']
 
           && exists(/databases/$(database)/documents/drivers/$(request.auth.uid))
 
         )
 
+        || (
+
+          resource.data.audience == 'individual'
+
+          && resource.data.targetUserId == request.auth.uid
+
+        )
+
       );
 
-      allow create: if isManager()
-
-        && request.resource.data.audience in ['drivers', 'customers']
+      allow create: if isAdminUser()
 
         && request.resource.data.title is string
 
@@ -555,6 +579,20 @@ service cloud.firestore {
 
       allow update, delete: if false;
 
+    }
+
+    match /complaints/{complaintId} {
+      allow read: if isAdminUser()
+        || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if hasPermission('complaints') || hasPermission('supportInbox');
+      allow delete: if isManager();
+    }
+
+    match /adminAuditLogs/{logId} {
+      allow read: if hasPermission('auditLog') || isManager();
+      allow create, update, delete: if false;
     }
 
   }

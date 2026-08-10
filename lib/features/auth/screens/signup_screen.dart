@@ -1,15 +1,15 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
-import 'package:hilla_ride/core/config/legal_config.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
-import 'package:hilla_ride/core/utils/legal_url_launcher.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/auth/widgets/password_text_field.dart';
+import 'package:hilla_ride/features/shared/screens/legal_content_screen.dart';
 import 'package:hilla_ride/features/shared/widgets/photo_upload_tile.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
@@ -32,6 +32,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _ageController = TextEditingController();
   final _plateController = TextEditingController();
   final _colorController = TextEditingController();
+  final _referralController = TextEditingController();
   PickedImage? _idPhoto;
   PickedImage? _profilePhoto;
   var _acceptedTerms = false;
@@ -48,6 +49,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _ageController.dispose();
     _plateController.dispose();
     _colorController.dispose();
+    _referralController.dispose();
     super.dispose();
   }
 
@@ -71,7 +73,18 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  Future<void> _launchUrl(String url) => openLegalDocumentUrl(url);
+  Future<void> _openLegal(LegalContentKind kind) async {
+    final l10n = AppLocalizations.of(context)!;
+    final lang = l10n.localeName.startsWith('ar') ? 'ar' : 'en';
+    final config = await context.read<AppState>().appConfigService.getConfig();
+    if (!mounted) return;
+    await LegalContentScreen.open(
+      context: context,
+      kind: kind,
+      config: config,
+      languageCode: lang,
+    );
+  }
 
   bool _validateCommonFields(AppLocalizations l10n) {
     if (_nameController.text.trim().isEmpty) {
@@ -171,6 +184,16 @@ class _SignupScreenState extends State<SignupScreen> {
         role: UserRole.customer,
         email: _emailController.text.trim(),
       );
+      final referralCode = _referralController.text.trim();
+      if (referralCode.isNotEmpty) {
+        try {
+          await context.read<AppState>().referralService.applyReferralCode(
+                code: referralCode,
+              );
+        } catch (_) {
+          // Signup succeeded; referral is best-effort.
+        }
+      }
       await authService.signOut();
       if (!mounted) return;
 
@@ -349,6 +372,17 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                TextField(
+                  controller: _referralController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: l10n.localeName.startsWith('ar')
+                        ? 'رمز الإحالة (اختياري)'
+                        : 'Referral code (optional)',
+                    prefixIcon: const Icon(Icons.card_giftcard_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
               ],
               PasswordTextField(
                 controller: _passwordController,
@@ -421,23 +455,12 @@ class _SignupScreenState extends State<SignupScreen> {
                         spacing: 8,
                         children: [
                           TextButton(
-                            onPressed: () => _launchUrl(
-                              LegalConfig.termsOfServiceUrl(
-                                languageCode: l10n.localeName.startsWith('ar')
-                                    ? 'ar'
-                                    : 'en',
-                              ),
-                            ),
+                            onPressed: () => _openLegal(LegalContentKind.terms),
                             child: Text(l10n.termsOfService),
                           ),
                           TextButton(
-                            onPressed: () => _launchUrl(
-                              LegalConfig.privacyPolicyUrl(
-                                languageCode: l10n.localeName.startsWith('ar')
-                                    ? 'ar'
-                                    : 'en',
-                              ),
-                            ),
+                            onPressed: () =>
+                                _openLegal(LegalContentKind.privacy),
                             child: Text(l10n.privacyPolicy),
                           ),
                         ],

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/shared/screens/edit_profile_screen.dart';
+import 'package:hilla_ride/features/shared/screens/help_support_screen.dart';
 import 'package:hilla_ride/features/shared/widgets/firebase_driver_photo_image.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
@@ -173,6 +175,10 @@ class _ProfileBody extends StatelessWidget {
             ),
           ),
         ],
+        if (role == UserRole.customer) ...[
+          const SizedBox(height: 16),
+          _ReferralCard(user: user),
+        ],
         const SizedBox(height: 16),
         AppSecondaryButton(
           label: l10n.editProfileButton,
@@ -192,6 +198,20 @@ class _ProfileBody extends StatelessWidget {
                   user: user,
                   driver: driverProfile,
                 ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        AppSecondaryButton(
+          label: Localizations.localeOf(context).languageCode == 'ar'
+              ? 'المساعدة والدعم'
+              : 'Help & Support',
+          icon: Icons.help_outline,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const HelpSupportScreen(),
               ),
             );
           },
@@ -283,6 +303,107 @@ class _ProfileAvatar extends StatelessWidget {
       child: Icon(
         role == UserRole.driver ? Icons.local_taxi : Icons.person,
         size: 42,
+      ),
+    );
+  }
+}
+
+class _ReferralCard extends StatefulWidget {
+  const _ReferralCard({required this.user});
+
+  final AppUser user;
+
+  @override
+  State<_ReferralCard> createState() => _ReferralCardState();
+}
+
+class _ReferralCardState extends State<_ReferralCard> {
+  String? _code;
+  var _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final code = await context
+          .read<AppState>()
+          .referralService
+          .ensureReferralCode(widget.user.uid);
+      if (mounted) {
+        setState(() {
+          _code = code;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isAr ? 'برنامج الإحالة' : 'Referral program',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          if (_loading)
+            const LinearProgressIndicator()
+          else if (_code == null)
+            Text(isAr ? 'تعذر تحميل الرمز' : 'Could not load code')
+          else ...[
+            _InfoRow(
+              label: isAr ? 'رمزك' : 'Your code',
+              value: _code!,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: _code!));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isAr ? 'تم نسخ الرمز' : 'Code copied',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: Text(isAr ? 'نسخ' : 'Copy'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    final message = isAr
+                        ? 'انضم إلى Hello TukTuk! استخدم رمز الإحالة $_code'
+                        : 'Join Hello TukTuk! Use my referral code $_code';
+                    Clipboard.setData(ClipboardData(text: message));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isAr ? 'تم نسخ رسالة المشاركة' : 'Share message copied',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: Text(isAr ? 'مشاركة' : 'Share'),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

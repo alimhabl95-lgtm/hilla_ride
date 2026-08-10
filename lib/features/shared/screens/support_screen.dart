@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:hilla_ride/core/config/legal_config.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/chat_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/utils/legal_url_launcher.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
+import 'package:hilla_ride/features/shared/screens/legal_content_screen.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -51,6 +51,19 @@ class _SupportScreenState extends State<SupportScreen> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  Future<void> _openLegal(LegalContentKind kind) async {
+    final l10n = AppLocalizations.of(context)!;
+    final lang = l10n.localeName.startsWith('ar') ? 'ar' : 'en';
+    final config = await context.read<AppState>().appConfigService.getConfig();
+    if (!mounted) return;
+    await LegalContentScreen.open(
+      context: context,
+      kind: kind,
+      config: config,
+      languageCode: lang,
+    );
   }
 
   Future<void> _send(AppUser profile) async {
@@ -146,25 +159,13 @@ class _SupportScreenState extends State<SupportScreen> {
                       AppSecondaryButton(
                         label: l10n.privacyPolicy,
                         icon: Icons.privacy_tip_outlined,
-                        onPressed: () => _launch(
-                          LegalConfig.privacyPolicyUrl(
-                            languageCode: l10n.localeName.startsWith('ar')
-                                ? 'ar'
-                                : 'en',
-                          ),
-                        ),
+                        onPressed: () => _openLegal(LegalContentKind.privacy),
                       ),
                       const SizedBox(height: 8),
                       AppSecondaryButton(
                         label: l10n.termsOfService,
                         icon: Icons.description_outlined,
-                        onPressed: () => _launch(
-                          LegalConfig.termsOfServiceUrl(
-                            languageCode: l10n.localeName.startsWith('ar')
-                                ? 'ar'
-                                : 'en',
-                          ),
-                        ),
+                        onPressed: () => _openLegal(LegalContentKind.terms),
                       ),
                     ],
                   ),

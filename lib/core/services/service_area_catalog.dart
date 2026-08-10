@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/models/service_area_models.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,13 +7,18 @@ import 'package:latlong2/latlong.dart';
 ///
 /// After the first snapshot, seed data is never used — an empty active set
 /// means no new rides (deactivated areas stay out immediately).
-class ServiceAreaCatalog {
+class ServiceAreaCatalog extends ChangeNotifier {
   ServiceAreaCatalog._();
   static final ServiceAreaCatalog instance = ServiceAreaCatalog._();
+
+  static const _seedProvinceId = 'babil';
+  static const _seedCountryId = 'iq';
 
   List<ServiceDistrictNode>? _liveDistricts;
   /// All districts (active + inactive) for admin filters / labels.
   List<ServiceDistrictNode>? _allDistricts;
+  List<ServiceDistrict> _rawDistricts = const [];
+  List<ServiceSubDistrict> _rawSubs = const [];
   Map<String, ServiceSubDistrict> _subById = {};
   Map<String, ServiceProvince> _provincesById = {};
   Map<String, ServiceCountry> _countriesById = {};
@@ -34,6 +40,8 @@ class ServiceAreaCatalog {
     _synced = true;
     _countriesById = {for (final c in countries) c.id: c};
     _provincesById = {for (final p in provinces) p.id: p};
+    _rawDistricts = List<ServiceDistrict>.from(districts);
+    _rawSubs = List<ServiceSubDistrict>.from(subs);
 
     bool parentActive(ServiceDistrict d) {
       final province = _provincesById[d.provinceId];
@@ -99,7 +107,43 @@ class ServiceAreaCatalog {
           ],
         ),
     ];
+    notifyListeners();
   }
+
+  List<ServiceProvince> get _seedProvinces => [
+        ServiceProvince(
+          id: _seedProvinceId,
+          countryId: _seedCountryId,
+          nameEn: BabilRegions.provinceNameEn,
+          nameAr: BabilRegions.provinceNameAr,
+        ),
+      ];
+
+  List<ServiceDistrict> get _seedDistrictsAsService => [
+        for (final d in BabilRegions.seedDistricts)
+          ServiceDistrict(
+            id: d.id,
+            provinceId: _seedProvinceId,
+            countryId: _seedCountryId,
+            nameEn: d.nameEn,
+            nameAr: d.nameAr,
+          ),
+      ];
+
+  List<ServiceSubDistrict> get _seedSubsAsService => [
+        for (final d in BabilRegions.seedDistricts)
+          for (final s in d.subDistricts)
+            ServiceSubDistrict(
+              id: s.id,
+              districtId: d.id,
+              provinceId: _seedProvinceId,
+              countryId: _seedCountryId,
+              nameEn: s.nameEn,
+              nameAr: s.nameAr,
+              center: s.center,
+              searchRadiusKm: s.searchRadiusKm,
+            ),
+      ];
 
   List<BabilDistrict> _nodesToBabil(List<ServiceDistrictNode> nodes) {
     return [
@@ -169,6 +213,91 @@ class ServiceAreaCatalog {
   }
 
   ServiceSubDistrict? subDistrictConfig(String id) => _subById[id];
+
+  /// All governorates (provinces) for admin filters — dynamic, never hardcoded.
+  List<ServiceProvince> get provincesForAdminFilters {
+    final list = _provincesById.values.toList();
+    if (list.isEmpty) return _seedProvinces;
+    list.sort((a, b) => a.nameEn.toLowerCase().compareTo(b.nameEn.toLowerCase()));
+    return list;
+  }
+
+  List<ServiceDistrict> get _allDistrictsForAdmin {
+    if (_rawDistricts.isNotEmpty) return _rawDistricts;
+    return _seedDistrictsAsService;
+  }
+
+  List<ServiceSubDistrict> get _allSubsForAdmin {
+    if (_rawSubs.isNotEmpty) return _rawSubs;
+    return _seedSubsAsService;
+  }
+
+  List<ServiceDistrict> districtsForProvince(String? provinceId) {
+    final source = _allDistrictsForAdmin;
+    if (provinceId == null || provinceId.isEmpty) return source;
+    return source.where((d) => d.provinceId == provinceId).toList();
+  }
+
+  List<ServiceSubDistrict> subsForDistrict(String? districtId) {
+    final source = _allSubsForAdmin;
+    if (districtId == null || districtId.isEmpty) return source;
+    return source.where((s) => s.districtId == districtId).toList();
+  }
+
+  String? provinceIdForDistrict(String districtId) {
+    for (final d in _allDistrictsForAdmin) {
+      if (d.id == districtId) return d.provinceId;
+    }
+    return _seedProvinceId;
+  }
+
+  ServiceProvince? provinceById(String id) {
+    final p = _provincesById[id];
+    if (p != null) return p;
+    for (final seed in _seedProvinces) {
+      if (seed.id == id) return seed;
+    }
+    return null;
+  }
+
+  ServiceDistrict? districtById(String id) {
+    for (final d in _allDistrictsForAdmin) {
+      if (d.id == id) return d;
+    }
+    return null;
+  }
+
+  String localizedProvinceName(String id, {required bool isAr}) {
+    if (id == _seedProvinceId) {
+      return isAr ? BabilRegions.provinceNameAr : BabilRegions.provinceNameEn;
+    }
+    final p = provinceById(id);
+    if (p == null) return id;
+    return isAr ? p.nameAr : p.nameEn;
+  }
+
+  String localizedDistrictName(String id, {required bool isAr}) {
+    final d = districtById(id);
+    if (d == null) {
+      final seed = BabilRegions.districtById(id);
+      return isAr ? seed.nameAr : seed.nameEn;
+    }
+    return isAr ? d.nameAr : d.nameEn;
+  }
+
+  String localizedSubName(String id, {required bool isAr}) {
+    for (final s in _allSubsForAdmin) {
+      if (s.id == id) return isAr ? s.nameAr : s.nameEn;
+    }
+    final live = _subById[id];
+    if (live != null) return isAr ? live.nameAr : live.nameEn;
+    for (final d in BabilRegions.seedDistricts) {
+      for (final s in d.subDistricts) {
+        if (s.id == id) return isAr ? s.nameAr : s.nameEn;
+      }
+    }
+    return id;
+  }
 
   /// True if [point] falls inside any active sub-district radius.
   bool isWithinAnyActiveArea(LatLng point) {

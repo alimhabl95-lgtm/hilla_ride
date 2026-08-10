@@ -1,8 +1,10 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
-import 'package:hilla_ride/core/constants/babil_regions.dart';
+import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/core/models/manager_permissions.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_assistants_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_customers_panel.dart';
@@ -13,6 +15,12 @@ import 'package:hilla_ride/features/admin/widgets/admin_pricing_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_promo_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_driver_ratings_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_support_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_complaints_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_notifications_center_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_driver_performance_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_reports_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_audit_log_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_app_settings_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_wallet_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_rewards_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_business_partners_panel.dart';
@@ -20,6 +28,8 @@ import 'package:hilla_ride/features/admin/widgets/admin_broadcast_actions.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_fake_driver_controls.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_profile_button.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_driver_card.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_global_search.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_live_map_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_overview_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_service_areas_panel.dart';
@@ -57,6 +67,25 @@ class _AdminTabDefinition {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedIndex = 0;
+  var _loginAuditLogged = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _logAdminLoginOnce();
+  }
+
+  Future<void> _logAdminLoginOnce() async {
+    if (_loginAuditLogged) return;
+    _loginAuditLogged = true;
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('logAdminLogin');
+      await callable.call();
+    } catch (_) {
+      // Best-effort audit; dashboard still loads if CF unavailable.
+    }
+  }
 
   List<_AdminTabDefinition> _tabs(AppLocalizations l10n) {
     final isAr = l10n.localeName.startsWith('ar');
@@ -188,6 +217,48 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         builder: const AdminSupportPanel(),
       ),
       _AdminTabDefinition(
+        permission: AdminPermissions.complaints,
+        icon: Icons.report_problem_outlined,
+        selectedIcon: Icons.report_problem,
+        label: isAr ? 'الشكاوى' : 'Complaints',
+        builder: const AdminComplaintsPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.notifications,
+        icon: Icons.notifications_outlined,
+        selectedIcon: Icons.notifications,
+        label: isAr ? 'الإشعارات' : 'Notifications',
+        builder: const AdminNotificationsCenterPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.driverPerformance,
+        icon: Icons.insights_outlined,
+        selectedIcon: Icons.insights,
+        label: isAr ? 'أداء السائقين' : 'Driver Performance',
+        builder: const AdminDriverPerformancePanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.reports,
+        icon: Icons.summarize_outlined,
+        selectedIcon: Icons.summarize,
+        label: isAr ? 'التقارير' : 'Reports',
+        builder: const AdminReportsPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.auditLog,
+        icon: Icons.fact_check_outlined,
+        selectedIcon: Icons.fact_check,
+        label: isAr ? 'سجل التدقيق' : 'Audit Log',
+        builder: const AdminAuditLogPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.appSettings,
+        icon: Icons.tune_outlined,
+        selectedIcon: Icons.tune,
+        label: isAr ? 'إعدادات التطبيق' : 'App Settings',
+        builder: const AdminAppSettingsPanel(),
+      ),
+      _AdminTabDefinition(
         permission: AdminPermissions.manageAssistants,
         icon: Icons.admin_panel_settings_outlined,
         selectedIcon: Icons.admin_panel_settings,
@@ -234,8 +305,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.adminPanelTitle),
+        title: isWide
+            ? Row(
+                children: [
+                  Text(l10n.adminPanelTitle),
+                  const SizedBox(width: 16),
+                  const Expanded(child: AdminGlobalSearchField()),
+                ],
+              )
+            : Text(l10n.adminPanelTitle),
         actions: [
+          if (!isWide) const AdminGlobalSearchField(compact: true),
           if (widget.adminUser.hasAdminPermission(AdminPermissions.rideHistory)) ...[
             IconButton(
               tooltip: l10n.completedRidesCount,
@@ -360,28 +440,24 @@ class _PendingDriversPanel extends StatefulWidget {
 }
 
 class _PendingDriversPanelState extends State<_PendingDriversPanel> {
-  String? _cityFilterId;
-  String? _subDistrictFilterId;
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   bool _matchesDriverFilter(DriverProfile driver) {
-    if (_cityFilterId != null &&
-        driver.assignedDistrictId != _cityFilterId) {
+    final catalog = ServiceAreaCatalog.instance;
+    if (!_filters.matchesGeo(
+      provinceId: catalog.provinceIdForDistrict(driver.assignedDistrictId),
+      districtId: driver.assignedDistrictId,
+      subDistrictId: driver.assignedSubDistrictId,
+    )) {
       return false;
     }
-    if (_subDistrictFilterId != null &&
-        driver.assignedSubDistrictId != _subDistrictFilterId) {
-      return false;
-    }
-    return true;
+    return _filters.matchesDate(driver.createdAt);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final adminService = context.read<AppState>().adminService;
-    final selectedDistrict = _cityFilterId == null
-        ? null
-        : BabilRegions.districtById(_cityFilterId!);
 
     return StreamBuilder<List<DriverProfile>>(
       stream: adminService.watchAllDrivers(),
@@ -432,20 +508,15 @@ class _PendingDriversPanelState extends State<_PendingDriversPanel> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                child: _AdminDriverDistrictFilter(
-                  cityFilterId: _cityFilterId,
-                  subDistrictFilterId: _subDistrictFilterId,
-                  selectedDistrict: selectedDistrict,
-                  localeName: l10n.localeName,
-                  onCityChanged: (value) {
-                    setState(() {
-                      _cityFilterId = value;
-                      _subDistrictFilterId = null;
-                    });
-                  },
-                  onSubDistrictChanged: (value) {
-                    setState(() => _subDistrictFilterId = value);
-                  },
+                child: AdminFilterBar(
+                  value: _filters,
+                  onChanged: (v) => setState(() => _filters = v),
+                  fields: const [
+                    AdminFilterField.province,
+                    AdminFilterField.district,
+                    AdminFilterField.subDistrict,
+                    AdminFilterField.dateRange,
+                  ],
                 ),
               ),
               Expanded(
@@ -480,20 +551,15 @@ class _PendingDriversPanelState extends State<_PendingDriversPanel> {
           },
           itemBuilder: (context, index) {
             if (index == 0) {
-              return _AdminDriverDistrictFilter(
-                cityFilterId: _cityFilterId,
-                subDistrictFilterId: _subDistrictFilterId,
-                selectedDistrict: selectedDistrict,
-                localeName: l10n.localeName,
-                onCityChanged: (value) {
-                  setState(() {
-                    _cityFilterId = value;
-                    _subDistrictFilterId = null;
-                  });
-                },
-                onSubDistrictChanged: (value) {
-                  setState(() => _subDistrictFilterId = value);
-                },
+              return AdminFilterBar(
+                value: _filters,
+                onChanged: (v) => setState(() => _filters = v),
+                fields: const [
+                  AdminFilterField.province,
+                  AdminFilterField.district,
+                  AdminFilterField.subDistrict,
+                  AdminFilterField.dateRange,
+                ],
               );
             }
             return AdminDriverCard(driver: drivers[index - 1]);
@@ -512,98 +578,46 @@ class _ActiveRidesPanel extends StatefulWidget {
 }
 
 class _ActiveRidesPanelState extends State<_ActiveRidesPanel> {
-  String? _cityFilterId;
-  String? _subDistrictFilterId;
-
-  String _districtLabel(BabilDistrict district, String localeName) {
-    return localeName.startsWith('ar') ? district.nameAr : district.nameEn;
-  }
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final adminService = context.read<AppState>().adminService;
-    final selectedDistrict = _cityFilterId == null
-        ? null
-        : BabilRegions.districtById(_cityFilterId!);
+    final catalog = ServiceAreaCatalog.instance;
 
     return StreamBuilder<List<Ride>>(
       stream: adminService.watchActiveRides(),
       builder: (context, snapshot) {
         final rides = snapshot.data ?? const [];
         final filtered = rides.where((ride) {
-          if (_cityFilterId != null && ride.districtId != _cityFilterId) {
+          if (!_filters.matchesGeo(
+            provinceId: catalog.provinceIdForDistrict(ride.districtId),
+            districtId: ride.districtId,
+            subDistrictId: ride.subDistrictId,
+          )) {
             return false;
           }
-          if (_subDistrictFilterId != null &&
-              ride.subDistrictId != _subDistrictFilterId) {
+          if (_filters.rideStatus != null &&
+              ride.status.value != _filters.rideStatus) {
             return false;
           }
-          return true;
+          return _filters.matchesDate(ride.createdAt);
         }).toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-              child: Column(
-                children: [
-                  DropdownButtonFormField<String?>(
-                    value: _cityFilterId,
-                    decoration: InputDecoration(
-                      labelText: l10n.filterByCity,
-                      prefixIcon: const Icon(Icons.location_city_outlined),
-                    ),
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(l10n.allCities),
-                      ),
-                      for (final district in BabilRegions.districtsForFilters)
-                        DropdownMenuItem<String?>(
-                          value: district.id,
-                          child: Text(
-                            _districtLabel(district, l10n.localeName),
-                          ),
-                        ),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        _cityFilterId = value;
-                        _subDistrictFilterId = null;
-                      });
-                    },
-                  ),
-                  if (selectedDistrict != null) ...[
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String?>(
-                      value: _subDistrictFilterId,
-                      decoration: InputDecoration(
-                        labelText: l10n.filterBySubDistrict,
-                        prefixIcon: const Icon(Icons.place_outlined),
-                      ),
-                      items: [
-                        DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text(l10n.allSubDistricts),
-                        ),
-                        for (final sub in selectedDistrict.subDistricts)
-                          DropdownMenuItem<String?>(
-                            value: sub.id,
-                            child: Text(
-                              l10n.localeName.startsWith('ar')
-                                  ? sub.nameAr
-                                  : sub.nameEn,
-                            ),
-                          ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _subDistrictFilterId = value),
-                    ),
-                  ],
-                ],
-              ),
+            AdminFilterBar(
+              value: _filters,
+              onChanged: (v) => setState(() => _filters = v),
+              fields: const [
+                AdminFilterField.province,
+                AdminFilterField.district,
+                AdminFilterField.subDistrict,
+                AdminFilterField.rideStatus,
+                AdminFilterField.dateRange,
+              ],
             ),
             Expanded(
               child: filtered.isEmpty
@@ -635,19 +649,37 @@ class _AllDriversPanel extends StatefulWidget {
 }
 
 class _AllDriversPanelState extends State<_AllDriversPanel> {
-  String? _cityFilterId;
-  String? _subDistrictFilterId;
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   bool _matchesDriverFilter(DriverProfile driver) {
-    if (_cityFilterId != null &&
-        driver.assignedDistrictId != _cityFilterId) {
+    final catalog = ServiceAreaCatalog.instance;
+    if (!_filters.matchesGeo(
+      provinceId: catalog.provinceIdForDistrict(driver.assignedDistrictId),
+      districtId: driver.assignedDistrictId,
+      subDistrictId: driver.assignedSubDistrictId,
+    )) {
       return false;
     }
-    if (_subDistrictFilterId != null &&
-        driver.assignedSubDistrictId != _subDistrictFilterId) {
-      return false;
+    if (_filters.driverStatus != null) {
+      final status = _filters.driverStatus!;
+      switch (status) {
+        case 'online':
+          if (!driver.isOnline) return false;
+        case 'offline':
+          if (driver.isOnline) return false;
+        case 'approved':
+          if (!driver.isApproved) return false;
+        case 'pending':
+          if (driver.approvalStatus != DriverApprovalStatus.pending) {
+            return false;
+          }
+        case 'blocked':
+          if (!driver.isBlocked) return false;
+        case 'busy':
+          if (!driver.hasActiveRide) return false;
+      }
     }
-    return true;
+    return _filters.matchesDate(driver.createdAt);
   }
 
   @override
@@ -655,9 +687,6 @@ class _AllDriversPanelState extends State<_AllDriversPanel> {
     final l10n = AppLocalizations.of(context)!;
     final adminService = context.read<AppState>().adminService;
     final isManager = widget.adminUser.isOwnerManager;
-    final selectedDistrict = _cityFilterId == null
-        ? null
-        : BabilRegions.districtById(_cityFilterId!);
 
     return StreamBuilder<List<DriverProfile>>(
       stream: adminService.watchAllDrivers(),
@@ -678,20 +707,16 @@ class _AllDriversPanelState extends State<_AllDriversPanel> {
           },
           itemBuilder: (context, index) {
             if (index == 0) {
-              return _AdminDriverDistrictFilter(
-                cityFilterId: _cityFilterId,
-                subDistrictFilterId: _subDistrictFilterId,
-                selectedDistrict: selectedDistrict,
-                localeName: l10n.localeName,
-                onCityChanged: (value) {
-                  setState(() {
-                    _cityFilterId = value;
-                    _subDistrictFilterId = null;
-                  });
-                },
-                onSubDistrictChanged: (value) {
-                  setState(() => _subDistrictFilterId = value);
-                },
+              return AdminFilterBar(
+                value: _filters,
+                onChanged: (v) => setState(() => _filters = v),
+                fields: const [
+                  AdminFilterField.province,
+                  AdminFilterField.district,
+                  AdminFilterField.subDistrict,
+                  AdminFilterField.driverStatus,
+                  AdminFilterField.dateRange,
+                ],
               );
             }
             if (index == 1) {
@@ -712,81 +737,6 @@ class _AllDriversPanelState extends State<_AllDriversPanel> {
   }
 }
 
-class _AdminDriverDistrictFilter extends StatelessWidget {
-  const _AdminDriverDistrictFilter({
-    required this.cityFilterId,
-    required this.subDistrictFilterId,
-    required this.selectedDistrict,
-    required this.localeName,
-    required this.onCityChanged,
-    required this.onSubDistrictChanged,
-  });
-
-  final String? cityFilterId;
-  final String? subDistrictFilterId;
-  final BabilDistrict? selectedDistrict;
-  final String localeName;
-  final ValueChanged<String?> onCityChanged;
-  final ValueChanged<String?> onSubDistrictChanged;
-
-  String _districtLabel(BabilDistrict district) {
-    return localeName.startsWith('ar') ? district.nameAr : district.nameEn;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Column(
-      children: [
-        DropdownButtonFormField<String?>(
-          value: cityFilterId,
-          decoration: InputDecoration(
-            labelText: l10n.filterByCity,
-            prefixIcon: const Icon(Icons.location_city_outlined),
-          ),
-          items: [
-            DropdownMenuItem<String?>(
-              value: null,
-              child: Text(l10n.allCities),
-            ),
-            for (final district in BabilRegions.districtsForFilters)
-              DropdownMenuItem<String?>(
-                value: district.id,
-                child: Text(_districtLabel(district)),
-              ),
-          ],
-          onChanged: onCityChanged,
-        ),
-        if (selectedDistrict != null) ...[
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String?>(
-            value: subDistrictFilterId,
-            decoration: InputDecoration(
-              labelText: l10n.filterBySubDistrict,
-              prefixIcon: const Icon(Icons.place_outlined),
-            ),
-            items: [
-              DropdownMenuItem<String?>(
-                value: null,
-                child: Text(l10n.allSubDistricts),
-              ),
-              for (final sub in selectedDistrict!.subDistricts)
-                DropdownMenuItem<String?>(
-                  value: sub.id,
-                  child: Text(
-                    localeName.startsWith('ar') ? sub.nameAr : sub.nameEn,
-                  ),
-                ),
-            ],
-            onChanged: onSubDistrictChanged,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
 class _RideHistoryPanel extends StatefulWidget {
   const _RideHistoryPanel();
 
@@ -795,131 +745,58 @@ class _RideHistoryPanel extends StatefulWidget {
 }
 
 class _RideHistoryPanelState extends State<_RideHistoryPanel> {
-  String? _cityFilterId;
-  String? _subDistrictFilterId;
-  final _rideNumberQueryController = TextEditingController();
-
-  @override
-  void dispose() {
-    _rideNumberQueryController.dispose();
-    super.dispose();
-  }
-
-  String _districtLabel(BabilDistrict district, String localeName) {
-    return localeName.startsWith('ar') ? district.nameAr : district.nameEn;
-  }
-
-  String _subDistrictLabel(
-    String districtId,
-    String subDistrictId,
-    String localeName,
-  ) {
-    final sub = BabilRegions.subDistrictById(districtId, subDistrictId);
-    return localeName.startsWith('ar') ? sub.nameAr : sub.nameEn;
-  }
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final adminService = context.read<AppState>().adminService;
     const fareService = FareService();
-    final selectedDistrict = _cityFilterId == null
-        ? null
-        : BabilRegions.districtById(_cityFilterId!);
+    final catalog = ServiceAreaCatalog.instance;
+    final isAr = l10n.localeName.startsWith('ar');
 
     return StreamBuilder<List<Ride>>(
       stream: adminService.watchRecentRides(),
       builder: (context, snapshot) {
         final rides = snapshot.data ?? const [];
         final filtered = rides.where((ride) {
-          if (_cityFilterId != null && ride.districtId != _cityFilterId) {
+          if (!_filters.matchesGeo(
+            provinceId: catalog.provinceIdForDistrict(ride.districtId),
+            districtId: ride.districtId,
+            subDistrictId: ride.subDistrictId,
+          )) {
             return false;
           }
-          if (_subDistrictFilterId != null &&
-              ride.subDistrictId != _subDistrictFilterId) {
+          if (_filters.rideStatus != null &&
+              ride.status.value != _filters.rideStatus) {
             return false;
           }
-          final rideNumberQuery = _rideNumberQueryController.text.trim();
-          if (rideNumberQuery.isNotEmpty) {
-            final haystack = '${ride.rideNumber} ${ride.id}'.toLowerCase();
-            if (!haystack.contains(rideNumberQuery.toLowerCase())) {
-              return false;
-            }
+          final q = _filters.query.trim().toLowerCase();
+          if (q.isNotEmpty) {
+            final haystack =
+                '${ride.rideNumber} ${ride.id} ${ride.pickupLabel} ${ride.destinationLabel}'
+                    .toLowerCase();
+            if (!haystack.contains(q)) return false;
           }
-          return true;
+          final when = ride.completedAt ?? ride.createdAt;
+          return _filters.matchesDate(when);
         }).toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _rideNumberQueryController,
-                    decoration: InputDecoration(
-                      labelText: l10n.searchRideByNumber,
-                      prefixIcon: const Icon(Icons.search),
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String?>(
-                    value: _cityFilterId,
-                    decoration: InputDecoration(
-                      labelText: l10n.filterByCity,
-                      prefixIcon: const Icon(Icons.location_city_outlined),
-                    ),
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(l10n.allCities),
-                      ),
-                      for (final district in BabilRegions.districtsForFilters)
-                        DropdownMenuItem<String?>(
-                          value: district.id,
-                          child: Text(
-                            _districtLabel(district, l10n.localeName),
-                          ),
-                        ),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        _cityFilterId = value;
-                        _subDistrictFilterId = null;
-                      });
-                    },
-                  ),
-                  if (selectedDistrict != null) ...[
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String?>(
-                      value: _subDistrictFilterId,
-                      decoration: InputDecoration(
-                        labelText: l10n.filterBySubDistrict,
-                        prefixIcon: const Icon(Icons.place_outlined),
-                      ),
-                      items: [
-                        DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text(l10n.allSubDistricts),
-                        ),
-                        for (final sub in selectedDistrict.subDistricts)
-                          DropdownMenuItem<String?>(
-                            value: sub.id,
-                            child: Text(
-                              l10n.localeName.startsWith('ar')
-                                  ? sub.nameAr
-                                  : sub.nameEn,
-                            ),
-                          ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _subDistrictFilterId = value),
-                    ),
-                  ],
-                ],
-              ),
+            AdminFilterBar(
+              value: _filters,
+              onChanged: (v) => setState(() => _filters = v),
+              hintText: l10n.searchRideByNumber,
+              fields: const [
+                AdminFilterField.province,
+                AdminFilterField.district,
+                AdminFilterField.subDistrict,
+                AdminFilterField.rideStatus,
+                AdminFilterField.dateRange,
+                AdminFilterField.search,
+              ],
             ),
             Expanded(
               child: filtered.isEmpty
@@ -936,19 +813,17 @@ class _RideHistoryPanelState extends State<_RideHistoryPanel> {
                             : DateFormat.yMMMd(l10n.localeName)
                                 .add_jm()
                                 .format(when);
-                        final district = ride.districtId.isEmpty
-                            ? null
-                            : BabilRegions.districtById(ride.districtId);
-                        final cityLabel = district == null
+                        final cityLabel = ride.districtId.isEmpty
                             ? ''
-                            : _districtLabel(district, l10n.localeName);
-                        final subLabel = ride.districtId.isEmpty ||
-                                ride.subDistrictId.isEmpty
-                            ? ''
-                            : _subDistrictLabel(
+                            : catalog.localizedDistrictName(
                                 ride.districtId,
+                                isAr: isAr,
+                              );
+                        final subLabel = ride.subDistrictId.isEmpty
+                            ? ''
+                            : catalog.localizedSubName(
                                 ride.subDistrictId,
-                                l10n.localeName,
+                                isAr: isAr,
                               );
 
                         return ListTile(
@@ -1006,21 +881,14 @@ class _RideCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     const fareService = FareService();
-    final district = ride.districtId.isEmpty
-        ? null
-        : BabilRegions.districtById(ride.districtId);
-    final cityLabel = district == null
+    final catalog = ServiceAreaCatalog.instance;
+    final isAr = localeName.startsWith('ar');
+    final cityLabel = ride.districtId.isEmpty
         ? ''
-        : (localeName.startsWith('ar') ? district.nameAr : district.nameEn);
-    final subLabel = ride.districtId.isEmpty || ride.subDistrictId.isEmpty
+        : catalog.localizedDistrictName(ride.districtId, isAr: isAr);
+    final subLabel = ride.subDistrictId.isEmpty
         ? ''
-        : (() {
-            final sub = BabilRegions.subDistrictById(
-              ride.districtId,
-              ride.subDistrictId,
-            );
-            return localeName.startsWith('ar') ? sub.nameAr : sub.nameEn;
-          })();
+        : catalog.localizedSubName(ride.subDistrictId, isAr: isAr);
 
     return Card(
       child: ListTile(

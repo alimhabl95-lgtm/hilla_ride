@@ -8,6 +8,7 @@ struct SignupView: View {
     @State private var phone = ""
     @State private var email = ""
     @State private var password = ""
+    @State private var referralCode = ""
     @State private var acceptedTerms = false
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -40,6 +41,13 @@ struct SignupView: View {
 
                     SecureField(L10n.string(.passwordLabel, language: appState.language), text: $password)
                         .textFieldStyle(AppTextFieldStyle())
+
+                    TextField(
+                        appState.language == .arabic ? "رمز الإحالة (اختياري)" : "Referral code (optional)",
+                        text: $referralCode
+                    )
+                    .textInputAutocapitalization(.characters)
+                    .textFieldStyle(AppTextFieldStyle())
 
                     Text(L10n.string(.passwordMinLength, language: appState.language))
                         .font(.caption)
@@ -121,6 +129,10 @@ struct SignupView: View {
                 fullName: fullName,
                 email: email
             )
+            let code = referralCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !code.isEmpty {
+                try? await ReferralService.applyReferralCode(code)
+            }
             try await appState.authService.signOut()
             showSuccess = true
         } catch {

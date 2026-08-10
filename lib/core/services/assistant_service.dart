@@ -68,6 +68,7 @@ class AssistantService {
   Future<void> approveAssistant({
     required String assistantId,
     required List<String> permissions,
+    String roleTemplate = '',
   }) async {
     await _firestore.collection('users').doc(assistantId).update({
       'permissions': sanitizePermissions(permissions),
@@ -75,6 +76,7 @@ class AssistantService {
       'approvedAt': FieldValue.serverTimestamp(),
       'isBlocked': false,
       'updatedAt': FieldValue.serverTimestamp(),
+      if (roleTemplate.isNotEmpty) 'roleTemplate': roleTemplate,
     });
   }
 
@@ -83,6 +85,7 @@ class AssistantService {
     required String email,
     required String password,
     required List<String> permissions,
+    String roleTemplate = '',
   }) async {
     final callable = _functions.httpsCallable('createAssistant');
     final result = await callable.call<Map<String, dynamic>>({
@@ -90,6 +93,7 @@ class AssistantService {
       'email': email.trim(),
       'password': password,
       'permissions': permissions,
+      if (roleTemplate.isNotEmpty) 'roleTemplate': roleTemplate,
     });
     return result.data['uid'] as String? ?? '';
   }
@@ -97,10 +101,12 @@ class AssistantService {
   Future<void> updateAssistantPermissions({
     required String assistantId,
     required List<String> permissions,
+    String roleTemplate = '',
   }) async {
     await _firestore.collection('users').doc(assistantId).update({
       'permissions': permissions,
       'updatedAt': FieldValue.serverTimestamp(),
+      if (roleTemplate.isNotEmpty) 'roleTemplate': roleTemplate,
     });
   }
 

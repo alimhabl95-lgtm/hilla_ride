@@ -58,6 +58,10 @@
 		A1000000000000000000009B /* MarketplaceHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000009B /* MarketplaceHomeView.swift */; };
 		A1000000000000000000009C /* BusinessStoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000009C /* BusinessStoreView.swift */; };
 		A1000000000000000000009D /* DriverDeliveryOrdersPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000009D /* DriverDeliveryOrdersPanel.swift */; };
+		A1000000000000000000009E /* AppRemoteConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000009E /* AppRemoteConfig.swift */; };
+		A1000000000000000000009F /* AppConfigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000009F /* AppConfigService.swift */; };
+		A100000000000000000000A0 /* ReferralService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A0 /* ReferralService.swift */; };
+		A100000000000000000000A1 /* AppGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A1 /* AppGateView.swift */; };
 		A10000000000000000000039 /* RideModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* RideModels.swift */; };
 		A10000000000000000000040 /* PricingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* PricingModels.swift */; };
 		A10000000000000000000041 /* PricingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* PricingService.swift */; };
@@ -151,6 +155,10 @@
 		A2000000000000000000009B /* MarketplaceHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceHomeView.swift; sourceTree = "<group>"; };
 		A2000000000000000000009C /* BusinessStoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessStoreView.swift; sourceTree = "<group>"; };
 		A2000000000000000000009D /* DriverDeliveryOrdersPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverDeliveryOrdersPanel.swift; sourceTree = "<group>"; };
+		A2000000000000000000009E /* AppRemoteConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRemoteConfig.swift; sourceTree = "<group>"; };
+		A2000000000000000000009F /* AppConfigService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfigService.swift; sourceTree = "<group>"; };
+		A200000000000000000000A0 /* ReferralService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferralService.swift; sourceTree = "<group>"; };
+		A200000000000000000000A1 /* AppGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGateView.swift; sourceTree = "<group>"; };
 		A20000000000000000000036 /* RideModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RideModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000037 /* PricingModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000038 /* PricingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingService.swift; sourceTree = "<group>"; };
@@ -248,6 +256,7 @@
 			children = (
 				A20000000000000000000002 /* AppState.swift */,
 				A20000000000000000000003 /* RootView.swift */,
+				A200000000000000000000A1 /* AppGateView.swift */,
 				A20000000000000000000025 /* AppShellView.swift */,
 				A20000000000000000000051 /* SessionGuardView.swift */,
 			);
@@ -323,6 +332,7 @@
 				A20000000000000000000092 /* MapPresence.swift */,
 				A20000000000000000000094 /* WalletModels.swift */,
 				A20000000000000000000098 /* BusinessModels.swift */,
+				A2000000000000000000009E /* AppRemoteConfig.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -353,6 +363,8 @@
 				A20000000000000000000095 /* WalletService.swift */,
 				A20000000000000000000097 /* ServiceAreaCatalog.swift */,
 				A20000000000000000000099 /* BusinessService.swift */,
+				A2000000000000000000009F /* AppConfigService.swift */,
+				A200000000000000000000A0 /* ReferralService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -626,6 +638,10 @@
 				A10000000000000000000083 /* MissingProfileRecoveryView.swift in Sources */,
 				A10000000000000000000084 /* ProfileAvatarView.swift in Sources */,
 				A10000000000000000000086 /* AnnouncementBannerView.swift in Sources */,
+				A1000000000000000000009E /* AppRemoteConfig.swift in Sources */,
+				A1000000000000000000009F /* AppConfigService.swift in Sources */,
+				A100000000000000000000A0 /* ReferralService.swift in Sources */,
+				A100000000000000000000A1 /* AppGateView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -675,7 +691,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 97;
+				CURRENT_PROJECT_VERSION = 98;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -708,7 +724,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = HelloTukTuk/HelloTukTuk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 97;
+				CURRENT_PROJECT_VERSION = 98;
 				DEVELOPMENT_TEAM = XAZ6V7UTYT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;

@@ -13,6 +13,7 @@ import 'package:hilla_ride/features/driver/screens/driver_rewards_screen.dart';
 import 'package:hilla_ride/features/driver/screens/driver_wallet_screen.dart';
 import 'package:hilla_ride/features/driver/widgets/driver_delivery_orders_panel.dart';
 import 'package:hilla_ride/features/driver/widgets/driver_ride_map_panel.dart';
+import 'package:hilla_ride/features/shared/widgets/announcement_banner.dart';
 import 'package:hilla_ride/features/shared/screens/ride_chat_screen.dart';
 import 'package:hilla_ride/features/shared/widgets/profile_avatar_circle.dart';
 import 'package:hilla_ride/features/shared/widgets/ride_earnings_summary.dart';
@@ -182,7 +183,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           const SizedBox(width: AppSpacing.sm),
         ],
       ),
-      body: StreamBuilder<DriverProfile?>(
+      body: Column(
+        children: [
+          const AnnouncementBanner(audience: 'drivers'),
+          Expanded(
+            child: StreamBuilder<DriverProfile?>(
         stream: context.read<AppState>().driverService.watchDriver(widget.driver.uid),
         builder: (context, driverSnapshot) {
           final driver = driverSnapshot.data ?? widget.driver;
@@ -282,6 +287,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             },
           );
         },
+            ),
+          ),
+        ],
       ),
     );
   }

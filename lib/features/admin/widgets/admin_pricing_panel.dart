@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/models/pricing_config.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/core/utils/input_parsers.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -22,13 +23,16 @@ class _AdminPricingPanelState extends State<AdminPricingPanel> {
   var _isLoading = true;
   var _showLoadWarning = false;
   String? _appliedFingerprint;
-  String _selectedDistrictId = BabilRegions.districtsForFilters.first.id;
+  late String _selectedDistrictId;
   String? _selectedSubDistrictId;
   StreamSubscription<PricingConfig>? _pricingSubscription;
 
   @override
   void initState() {
     super.initState();
+    final districts = ServiceAreaCatalog.instance.districtsForAdminFilters;
+    _selectedDistrictId =
+        districts.isNotEmpty ? districts.first.id : BabilRegions.customerDistrict.id;
     _applyConfig(PricingConfig.defaults);
     _startWatchingPricing();
   }
@@ -210,18 +214,20 @@ class _AdminPricingPanelState extends State<AdminPricingPanel> {
   }
 
   String _areaTitle(AppLocalizations l10n, bool isArabic) {
-    final district = BabilRegions.districtById(_selectedDistrictId);
-    final districtLabel = isArabic ? district.nameAr : district.nameEn;
+    final catalog = ServiceAreaCatalog.instance;
+    final districtLabel = catalog.localizedDistrictName(
+      _selectedDistrictId,
+      isAr: isArabic,
+    );
 
     if (_selectedSubDistrictId == null) {
       return l10n.pricingForCity(districtLabel);
     }
 
-    final sub = BabilRegions.subDistrictById(
-      _selectedDistrictId,
+    final subLabel = catalog.localizedSubName(
       _selectedSubDistrictId!,
+      isAr: isArabic,
     );
-    final subLabel = isArabic ? sub.nameAr : sub.nameEn;
     return l10n.pricingForArea(districtLabel, subLabel);
   }
 
@@ -229,78 +235,106 @@ class _AdminPricingPanelState extends State<AdminPricingPanel> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isArabic = l10n.localeName.startsWith('ar');
-    final district = BabilRegions.districtById(_selectedDistrictId);
     final canSave = _brackets.isNotEmpty && !_isSaving && !_isLoading;
 
-    return ListView(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        24 + MediaQuery.paddingOf(context).bottom + 48,
-      ),
-      children: [
-        Text(
-          l10n.pricingRulesTitle,
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 8),
-        Text(l10n.pricingRulesHint),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _selectedDistrictId,
-          decoration: InputDecoration(labelText: l10n.cityPricingLabel),
-          items: BabilRegions.districtsForFilters
-              .map(
-                (item) => DropdownMenuItem(
-                  value: item.id,
-                  child: Text(isArabic ? item.nameAr : item.nameEn),
-                ),
-              )
-              .toList(),
-          onChanged: _isSaving ? null : _onDistrictChanged,
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String?>(
-          value: _selectedSubDistrictId,
-          decoration: InputDecoration(labelText: l10n.subDistrictLabel),
-          items: [
-            DropdownMenuItem<String?>(
-              value: null,
-              child: Text(l10n.pricingDistrictDefault),
+    return ListenableBuilder(
+      listenable: ServiceAreaCatalog.instance,
+      builder: (context, _) {
+        final catalog = ServiceAreaCatalog.instance;
+        final districts = catalog.districtsForAdminFilters;
+        final districtIds = districts.map((d) => d.id).toSet();
+        final safeDistrictId = districtIds.contains(_selectedDistrictId)
+            ? _selectedDistrictId
+            : (districts.isNotEmpty ? districts.first.id : null);
+        final districtSubs = safeDistrictId == null
+            ? const <BabilSubDistrict>[]
+            : catalog
+                .subsForDistrict(safeDistrictId)
+                .map(
+                  (s) => BabilSubDistrict(
+                    id: s.id,
+                    nameAr: s.nameAr,
+                    nameEn: s.nameEn,
+                    center: s.center,
+                    searchRadiusKm: s.searchRadiusKm,
+                  ),
+                )
+                .toList();
+        final subIds = districtSubs.map((s) => s.id).toSet();
+        final safeSubId = _selectedSubDistrictId == null ||
+                subIds.contains(_selectedSubDistrictId)
+            ? _selectedSubDistrictId
+            : null;
+
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            24,
+            24,
+            24 + MediaQuery.paddingOf(context).bottom + 48,
+          ),
+          children: [
+            Text(
+              l10n.pricingRulesTitle,
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
-            ...district.subDistricts.map(
-              (sub) => DropdownMenuItem<String?>(
-                value: sub.id,
-                child: Text(isArabic ? sub.nameAr : sub.nameEn),
-              ),
-            ),
-          ],
-          onChanged: _isSaving ? null : _onSubDistrictChanged,
-        ),
-        if (_showLoadWarning) ...[
-          const SizedBox(height: 12),
-          MaterialBanner(
-            content: Text(l10n.pricingUsingDefaultsHint),
-            leading: const Icon(Icons.info_outline),
-            backgroundColor:
-                Theme.of(context).colorScheme.primaryContainer.withValues(
-                      alpha: 0.35,
+            const SizedBox(height: 8),
+            Text(l10n.pricingRulesHint),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: safeDistrictId,
+              decoration: InputDecoration(labelText: l10n.cityPricingLabel),
+              items: districts
+                  .map(
+                    (item) => DropdownMenuItem(
+                      value: item.id,
+                      child: Text(isArabic ? item.nameAr : item.nameEn),
                     ),
-            actions: const [SizedBox.shrink()],
-          ),
-        ],
-        if (_isLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else ...[
-          const SizedBox(height: 24),
-          Text(
-            _areaTitle(l10n, isArabic),
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+                  )
+                  .toList(),
+              onChanged: _isSaving ? null : _onDistrictChanged,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String?>(
+              value: safeSubId,
+              decoration: InputDecoration(labelText: l10n.subDistrictLabel),
+              items: [
+                DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text(l10n.pricingDistrictDefault),
+                ),
+                ...districtSubs.map(
+                  (sub) => DropdownMenuItem<String?>(
+                    value: sub.id,
+                    child: Text(isArabic ? sub.nameAr : sub.nameEn),
+                  ),
+                ),
+              ],
+              onChanged: _isSaving ? null : _onSubDistrictChanged,
+            ),
+            if (_showLoadWarning) ...[
+              const SizedBox(height: 12),
+              MaterialBanner(
+                content: Text(l10n.pricingUsingDefaultsHint),
+                leading: const Icon(Icons.info_outline),
+                backgroundColor:
+                    Theme.of(context).colorScheme.primaryContainer.withValues(
+                          alpha: 0.35,
+                        ),
+                actions: const [SizedBox.shrink()],
+              ),
+            ],
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else ...[
+              const SizedBox(height: 24),
+              Text(
+                _areaTitle(l10n, isArabic),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
           if (_selectedSubDistrictId != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -416,6 +450,8 @@ class _AdminPricingPanelState extends State<AdminPricingPanel> {
           ),
         ],
       ],
+    );
+      },
     );
   }
 }

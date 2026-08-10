@@ -7,10 +7,13 @@ struct MarketplaceHomeView: View {
     @State private var types: [BusinessTypeConfig] = []
     @State private var businesses: [BusinessPartner] = []
     @State private var typeFilter: String?
+    @State private var favoriteIds: Set<String> = []
     @State private var typesTask: Task<Void, Never>?
     @State private var businessesTask: Task<Void, Never>?
+    @State private var favoritesTask: Task<Void, Never>?
 
     private let service = BusinessService()
+    private let savedPlacesService = SavedPlacesService()
     private var isAr: Bool { appState.language == .arabic }
 
     var body: some View {
@@ -30,10 +33,12 @@ struct MarketplaceHomeView: View {
         .onAppear {
             startWatchingTypes()
             startWatchingBusinesses()
+            startWatchingFavorites()
         }
         .onDisappear {
             typesTask?.cancel()
             businessesTask?.cancel()
+            favoritesTask?.cancel()
         }
         .onChange(of: typeFilter) { _ in
             startWatchingBusinesses()
@@ -88,34 +93,44 @@ struct MarketplaceHomeView: View {
             ScrollView {
                 LazyVStack(spacing: 10) {
                     ForEach(businesses) { business in
-                        NavigationLink(value: business.id) {
-                            HStack(spacing: 12) {
-                                asyncLogo(url: business.logoUrl)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(business.name(language: appState.language))
-                                        .font(.headline)
-                                        .foregroundStyle(BrandColors.navy)
-                                    Text(
-                                        [
-                                            business.typeId,
-                                            business.address,
-                                            String(format: "★ %.1f", business.rating)
-                                        ]
-                                        .filter { !$0.isEmpty }
-                                        .joined(separator: " • ")
-                                    )
-                                    .font(.footnote)
-                                    .foregroundStyle(BrandColors.muted)
-                                    .lineLimit(2)
+                        HStack(spacing: 8) {
+                            NavigationLink(value: business.id) {
+                                HStack(spacing: 12) {
+                                    asyncLogo(url: business.logoUrl)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(business.name(language: appState.language))
+                                            .font(.headline)
+                                            .foregroundStyle(BrandColors.navy)
+                                        Text(
+                                            [
+                                                business.typeId,
+                                                business.address,
+                                                String(format: "★ %.1f", business.rating)
+                                            ]
+                                            .filter { !$0.isEmpty }
+                                            .joined(separator: " • ")
+                                        )
+                                        .font(.footnote)
+                                        .foregroundStyle(BrandColors.muted)
+                                        .lineLimit(2)
+                                    }
+                                    Spacer(minLength: 8)
+                                    Image(systemName: "chevron.forward")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(BrandColors.tealDark)
                                 }
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.forward")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(BrandColors.tealDark)
+                                .frame(minHeight: 48)
                             }
-                            .frame(minHeight: 48)
+                            .buttonStyle(.plain)
+
+                            Button {
+                                Task { await toggleFavorite(business.id) }
+                            } label: {
+                                Image(systemName: favoriteIds.contains(business.id) ? "heart.fill" : "heart")
+                                    .foregroundStyle(favoriteIds.contains(business.id) ? .red : BrandColors.muted)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                         .appCard()
                     }
                 }
@@ -163,6 +178,26 @@ struct MarketplaceHomeView: View {
                 guard !Task.isCancelled else { break }
                 await MainActor.run { businesses = items }
             }
+        }
+    }
+
+    private func startWatchingFavorites() {
+        favoritesTask?.cancel()
+        guard let uid = appState.currentUser?.uid else { return }
+        favoritesTask = Task {
+            for await ids in savedPlacesService.watchFavoriteBusinessIds(uid: uid) {
+                guard !Task.isCancelled else { break }
+                await MainActor.run { favoriteIds = ids }
+            }
+        }
+    }
+
+    private func toggleFavorite(_ businessId: String) async {
+        guard let uid = appState.currentUser?.uid else { return }
+        do {
+            _ = try await savedPlacesService.toggleFavoriteBusiness(uid: uid, businessId: businessId)
+        } catch {
+            // Best-effort toggle.
         }
     }
 }

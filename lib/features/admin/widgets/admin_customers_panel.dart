@@ -2,83 +2,127 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
+import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/admin_service.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/features/shared/widgets/firebase_driver_photo_image.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
-class AdminCustomersPanel extends StatelessWidget {
+class AdminCustomersPanel extends StatefulWidget {
   const AdminCustomersPanel({super.key});
+
+  @override
+  State<AdminCustomersPanel> createState() => _AdminCustomersPanelState();
+}
+
+class _AdminCustomersPanelState extends State<AdminCustomersPanel> {
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
+
+  bool _matchesCustomer(AppUser customer) {
+    if (_filters.customerStatus == 'active' && customer.isBlocked) {
+      return false;
+    }
+    if (_filters.customerStatus == 'blocked' && !customer.isBlocked) {
+      return false;
+    }
+    final q = _filters.query.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      final haystack =
+          '${customer.name} ${customer.phone} ${customer.uid}'.toLowerCase();
+      if (!haystack.contains(q)) return false;
+    }
+    return _filters.matchesDate(customer.createdAt);
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final adminService = context.read<AppState>().adminService;
 
-    return StreamBuilder<List<AppUser>>(
-      stream: adminService.watchCustomers(),
-      builder: (context, snapshot) {
-        final customers = snapshot.data ?? const [];
-        if (customers.isEmpty) {
-          return Center(child: Text(l10n.noCustomers));
-        }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AdminFilterBar(
+          value: _filters,
+          onChanged: (v) => setState(() => _filters = v),
+          fields: const [
+            AdminFilterField.customerStatus,
+            AdminFilterField.dateRange,
+            AdminFilterField.search,
+          ],
+        ),
+        Expanded(
+          child: StreamBuilder<List<AppUser>>(
+            stream: adminService.watchCustomers(),
+            builder: (context, snapshot) {
+              final customers = (snapshot.data ?? const [])
+                  .where(_matchesCustomer)
+                  .toList();
+              if (customers.isEmpty) {
+                return Center(child: Text(l10n.noCustomers));
+              }
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(24),
-          itemCount: customers.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final customer = customers[index];
-            return Card(
-              child: ListTile(
-                title: Text(customer.name),
-                subtitle: Text(
-                  '${customer.phone}\n${l10n.cancelledRidesCount}: ${customer.cancelledRidesCount}${customer.isBlocked ? '\n${l10n.blockedLabel}' : ''}',
-                ),
-                isThreeLine: true,
-                trailing: Wrap(
-                  spacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (customer.isBlocked)
-                      OutlinedButton(
-                        onPressed: () => adminService.setCustomerBlocked(
-                          userId: customer.uid,
-                          blocked: false,
-                        ),
-                        child: Text(l10n.unblockUser),
-                      )
-                    else
-                      OutlinedButton(
-                        onPressed: () => adminService.setCustomerBlocked(
-                          userId: customer.uid,
-                          blocked: true,
-                        ),
-                        child: Text(l10n.blockUser),
+              return ListView.separated(
+                padding: const EdgeInsets.all(24),
+                itemCount: customers.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final customer = customers[index];
+                  return Card(
+                    child: ListTile(
+                      title: Text(customer.name),
+                      subtitle: Text(
+                        '${customer.phone}\n${l10n.cancelledRidesCount}: ${customer.cancelledRidesCount}${customer.isBlocked ? '\n${l10n.blockedLabel}' : ''}',
                       ),
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.error,
-                        side: BorderSide(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                      isThreeLine: true,
+                      trailing: Wrap(
+                        spacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (customer.isBlocked)
+                            OutlinedButton(
+                              onPressed: () => adminService.setCustomerBlocked(
+                                userId: customer.uid,
+                                blocked: false,
+                              ),
+                              child: Text(l10n.unblockUser),
+                            )
+                          else
+                            OutlinedButton(
+                              onPressed: () => adminService.setCustomerBlocked(
+                                userId: customer.uid,
+                                blocked: true,
+                              ),
+                              child: Text(l10n.blockUser),
+                            ),
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.error,
+                              side: BorderSide(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                            onPressed: () => _confirmDeleteCustomer(
+                              context,
+                              adminService: adminService,
+                              customer: customer,
+                            ),
+                            child: Text(l10n.deleteCustomer),
+                          ),
+                        ],
                       ),
-                      onPressed: () => _confirmDeleteCustomer(
-                        context,
-                        adminService: adminService,
-                        customer: customer,
-                      ),
-                      child: Text(l10n.deleteCustomer),
                     ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

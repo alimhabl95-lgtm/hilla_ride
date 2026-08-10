@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:hilla_ride/core/constants/babil_regions.dart';
+import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/commission_config.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/features/admin/screens/admin_driver_detail_screen.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -21,22 +23,20 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
   var _loaded = false;
   var _reconciled = false;
   final _receivingDriverIds = <String>{};
-  String? _cityFilterId;
-
-  String _districtLabel(BabilDistrict district, String localeName) {
-    return localeName.startsWith('ar') ? district.nameAr : district.nameEn;
-  }
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   String _driverCityLabel(DriverProfile driver, String localeName) {
     if (!driver.hasAssignedWorkArea) return '—';
-    final district = BabilRegions.districtById(driver.assignedDistrictId);
-    final sub = BabilRegions.subDistrictById(
+    final catalog = ServiceAreaCatalog.instance;
+    final isAr = localeName.startsWith('ar');
+    final districtName = catalog.localizedDistrictName(
       driver.assignedDistrictId,
-      driver.assignedSubDistrictId,
+      isAr: isAr,
     );
-    final districtName =
-        localeName.startsWith('ar') ? district.nameAr : district.nameEn;
-    final subName = localeName.startsWith('ar') ? sub.nameAr : sub.nameEn;
+    final subName = catalog.localizedSubName(
+      driver.assignedSubDistrictId,
+      isAr: isAr,
+    );
     return '$districtName • $subName';
   }
 
@@ -170,14 +170,19 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
           stream: adminService.watchAllDrivers(),
           builder: (context, driversSnapshot) {
             final allDrivers = driversSnapshot.data ?? const [];
-            final drivers = _cityFilterId == null
-                ? allDrivers
-                : allDrivers
-                    .where(
-                      (driver) =>
-                          driver.assignedDistrictId == _cityFilterId,
-                    )
-                    .toList();
+            final catalog = ServiceAreaCatalog.instance;
+            final isAr = l10n.localeName.startsWith('ar');
+            final drivers = allDrivers.where((driver) {
+              if (!_filters.matchesGeo(
+                provinceId:
+                    catalog.provinceIdForDistrict(driver.assignedDistrictId),
+                districtId: driver.assignedDistrictId,
+                subDistrictId: driver.assignedSubDistrictId,
+              )) {
+                return false;
+              }
+              return _filters.matchesDate(driver.createdAt);
+            }).toList();
             final totalOutstanding = drivers.fold<int>(
               0,
               (sum, driver) => sum + driver.owedPlatformCommissionIqd,
@@ -197,9 +202,9 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
               ..sort((a, b) {
                 if (a == '_unassigned') return 1;
                 if (b == '_unassigned') return -1;
-                final districtA = BabilRegions.districtById(a);
-                final districtB = BabilRegions.districtById(b);
-                return districtA.nameEn.compareTo(districtB.nameEn);
+                final nameA = catalog.localizedDistrictName(a, isAr: false);
+                final nameB = catalog.localizedDistrictName(b, isAr: false);
+                return nameA.compareTo(nameB);
               });
 
             return ListView(
@@ -234,26 +239,15 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
                   label: Text(l10n.saveCommissionSettings),
                 ),
                 const SizedBox(height: 32),
-                DropdownButtonFormField<String?>(
-                  value: _cityFilterId,
-                  decoration: InputDecoration(
-                    labelText: l10n.filterByCity,
-                    prefixIcon: const Icon(Icons.location_city_outlined),
-                  ),
-                  items: [
-                    DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text(l10n.allCities),
-                    ),
-                    for (final district in BabilRegions.districtsForFilters)
-                      DropdownMenuItem<String?>(
-                        value: district.id,
-                        child: Text(
-                          _districtLabel(district, l10n.localeName),
-                        ),
-                      ),
+                AdminFilterBar(
+                  value: _filters,
+                  onChanged: (v) => setState(() => _filters = v),
+                  fields: const [
+                    AdminFilterField.province,
+                    AdminFilterField.district,
+                    AdminFilterField.subDistrict,
+                    AdminFilterField.dateRange,
                   ],
-                  onChanged: (value) => setState(() => _cityFilterId = value),
                 ),
                 const SizedBox(height: 16),
                 Card(
@@ -311,9 +305,9 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
                         );
                         final groupTitle = groupKey == '_unassigned'
                             ? l10n.driverWorkDistrictRequired
-                            : _districtLabel(
-                                BabilRegions.districtById(groupKey),
-                                l10n.localeName,
+                            : catalog.localizedDistrictName(
+                                groupKey,
+                                isAr: isAr,
                               );
 
                         return Column(

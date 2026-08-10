@@ -1,4 +1,5 @@
 import 'package:hilla_ride/core/models/app_models.dart';
+import 'package:hilla_ride/core/models/business_models.dart';
 
 class DayBucket {
   const DayBucket({
@@ -61,6 +62,14 @@ class AdminOverviewStats {
     required this.recentDrivers,
     required this.blockedWalletDrivers,
     required this.highDebtDrivers,
+    this.walletBalanceTotalIqd = 0,
+    this.rewardsIssuedIqd = 0,
+    this.activeRestaurants = 0,
+    this.activeSupermarkets = 0,
+    this.activePharmacies = 0,
+    this.activeBusinesses = 0,
+    this.ordersToday = 0,
+    this.deliveryRevenueIqd = 0,
   });
 
   final int tripsToday;
@@ -87,6 +96,14 @@ class AdminOverviewStats {
   final List<DriverProfile> recentDrivers;
   final List<DriverProfile> blockedWalletDrivers;
   final List<DriverProfile> highDebtDrivers;
+  final int walletBalanceTotalIqd;
+  final int rewardsIssuedIqd;
+  final int activeRestaurants;
+  final int activeSupermarkets;
+  final int activePharmacies;
+  final int activeBusinesses;
+  final int ordersToday;
+  final int deliveryRevenueIqd;
 
   static DateTime startOfLocalDay([DateTime? now]) {
     final n = now ?? DateTime.now();
@@ -102,6 +119,8 @@ class AdminOverviewStats {
     required List<Ride> cancelledSinceMonth,
     required List<DriverProfile> drivers,
     required List<AppUser> customers,
+    List<BusinessPartner> businesses = const [],
+    List<BusinessOrder> orders = const [],
     int chartDays = 14,
   }) {
     final now = DateTime.now();
@@ -221,6 +240,33 @@ class AdminOverviewStats {
       ..sort((a, b) => b.outstandingPlatformCommissionIqd
           .compareTo(a.outstandingPlatformCommissionIqd));
 
+    final walletBalanceTotalIqd = approvedDrivers.fold<int>(
+      0,
+      (sum, d) => sum + d.walletBalanceIqd,
+    );
+    final rewardsIssuedIqd = approvedDrivers.fold<int>(
+      0,
+      (sum, d) => sum + d.totalBonusGrantedIqd,
+    );
+
+    final liveBusinesses =
+        businesses.where((b) => b.isLive && !b.temporarilyClosed).toList();
+    final activeRestaurants =
+        liveBusinesses.where((b) => b.typeId == 'restaurant').length;
+    final activeSupermarkets =
+        liveBusinesses.where((b) => b.typeId == 'supermarket').length;
+    final activePharmacies =
+        liveBusinesses.where((b) => b.typeId == 'pharmacy').length;
+
+    final ordersTodayList = orders.where((o) {
+      final t = o.createdAt;
+      return t != null && !t.isBefore(todayStart);
+    }).toList();
+    final ordersToday = ordersTodayList.length;
+    final deliveryRevenueIqd = ordersTodayList
+        .where((o) => o.status == BusinessOrderStatus.delivered)
+        .fold<int>(0, (sum, o) => sum + o.platformCommissionIqd);
+
     return AdminOverviewStats(
       tripsToday: tripsToday,
       activeTrips: activeRides.length,
@@ -253,6 +299,14 @@ class AdminOverviewStats {
       recentDrivers: recentDrivers.take(8).toList(),
       blockedWalletDrivers: blocked,
       highDebtDrivers: highDebt.take(8).toList(),
+      walletBalanceTotalIqd: walletBalanceTotalIqd,
+      rewardsIssuedIqd: rewardsIssuedIqd,
+      activeRestaurants: activeRestaurants,
+      activeSupermarkets: activeSupermarkets,
+      activePharmacies: activePharmacies,
+      activeBusinesses: liveBusinesses.length,
+      ordersToday: ordersToday,
+      deliveryRevenueIqd: deliveryRevenueIqd,
     );
   }
 }

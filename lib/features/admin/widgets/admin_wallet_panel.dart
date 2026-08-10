@@ -1,12 +1,14 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:hilla_ride/core/constants/babil_regions.dart';
+import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/wallet_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/features/admin/screens/admin_driver_wallet_screen.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -75,7 +77,7 @@ class _PendingRechargesTab extends StatefulWidget {
 }
 
 class _PendingRechargesTabState extends State<_PendingRechargesTab> {
-  String? _cityFilterId;
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   void _openDriverWallet(BuildContext context, WalletRechargeRequest request) {
     Navigator.of(context).push(
@@ -101,8 +103,10 @@ class _PendingRechargesTabState extends State<_PendingRechargesTab> {
     if (districtId.isEmpty) {
       return widget.isAr ? 'بدون مدينة' : 'No city';
     }
-    final d = BabilRegions.districtById(districtId);
-    return widget.isAr ? d.nameAr : d.nameEn;
+    return ServiceAreaCatalog.instance.localizedDistrictName(
+      districtId,
+      isAr: widget.isAr,
+    );
   }
 
   Future<void> _review(
@@ -249,36 +253,38 @@ class _PendingRechargesTabState extends State<_PendingRechargesTab> {
             }
 
             final items = all.where((req) {
-              if (_cityFilterId == null) return true;
-              return _districtIdFor(req, driversById) == _cityFilterId;
+              final district = _districtIdFor(req, driversById);
+              final sub = driversById[req.driverId]?.assignedSubDistrictId ?? '';
+              if (!_filters.matchesGeo(
+                provinceId:
+                    ServiceAreaCatalog.instance.provinceIdForDistrict(district),
+                districtId: district,
+                subDistrictId: sub,
+              )) {
+                return false;
+              }
+              final q = _filters.query.trim().toLowerCase();
+              if (q.isNotEmpty) {
+                final haystack =
+                    '${req.driverName} ${req.driverPhone} ${req.driverId} ${req.referenceNumber}'
+                        .toLowerCase();
+                if (!haystack.contains(q)) return false;
+              }
+              return _filters.matchesDate(req.createdAt);
             }).toList();
 
             return Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                  child: DropdownButtonFormField<String?>(
-                    // ignore: deprecated_member_use
-                    value: _cityFilterId,
-                    decoration: InputDecoration(
-                      labelText: isAr ? 'تصفية حسب المدينة' : 'Filter by city',
-                      prefixIcon: const Icon(Icons.location_city_outlined),
-                    ),
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(isAr ? 'كل المدن' : 'All cities'),
-                      ),
-                      for (final district in BabilRegions.districtsForFilters)
-                        DropdownMenuItem<String?>(
-                          value: district.id,
-                          child: Text(
-                            isAr ? district.nameAr : district.nameEn,
-                          ),
-                        ),
-                    ],
-                    onChanged: (v) => setState(() => _cityFilterId = v),
-                  ),
+                AdminFilterBar(
+                  value: _filters,
+                  onChanged: (v) => setState(() => _filters = v),
+                  fields: const [
+                    AdminFilterField.province,
+                    AdminFilterField.district,
+                    AdminFilterField.subDistrict,
+                    AdminFilterField.dateRange,
+                    AdminFilterField.search,
+                  ],
                 ),
                 Expanded(
                   child: items.isEmpty
@@ -352,6 +358,7 @@ class _PendingRechargesTabState extends State<_PendingRechargesTab> {
                                     if (req.screenshotUrl.isNotEmpty) ...[
                                       const SizedBox(height: 8),
                                       _WalletReceiptImage(
+                                        driverId: req.driverId,
                                         url: req.screenshotUrl,
                                         isAr: isAr,
                                       ),
@@ -403,8 +410,13 @@ class _PendingRechargesTabState extends State<_PendingRechargesTab> {
 }
 
 class _WalletReceiptImage extends StatefulWidget {
-  const _WalletReceiptImage({required this.url, required this.isAr});
+  const _WalletReceiptImage({
+    required this.driverId,
+    required this.url,
+    required this.isAr,
+  });
 
+  final String driverId;
   final String url;
   final bool isAr;
 
@@ -424,7 +436,10 @@ class _WalletReceiptImageState extends State<_WalletReceiptImage> {
     _bytesFuture = context
         .read<AppState>()
         .storageService
-        .loadBytesFromDownloadUrl(widget.url);
+        .loadWalletReceiptForAdmin(
+          driverId: widget.driverId,
+          screenshotUrl: widget.url,
+        );
   }
 
   @override
@@ -435,7 +450,10 @@ class _WalletReceiptImageState extends State<_WalletReceiptImage> {
       _bytesFuture = context
           .read<AppState>()
           .storageService
-          .loadBytesFromDownloadUrl(widget.url);
+          .loadWalletReceiptForAdmin(
+            driverId: widget.driverId,
+            screenshotUrl: widget.url,
+          );
     }
   }
 
@@ -444,7 +462,10 @@ class _WalletReceiptImageState extends State<_WalletReceiptImage> {
       _bytesFuture = context
           .read<AppState>()
           .storageService
-          .loadBytesFromDownloadUrl(widget.url);
+          .loadWalletReceiptForAdmin(
+            driverId: widget.driverId,
+            screenshotUrl: widget.url,
+          );
     });
   }
 

@@ -20,6 +20,7 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _selectedPermissions = {...AdminPermissions.defaultAssistant};
+  var _selectedRoleTemplate = '';
   var _isSaving = false;
 
   static final _emailRegExp = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
@@ -56,8 +57,75 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
         l10n.localeName.startsWith('ar') ? 'المكافآت والحوافز' : 'Rewards & incentives',
       AdminPermissions.businessPartners =>
         l10n.localeName.startsWith('ar') ? 'شركاء الأعمال' : 'Business partners',
+      AdminPermissions.complaints =>
+        l10n.localeName.startsWith('ar') ? 'الشكاوى' : 'Complaints',
+      AdminPermissions.notifications =>
+        l10n.localeName.startsWith('ar') ? 'مركز الإشعارات' : 'Notifications center',
+      AdminPermissions.driverPerformance =>
+        l10n.localeName.startsWith('ar') ? 'أداء السائقين' : 'Driver performance',
+      AdminPermissions.reports =>
+        l10n.localeName.startsWith('ar') ? 'التقارير' : 'Reports',
+      AdminPermissions.auditLog =>
+        l10n.localeName.startsWith('ar') ? 'سجل التدقيق' : 'Audit log',
+      AdminPermissions.appSettings =>
+        l10n.localeName.startsWith('ar') ? 'إعدادات التطبيق' : 'App settings',
       _ => permission,
     };
+  }
+
+  void _applyRoleTemplate(String key) {
+    final permissions = AdminRoleTemplates.templateKeys[key];
+    if (permissions == null) return;
+    setState(() {
+      _selectedRoleTemplate = key;
+      _selectedPermissions
+        ..clear()
+        ..addAll(
+          permissions.where((p) => p != AdminPermissions.manageAssistants),
+        );
+    });
+  }
+
+  Widget _roleTemplateChips(AppLocalizations l10n) {
+    final isAr = l10n.localeName.startsWith('ar');
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: AdminRoleTemplates.templateKeys.keys.map((key) {
+        return ActionChip(
+          label: Text(AdminRoleTemplates.labelForKey(key, isAr: isAr)),
+          onPressed: _isSaving ? null : () => _applyRoleTemplate(key),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _permissionCheckboxes(
+    AppLocalizations l10n,
+    Set<String> selected,
+    void Function(void Function()) setDialogState,
+  ) {
+    return Column(
+      children: AdminPermissions.all
+          .where((p) => p != AdminPermissions.manageAssistants)
+          .map(
+            (permission) => CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: selected.contains(permission),
+              onChanged: (value) {
+                setDialogState(() {
+                  if (value == true) {
+                    selected.add(permission);
+                  } else {
+                    selected.remove(permission);
+                  }
+                });
+              },
+              title: Text(_permissionLabel(l10n, permission)),
+            ),
+          )
+          .toList(),
+    );
   }
 
   Future<void> _createAssistant() async {
@@ -85,11 +153,13 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
         permissions: assistantService.sanitizePermissions(
           _selectedPermissions.toList(),
         ),
+        roleTemplate: _selectedRoleTemplate,
       );
       if (!mounted) return;
       _nameController.clear();
       _emailController.clear();
       _passwordController.clear();
+      setState(() => _selectedRoleTemplate = '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.assistantCreated)),
       );
@@ -116,37 +186,50 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
     final l10n = AppLocalizations.of(context)!;
     final assistantService = context.read<AppState>().assistantService;
     final selected = {...AdminPermissions.defaultAssistant};
+    var roleTemplate = '';
 
-    final approved = await showDialog<Set<String>>(
+    final approved = await showDialog<({Set<String> permissions, String template})>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final isAr = l10n.localeName.startsWith('ar');
             return AlertDialog(
               title: Text(l10n.approveAssistantTitle),
               content: SizedBox(
                 width: 420,
                 child: SingleChildScrollView(
                   child: Column(
-                    children: AdminPermissions.all
-                        .where((p) => p != AdminPermissions.manageAssistants)
-                        .map(
-                          (permission) => CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: selected.contains(permission),
-                            onChanged: (value) {
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: AdminRoleTemplates.templateKeys.keys.map((key) {
+                          return ActionChip(
+                            label: Text(
+                              AdminRoleTemplates.labelForKey(key, isAr: isAr),
+                            ),
+                            onPressed: () {
                               setDialogState(() {
-                                if (value == true) {
-                                  selected.add(permission);
-                                } else {
-                                  selected.remove(permission);
-                                }
+                                roleTemplate = key;
+                                selected
+                                  ..clear()
+                                  ..addAll(
+                                    AdminRoleTemplates.templateKeys[key]!
+                                        .where(
+                                          (p) =>
+                                              p != AdminPermissions.manageAssistants,
+                                        ),
+                                  );
                               });
                             },
-                            title: Text(_permissionLabel(l10n, permission)),
-                          ),
-                        )
-                        .toList(),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 12),
+                      _permissionCheckboxes(l10n, selected, setDialogState),
+                    ],
                   ),
                 ),
               ),
@@ -156,7 +239,9 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
                   child: Text(l10n.cancel),
                 ),
                 FilledButton(
-                  onPressed: () => Navigator.of(context).pop(selected),
+                  onPressed: () => Navigator.of(context).pop(
+                    (permissions: selected, template: roleTemplate),
+                  ),
                   child: Text(l10n.approveAssistantButton),
                 ),
               ],
@@ -171,7 +256,8 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
     try {
       await assistantService.approveAssistant(
         assistantId: assistant.uid,
-        permissions: approved.toList(),
+        permissions: approved.permissions.toList(),
+        roleTemplate: approved.template,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -189,37 +275,50 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
     final l10n = AppLocalizations.of(context)!;
     final assistantService = context.read<AppState>().assistantService;
     final selected = {...assistant.permissions};
+    var roleTemplate = assistant.roleTemplate;
 
-    final updated = await showDialog<Set<String>>(
+    final updated = await showDialog<({Set<String> permissions, String template})>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final isAr = l10n.localeName.startsWith('ar');
             return AlertDialog(
               title: Text(l10n.editAssistantPermissions),
               content: SizedBox(
                 width: 420,
                 child: SingleChildScrollView(
                   child: Column(
-                    children: AdminPermissions.all
-                        .where((p) => p != AdminPermissions.manageAssistants)
-                        .map(
-                          (permission) => CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: selected.contains(permission),
-                            onChanged: (value) {
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: AdminRoleTemplates.templateKeys.keys.map((key) {
+                          return ActionChip(
+                            label: Text(
+                              AdminRoleTemplates.labelForKey(key, isAr: isAr),
+                            ),
+                            onPressed: () {
                               setDialogState(() {
-                                if (value == true) {
-                                  selected.add(permission);
-                                } else {
-                                  selected.remove(permission);
-                                }
+                                roleTemplate = key;
+                                selected
+                                  ..clear()
+                                  ..addAll(
+                                    AdminRoleTemplates.templateKeys[key]!
+                                        .where(
+                                          (p) =>
+                                              p != AdminPermissions.manageAssistants,
+                                        ),
+                                  );
                               });
                             },
-                            title: Text(_permissionLabel(l10n, permission)),
-                          ),
-                        )
-                        .toList(),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 12),
+                      _permissionCheckboxes(l10n, selected, setDialogState),
+                    ],
                   ),
                 ),
               ),
@@ -229,7 +328,9 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
                   child: Text(l10n.cancel),
                 ),
                 FilledButton(
-                  onPressed: () => Navigator.of(context).pop(selected),
+                  onPressed: () => Navigator.of(context).pop(
+                    (permissions: selected, template: roleTemplate),
+                  ),
                   child: Text(l10n.save),
                 ),
               ],
@@ -243,7 +344,8 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
 
     await assistantService.updateAssistantPermissions(
       assistantId: assistant.uid,
-      permissions: assistantService.sanitizePermissions(updated.toList()),
+      permissions: assistantService.sanitizePermissions(updated.permissions.toList()),
+      roleTemplate: updated.template,
     );
   }
 
@@ -308,6 +410,9 @@ class _AdminAssistantsPanelState extends State<AdminAssistantsPanel> {
                       l10n.assistantPermissionsTitle,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
+                    const SizedBox(height: 8),
+                    _roleTemplateChips(l10n),
+                    const SizedBox(height: 8),
                     ...AdminPermissions.all
                         .where((p) => p != AdminPermissions.manageAssistants)
                         .map(

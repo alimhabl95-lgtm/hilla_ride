@@ -342,6 +342,34 @@ class StorageService {
     return null;
   }
 
+  /// Load wallet recharge receipt for admin review (Admin SDK via Cloud Function).
+  Future<Uint8List?> loadWalletReceiptForAdmin({
+    required String driverId,
+    required String screenshotUrl,
+  }) async {
+    final url = screenshotUrl.trim();
+    final id = driverId.trim();
+    if (url.isEmpty || id.isEmpty) return null;
+
+    try {
+      final callable = _functions.httpsCallable('getWalletReceiptForAdmin');
+      final result = await callable.call({
+        'driverId': id,
+        'screenshotUrl': url,
+      });
+      final data = Map<String, dynamic>.from(result.data as Map? ?? {});
+      final base64 = data['base64'] as String? ?? '';
+      if (base64.isEmpty) return null;
+      return base64Decode(base64);
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('getWalletReceiptForAdmin failed: $error');
+      }
+    }
+
+    return loadBytesFromDownloadUrl(url);
+  }
+
   /// Load image bytes via the Storage SDK (works on web; avoids CORS on download URLs).
   Future<Uint8List?> loadBytesFromDownloadUrl(
     String downloadUrl, {

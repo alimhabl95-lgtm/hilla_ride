@@ -1,14 +1,13 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:hilla_ride/core/config/legal_config.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/features/shared/screens/legal_content_screen.dart';
 import 'package:hilla_ride/features/shared/widgets/photo_upload_tile.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:hilla_ride/core/utils/legal_url_launcher.dart';
 
 class DriverRegistrationScreen extends StatefulWidget {
   const DriverRegistrationScreen({
@@ -43,7 +42,18 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     super.dispose();
   }
 
-  Future<void> _launchUrl(String url) => openLegalDocumentUrl(url);
+  Future<void> _openLegal(LegalContentKind kind) async {
+    final l10n = AppLocalizations.of(context)!;
+    final lang = l10n.localeName.startsWith('ar') ? 'ar' : 'en';
+    final config = await context.read<AppState>().appConfigService.getConfig();
+    if (!mounted) return;
+    await LegalContentScreen.open(
+      context: context,
+      kind: kind,
+      config: config,
+      languageCode: lang,
+    );
+  }
 
   Future<void> _pickPhoto({required bool isIdPhoto, required ImageSource source}) async {
     final l10n = AppLocalizations.of(context)!;
@@ -243,23 +253,11 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                       spacing: 8,
                       children: [
                         TextButton(
-                          onPressed: () => _launchUrl(
-                            LegalConfig.termsOfServiceUrl(
-                              languageCode: l10n.localeName.startsWith('ar')
-                                  ? 'ar'
-                                  : 'en',
-                            ),
-                          ),
+                          onPressed: () => _openLegal(LegalContentKind.terms),
                           child: Text(l10n.termsOfService),
                         ),
                         TextButton(
-                          onPressed: () => _launchUrl(
-                            LegalConfig.privacyPolicyUrl(
-                              languageCode: l10n.localeName.startsWith('ar')
-                                  ? 'ar'
-                                  : 'en',
-                            ),
-                          ),
+                          onPressed: () => _openLegal(LegalContentKind.privacy),
                           child: Text(l10n.privacyPolicy),
                         ),
                       ],

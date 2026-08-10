@@ -97,6 +97,20 @@ final class SavedPlacesService {
         ])
         return true
     }
+
+    func watchFavoriteBusinessIds(uid: String) -> AsyncStream<Set<String>> {
+        AsyncStream { continuation in
+            let listener = firestore.collection("users").document(uid)
+                .collection("favorite_businesses")
+                .addSnapshotListener { snapshot, _ in
+                    let ids = Set((snapshot?.documents ?? []).map(\.documentID))
+                    continuation.yield(ids)
+                }
+            continuation.onTermination = { _ in
+                listener.remove()
+            }
+        }
+    }
 }
 
 enum SavedPlacesError: LocalizedError {

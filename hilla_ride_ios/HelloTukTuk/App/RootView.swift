@@ -9,7 +9,9 @@ struct RootView: View {
             if showSplash {
                 WelcomeSplashView { showSplash = false }
             } else {
-                content
+                AppGateView {
+                    content
+                }
             }
         }
         .environment(\.layoutDirection, appState.language.layoutDirection)

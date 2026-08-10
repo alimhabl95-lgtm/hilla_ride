@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/reward_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -16,11 +18,15 @@ class _AdminRewardsPanelState extends State<AdminRewardsPanel>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   String? _selectedCampaignId;
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
+    _tabs.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -74,6 +80,15 @@ class _AdminRewardsPanelState extends State<AdminRewardsPanel>
             Tab(text: isAr ? 'سجل التدقيق' : 'Audit'),
           ],
         ),
+        if (_tabs.index == 1 || _tabs.index == 2)
+          AdminFilterBar(
+            value: _filters,
+            onChanged: (v) => setState(() => _filters = v),
+            fields: const [
+              AdminFilterField.dateRange,
+              AdminFilterField.search,
+            ],
+          ),
         Expanded(
           child: TabBarView(
             controller: _tabs,
@@ -162,10 +177,12 @@ class _AdminRewardsPanelState extends State<AdminRewardsPanel>
               _GrantsTab(
                 campaignId: _selectedCampaignId,
                 isAr: isAr,
+                filters: _filters,
               ),
               _AuditTab(
                 campaignId: _selectedCampaignId,
                 isAr: isAr,
+                filters: _filters,
               ),
             ],
           ),
@@ -270,10 +287,15 @@ class _AdminRewardsPanelState extends State<AdminRewardsPanel>
 }
 
 class _GrantsTab extends StatelessWidget {
-  const _GrantsTab({required this.campaignId, required this.isAr});
+  const _GrantsTab({
+    required this.campaignId,
+    required this.isAr,
+    required this.filters,
+  });
 
   final String? campaignId;
   final bool isAr;
+  final AdminFilterCriteria filters;
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +313,15 @@ class _GrantsTab extends StatelessWidget {
     return StreamBuilder<List<RewardGrant>>(
       stream: rewards.watchGrantsForCampaign(campaignId!),
       builder: (context, snap) {
-        final items = snap.data ?? const [];
+        final items = (snap.data ?? const []).where((g) {
+          if (!filters.matchesDate(g.createdAt)) return false;
+          final q = filters.query.trim().toLowerCase();
+          if (q.isEmpty) return true;
+          final haystack =
+              '${g.driverId} ${g.campaignTitleEn} ${g.campaignTitleAr} ${g.rewardType}'
+                  .toLowerCase();
+          return haystack.contains(q);
+        }).toList();
         if (items.isEmpty) {
           return Center(
             child: Text(isAr ? 'لا منح لهذه الحملة بعد' : 'No grants yet'),
@@ -325,10 +355,15 @@ class _GrantsTab extends StatelessWidget {
 }
 
 class _AuditTab extends StatelessWidget {
-  const _AuditTab({required this.campaignId, required this.isAr});
+  const _AuditTab({
+    required this.campaignId,
+    required this.isAr,
+    required this.filters,
+  });
 
   final String? campaignId;
   final bool isAr;
+  final AdminFilterCriteria filters;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +374,15 @@ class _AuditTab extends StatelessWidget {
         if (snap.hasError) {
           return Center(child: Text('${snap.error}'));
         }
-        final items = snap.data ?? const [];
+        final items = (snap.data ?? const []).where((log) {
+          if (!filters.matchesDate(log.createdAt)) return false;
+          final q = filters.query.trim().toLowerCase();
+          if (q.isEmpty) return true;
+          final haystack =
+              '${log.action} ${log.campaignId} ${log.driverId} ${log.actorUid}'
+                  .toLowerCase();
+          return haystack.contains(q);
+        }).toList();
         if (items.isEmpty) {
           return Center(
             child: Text(isAr ? 'لا سجلات بعد' : 'No audit logs yet'),

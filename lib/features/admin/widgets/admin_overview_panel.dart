@@ -2,13 +2,16 @@ import 'dart:async';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:hilla_ride/core/constants/babil_regions.dart';
+import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/announcement.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
+import 'package:hilla_ride/core/models/business_models.dart';
 import 'package:hilla_ride/core/models/wallet_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/admin_stats_service.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -31,9 +34,11 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
   List<AppUser> _customers = const [];
   List<WalletRechargeRequest> _pendingRecharges = const [];
   List<Announcement> _announcements = const [];
+  List<BusinessPartner> _businesses = const [];
+  List<BusinessOrder> _orders = const [];
   final _subs = <StreamSubscription>[];
   var _ready = false;
-  String? _cityFilterId;
+  AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   @override
   void initState() {
@@ -42,8 +47,10 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
   }
 
   void _bind() {
-    final admin = context.read<AppState>().adminService;
-    final wallet = context.read<AppState>().walletService;
+    final app = context.read<AppState>();
+    final admin = app.adminService;
+    final wallet = app.walletService;
+    final business = app.businessService;
     final monthStart = AdminOverviewStats.startOfLocalDay()
         .subtract(const Duration(days: 29));
 
@@ -64,6 +71,8 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
       admin
           .watchRecentAnnouncements()
           .listen((v) => _set(() => _announcements = v)),
+      business.watchBusinesses().listen((v) => _set(() => _businesses = v)),
+      business.watchAllOrders().listen((v) => _set(() => _orders = v)),
     ]);
     _set(() => _ready = true);
   }
@@ -89,23 +98,66 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    bool rideInCity(Ride r) =>
-        _cityFilterId == null || r.districtId == _cityFilterId;
-    bool driverInCity(DriverProfile d) =>
-        _cityFilterId == null || d.assignedDistrictId == _cityFilterId;
+    final catalog = ServiceAreaCatalog.instance;
 
-    final active = _active.where(rideInCity).toList();
-    final ridesMonth = _ridesMonth.where(rideInCity).toList();
-    final completedMonth = _completedMonth.where(rideInCity).toList();
-    final cancelledMonth = _cancelledMonth.where(rideInCity).toList();
-    final drivers = _drivers.where(driverInCity).toList();
+    bool rideMatches(Ride r) {
+      if (!_filters.matchesGeo(
+        provinceId: catalog.provinceIdForDistrict(r.districtId),
+        districtId: r.districtId,
+        subDistrictId: r.subDistrictId,
+      )) {
+        return false;
+      }
+      return _filters.matchesDate(r.createdAt);
+    }
+
+    bool driverMatches(DriverProfile d) {
+      return _filters.matchesGeo(
+        provinceId: catalog.provinceIdForDistrict(d.assignedDistrictId),
+        districtId: d.assignedDistrictId,
+        subDistrictId: d.assignedSubDistrictId,
+      );
+    }
+
+    bool businessMatches(BusinessPartner b) {
+      if (!_filters.matchesGeo(
+        provinceId: b.provinceId,
+        districtId: b.districtId,
+        subDistrictId: b.subDistrictId,
+      )) {
+        return false;
+      }
+      return _filters.matchesDate(b.createdAt);
+    }
+
+    bool orderMatches(BusinessOrder o) {
+      if (!_filters.matchesGeo(
+        districtId: o.districtId,
+        subDistrictId: o.subDistrictId,
+      )) {
+        return false;
+      }
+      return _filters.matchesDate(o.createdAt);
+    }
+
+    final active = _active.where(rideMatches).toList();
+    final ridesMonth = _ridesMonth.where(rideMatches).toList();
+    final completedMonth = _completedMonth.where(rideMatches).toList();
+    final cancelledMonth = _cancelledMonth.where(rideMatches).toList();
+    final drivers = _drivers.where(driverMatches).toList();
+    final businesses = _businesses.where(businessMatches).toList();
+    final orders = _orders.where(orderMatches).toList();
     final driversById = {for (final d in _drivers) d.uid: d};
     final pendingRecharges = _pendingRecharges.where((req) {
-      if (_cityFilterId == null) return true;
+      if (!_filters.hasGeo && !_filters.hasDateRange) return true;
       final district = req.districtId.isNotEmpty
           ? req.districtId
           : (driversById[req.driverId]?.assignedDistrictId ?? '');
-      return district == _cityFilterId;
+      final sub = driversById[req.driverId]?.assignedSubDistrictId ?? '';
+      if (!_filters.matchesGeo(districtId: district, subDistrictId: sub)) {
+        return false;
+      }
+      return _filters.matchesDate(req.createdAt);
     }).toList();
 
     final stats = AdminOverviewStats.compute(
@@ -115,6 +167,8 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
       cancelledSinceMonth: cancelledMonth,
       drivers: drivers,
       customers: _customers,
+      businesses: businesses,
+      orders: orders,
     );
 
     return ListView(
@@ -136,26 +190,15 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
               ),
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String?>(
-          // ignore: deprecated_member_use
-          value: _cityFilterId,
-          decoration: InputDecoration(
-            labelText: isAr ? 'عرض حسب المدينة' : 'View by city',
-            prefixIcon: const Icon(Icons.location_city_outlined),
-            border: const OutlineInputBorder(),
-          ),
-          items: [
-            DropdownMenuItem<String?>(
-              value: null,
-              child: Text(isAr ? 'كل المدن' : 'All cities'),
-            ),
-            for (final district in BabilRegions.districtsForFilters)
-              DropdownMenuItem<String?>(
-                value: district.id,
-                child: Text(isAr ? district.nameAr : district.nameEn),
-              ),
+        AdminFilterBar(
+          value: _filters,
+          onChanged: (v) => setState(() => _filters = v),
+          fields: const [
+            AdminFilterField.province,
+            AdminFilterField.district,
+            AdminFilterField.subDistrict,
+            AdminFilterField.dateRange,
           ],
-          onChanged: (v) => setState(() => _cityFilterId = v),
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -163,52 +206,109 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
           runSpacing: 12,
           children: [
             _KpiCard(
-              label: isAr ? 'رحلات اليوم' : 'Trips today',
-              value: '${stats.tripsToday}',
-              color: const Color(0xFF0F766E),
-            ),
-            _KpiCard(
-              label: isAr ? 'رحلات نشطة' : 'Active trips',
-              value: '${stats.activeTrips}',
-              color: const Color(0xFF2563EB),
-            ),
-            _KpiCard(
-              label: isAr ? 'مكتملة اليوم' : 'Completed today',
-              value: '${stats.completedToday}',
-              color: const Color(0xFF16A34A),
-            ),
-            _KpiCard(
-              label: isAr ? 'ملغاة اليوم' : 'Cancelled today',
-              value: '${stats.cancelledToday}',
-              color: const Color(0xFFDC2626),
-            ),
-            _KpiCard(
+              icon: Icons.wifi_tethering,
               label: isAr ? 'سائقون متصلون' : 'Online drivers',
               value: '${stats.onlineDrivers}',
               color: const Color(0xFF16A34A),
             ),
             _KpiCard(
+              icon: Icons.wifi_off,
               label: isAr ? 'سائقون غير متصلين' : 'Offline drivers',
               value: '${stats.offlineDrivers}',
               color: const Color(0xFF64748B),
             ),
             _KpiCard(
-              label: isAr ? 'العملاء' : 'Customers',
+              icon: Icons.people_outline,
+              label: isAr ? 'العملاء النشطون' : 'Active customers',
               value: '${stats.totalCustomers}',
               color: const Color(0xFF7C3AED),
             ),
             _KpiCard(
-              label: isAr ? 'السائقون' : 'Drivers',
-              value: '${stats.totalDrivers}',
-              color: const Color(0xFF0F766E),
+              icon: Icons.local_taxi,
+              label: isAr ? 'رحلات نشطة' : 'Active trips',
+              value: '${stats.activeTrips}',
+              color: const Color(0xFF2563EB),
             ),
             _KpiCard(
-              label: isAr ? 'إيراد اليوم (عمولة)' : 'Daily revenue',
+              icon: Icons.check_circle_outline,
+              label: isAr ? 'مكتملة اليوم' : 'Completed today',
+              value: '${stats.completedToday}',
+              color: const Color(0xFF16A34A),
+            ),
+            _KpiCard(
+              icon: Icons.cancel_outlined,
+              label: isAr ? 'ملغاة اليوم' : 'Cancelled today',
+              value: '${stats.cancelledToday}',
+              color: const Color(0xFFDC2626),
+            ),
+            _KpiCard(
+              icon: Icons.payments_outlined,
+              label: isAr ? 'إيراد الرحلات (اليوم)' : 'Ride revenue (today)',
               value: _fare.formatIqd(stats.dailyRevenueIqd, locale: l10n.localeName),
               subtitle:
                   '${isAr ? 'حجم' : 'GMV'}: ${_fare.formatIqd(stats.dailyGmvIqd, locale: l10n.localeName)}',
               color: const Color(0xFFD97706),
               wide: true,
+            ),
+            _KpiCard(
+              icon: Icons.delivery_dining,
+              label: isAr ? 'إيراد التوصيل (اليوم)' : 'Delivery revenue (today)',
+              value: _fare.formatIqd(stats.deliveryRevenueIqd, locale: l10n.localeName),
+              color: const Color(0xFFEA580C),
+            ),
+            _KpiCard(
+              icon: Icons.account_balance_wallet_outlined,
+              label: isAr ? 'رصيد المحافظ' : 'Wallet balance',
+              value: _fare.formatIqd(stats.walletBalanceTotalIqd, locale: l10n.localeName),
+              color: const Color(0xFF0F766E),
+            ),
+            _KpiCard(
+              icon: Icons.card_giftcard,
+              label: isAr ? 'المكافآت الممنوحة' : 'Rewards issued',
+              value: _fare.formatIqd(stats.rewardsIssuedIqd, locale: l10n.localeName),
+              color: const Color(0xFFEAB308),
+            ),
+            _KpiCard(
+              icon: Icons.restaurant,
+              label: isAr ? 'مطاعم نشطة' : 'Active restaurants',
+              value: '${stats.activeRestaurants}',
+              color: const Color(0xFFDC2626),
+            ),
+            _KpiCard(
+              icon: Icons.local_grocery_store,
+              label: isAr ? 'سوبرماركت نشطة' : 'Active supermarkets',
+              value: '${stats.activeSupermarkets}',
+              color: const Color(0xFF2563EB),
+            ),
+            _KpiCard(
+              icon: Icons.local_pharmacy,
+              label: isAr ? 'صيدليات نشطة' : 'Active pharmacies',
+              value: '${stats.activePharmacies}',
+              color: const Color(0xFF16A34A),
+            ),
+            _KpiCard(
+              icon: Icons.storefront,
+              label: isAr ? 'أعمال نشطة' : 'Active businesses',
+              value: '${stats.activeBusinesses}',
+              color: const Color(0xFF7C3AED),
+            ),
+            _KpiCard(
+              icon: Icons.receipt_long,
+              label: isAr ? 'طلبات اليوم' : 'Orders today',
+              value: '${stats.ordersToday}',
+              color: const Color(0xFF0F766E),
+            ),
+            _KpiCard(
+              icon: Icons.today,
+              label: isAr ? 'رحلات اليوم' : 'Trips today',
+              value: '${stats.tripsToday}',
+              color: const Color(0xFF0F766E),
+            ),
+            _KpiCard(
+              icon: Icons.groups_outlined,
+              label: isAr ? 'السائقون' : 'Drivers',
+              value: '${stats.totalDrivers}',
+              color: const Color(0xFF0F766E),
             ),
             _KpiCard(
               label: isAr ? 'إيراد الأسبوع' : 'Weekly revenue',
@@ -227,6 +327,7 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
               wide: true,
             ),
             _KpiCard(
+              icon: Icons.star_outline,
               label: isAr ? 'متوسط تقييم السائق' : 'Avg driver rating',
               value: stats.averageDriverRating.toStringAsFixed(2),
               color: const Color(0xFFEAB308),
@@ -496,6 +597,7 @@ class _KpiCard extends StatelessWidget {
     required this.color,
     this.subtitle,
     this.wide = false,
+    this.icon,
   });
 
   final String label;
@@ -503,6 +605,7 @@ class _KpiCard extends StatelessWidget {
   final String? subtitle;
   final Color color;
   final bool wide;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -514,6 +617,10 @@ class _KpiCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (icon != null) ...[
+                Icon(icon, color: color, size: 22),
+                const SizedBox(height: 6),
+              ],
               Text(
                 label,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

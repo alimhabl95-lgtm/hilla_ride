@@ -3,6 +3,7 @@ import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/features/customer/screens/customer_home_map_screen.dart';
 import 'package:hilla_ride/features/customer/screens/marketplace_home_screen.dart';
+import 'package:hilla_ride/features/shared/widgets/announcement_banner.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 
 /// Customer home with Ride + Marketplace tabs (marketplace is fully live/synced).
@@ -23,6 +24,7 @@ class _CustomerHomeShellState extends State<CustomerHomeShell> {
     final isAr = AppLocalizations.of(context)!.localeName.startsWith('ar');
     return Column(
       children: [
+        const AnnouncementBanner(audience: 'customers'),
         Expanded(
           child: IndexedStack(
             index: _index,

@@ -90,11 +90,19 @@ class _MarketplaceHomeScreenState extends State<MarketplaceHomeScreen> {
                         icon: Icons.storefront_outlined,
                       );
                     }
+                return StreamBuilder<Set<String>>(
+                  stream: context
+                      .read<AppState>()
+                      .savedPlacesService
+                      .watchFavoriteBusinessIds(widget.user.uid),
+                  builder: (context, favSnap) {
+                    final favorites = favSnap.data ?? const {};
                     return ListView.builder(
                       padding: const EdgeInsets.all(12),
                       itemCount: items.length,
                       itemBuilder: (context, i) {
                         final b = items[i];
+                        final isFavorite = favorites.contains(b.id);
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: AppCard(
@@ -144,6 +152,26 @@ class _MarketplaceHomeScreenState extends State<MarketplaceHomeScreen> {
                                     ],
                                   ),
                                 ),
+                                IconButton(
+                                  tooltip: isFavorite
+                                      ? (isAr ? 'إزالة من المفضلة' : 'Remove favorite')
+                                      : (isAr ? 'إضافة للمفضلة' : 'Add favorite'),
+                                  icon: Icon(
+                                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    color: isFavorite
+                                        ? Theme.of(context).colorScheme.error
+                                        : null,
+                                  ),
+                                  onPressed: () {
+                                    context
+                                        .read<AppState>()
+                                        .savedPlacesService
+                                        .toggleFavoriteBusiness(
+                                          uid: widget.user.uid,
+                                          businessId: b.id,
+                                        );
+                                  },
+                                ),
                                 const Icon(Icons.chevron_right, size: 22),
                               ],
                             ),
@@ -151,6 +179,8 @@ class _MarketplaceHomeScreenState extends State<MarketplaceHomeScreen> {
                         );
                       },
                     );
+                  },
+                );
                   },
                 );
               },

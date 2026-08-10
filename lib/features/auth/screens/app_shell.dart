@@ -17,7 +17,7 @@ import 'package:hilla_ride/features/driver/screens/driver_home_screen.dart';
 import 'package:hilla_ride/features/driver/screens/driver_registration_screen.dart';
 import 'package:hilla_ride/features/manager/screens/manager_home_screen.dart';
 import 'package:hilla_ride/features/shared/screens/ride_history_screen.dart';
-import 'package:hilla_ride/features/shared/screens/support_screen.dart';
+import 'package:hilla_ride/features/shared/screens/help_support_screen.dart';
 import 'package:hilla_ride/features/shared/screens/user_profile_screen.dart';
 import 'package:hilla_ride/features/auth/widgets/session_guard.dart';
 import 'package:hilla_ride/features/shared/widgets/announcement_icon_button.dart';
@@ -547,7 +547,7 @@ class MobileAppBarActions extends StatelessWidget {
               icon: const Icon(Icons.support_agent_outlined),
               onPressed: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SupportScreen()),
+                  MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
                 );
               },
             ),

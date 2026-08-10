@@ -14,7 +14,12 @@ import 'package:hilla_ride/core/services/saved_places_service.dart';
 import 'package:hilla_ride/core/services/support_service.dart';
 import 'package:hilla_ride/core/services/storage_service.dart';
 import 'package:hilla_ride/core/services/session_service.dart';
+import 'package:hilla_ride/core/services/admin_audit_service.dart';
+import 'package:hilla_ride/core/services/admin_report_service.dart';
+import 'package:hilla_ride/core/services/app_config_service.dart';
 import 'package:hilla_ride/core/services/business_service.dart';
+import 'package:hilla_ride/core/services/complaint_service.dart';
+import 'package:hilla_ride/core/services/referral_service.dart';
 import 'package:hilla_ride/core/services/reward_service.dart';
 import 'package:hilla_ride/core/services/service_area_service.dart';
 import 'package:hilla_ride/core/services/wallet_service.dart';
@@ -41,7 +46,12 @@ class AppState extends ChangeNotifier {
     WalletService? walletService,
     ServiceAreaService? serviceAreaService,
     RewardService? rewardService,
+    ReferralService? referralService,
     BusinessService? businessService,
+    ComplaintService? complaintService,
+    AdminAuditService? adminAuditService,
+    AdminReportService? adminReportService,
+    AppConfigService? appConfigService,
   })  : sessionService = sessionService ?? SessionService(),
         authService = authService ??
             AuthService(sessionService: sessionService ?? SessionService()),
@@ -62,7 +72,12 @@ class AppState extends ChangeNotifier {
         walletService = walletService ?? WalletService(),
         serviceAreaService = serviceAreaService ?? ServiceAreaService(),
         rewardService = rewardService ?? RewardService(),
+        referralService = referralService ?? ReferralService(),
         businessService = businessService ?? BusinessService(),
+        complaintService = complaintService ?? ComplaintService(),
+        adminAuditService = adminAuditService ?? AdminAuditService(),
+        adminReportService = adminReportService ?? AdminReportService(),
+        appConfigService = appConfigService ?? AppConfigService(),
         rideService = rideService ??
             RideService(
               driverService: driverService ?? DriverService(),
@@ -92,7 +107,12 @@ class AppState extends ChangeNotifier {
   final WalletService walletService;
   final ServiceAreaService serviceAreaService;
   final RewardService rewardService;
+  final ReferralService referralService;
   final BusinessService businessService;
+  final ComplaintService complaintService;
+  final AdminAuditService adminAuditService;
+  final AdminReportService adminReportService;
+  final AppConfigService appConfigService;
 
   factory AppState.create() {
     final sessionService = SessionService();

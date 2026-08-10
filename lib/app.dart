@@ -8,6 +8,7 @@ import 'package:hilla_ride/features/admin/widgets/admin_profile_button.dart';
 import 'package:hilla_ride/features/auth/screens/app_shell.dart';
 import 'package:hilla_ride/features/business/screens/business_portal_shell.dart';
 import 'package:hilla_ride/features/customer/screens/customer_splash_screen.dart';
+import 'package:hilla_ride/features/shared/widgets/app_gate.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -96,9 +97,12 @@ class _RootScaffold extends StatelessWidget {
                 ),
           body: variant.isWebAdmin
               ? const AppShell()
-              : variant.isWebBusiness
-                  ? const BusinessPortalShell()
-                  : const WelcomeSplashGate(child: AppShell()),
+              : AppGate(
+                  bypassGate: false,
+                  child: variant.isWebBusiness
+                      ? const BusinessPortalShell()
+                      : const WelcomeSplashGate(child: AppShell()),
+                ),
         );
       },
     );

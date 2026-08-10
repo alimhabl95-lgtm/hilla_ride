@@ -95,6 +95,9 @@ class _BookRideScreenState extends State<BookRideScreen> {
             user: widget.user,
             config: promoConfig,
             baseFareIqd: quote.fareIqd!,
+            districtId: widget.districtId,
+            promoKind: 'ride',
+            customerCompletedRides: widget.user.completedRidesCount,
           );
         } catch (_) {
           promo = null;

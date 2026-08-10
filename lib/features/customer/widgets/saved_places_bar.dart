@@ -58,6 +58,13 @@ class _SavedPlacesBarState extends State<SavedPlacesBar> {
         );
   }
 
+  List<SavedPlace> get _chipPlaces {
+    final home = _savedPlaces.where((p) => p.isHome).toList();
+    final work = _savedPlaces.where((p) => p.isWork).toList();
+    final other = _savedPlaces.where((p) => !p.isHome && !p.isWork).toList();
+    return [...home, ...work, ...other];
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_uid == null) return const SizedBox.shrink();
@@ -94,19 +101,30 @@ class _SavedPlacesBarState extends State<SavedPlacesBar> {
             height: widget.compact ? 32 : 40,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: _savedPlaces.length,
+              itemCount: _chipPlaces.length,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
-                final saved = _savedPlaces[index];
+                final saved = _chipPlaces[index];
+                final icon = saved.isHome
+                    ? Icons.home_outlined
+                    : saved.isWork
+                        ? Icons.work_outline
+                        : Icons.place;
                 return InputChip(
-                  avatar: const Icon(Icons.place, size: 18),
+                  avatar: Icon(icon, size: 18),
                   label: Text(
-                    saved.label,
+                    saved.isHome
+                        ? (l10n.localeName.startsWith('ar') ? 'المنزل' : 'Home')
+                        : saved.isWork
+                            ? (l10n.localeName.startsWith('ar') ? 'العمل' : 'Work')
+                            : saved.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   onPressed: () => widget.onPlaceSelected(saved.toPlaceResult()),
-                  onDeleted: () => _delete(saved),
+                  onDeleted: saved.isHome || saved.isWork
+                      ? () => _delete(saved)
+                      : () => _delete(saved),
                 );
               },
             ),

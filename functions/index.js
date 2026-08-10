@@ -420,6 +420,108 @@ exports.onRideUpdated = functions.firestore
       );
     }
 
+    if (before.status !== after.status) {
+      const statusChanged = after.status;
+      const customerId = String(after.customerId || "");
+      const driverId = String(after.driverId || "");
+      const cancelledBy = String(after.cancelledBy || "").trim().toLowerCase();
+
+      if (statusChanged === "inProgress" && customerId) {
+        const customerDoc = await admin
+          .firestore()
+          .collection("users")
+          .doc(customerId)
+          .get();
+        await sendToToken(
+          customerDoc.data()?.fcmToken,
+          "Trip started",
+          "Your trip has started",
+          { rideId, type: "ride_in_progress" },
+          "customer_ride_accepted",
+        );
+      }
+
+      if (statusChanged === "completed") {
+        if (customerId) {
+          const customerDoc = await admin
+            .firestore()
+            .collection("users")
+            .doc(customerId)
+            .get();
+          await sendToToken(
+            customerDoc.data()?.fcmToken,
+            "Trip completed",
+            "Your trip has been completed. Thank you for riding with us!",
+            { rideId, type: "ride_completed" },
+            "customer_ride_accepted",
+          );
+        }
+        if (driverId) {
+          const driverDoc = await admin
+            .firestore()
+            .collection("drivers")
+            .doc(driverId)
+            .get();
+          const driverUser = await admin
+            .firestore()
+            .collection("users")
+            .doc(driverId)
+            .get();
+          const driverToken =
+            driverDoc.data()?.fcmToken || driverUser.data()?.fcmToken;
+          await sendToToken(
+            driverToken,
+            "Trip completed",
+            "Trip completed successfully",
+            { rideId, type: "ride_completed_driver" },
+            "default",
+          );
+        }
+      }
+
+      if (statusChanged === "cancelled") {
+        if (customerId) {
+          const customerDoc = await admin
+            .firestore()
+            .collection("users")
+            .doc(customerId)
+            .get();
+          await sendToToken(
+            customerDoc.data()?.fcmToken,
+            "Trip cancelled",
+            "Your trip was cancelled",
+            { rideId, type: "ride_cancelled" },
+            "customer_ride_accepted",
+          );
+        }
+        if (driverId) {
+          const driverDoc = await admin
+            .firestore()
+            .collection("drivers")
+            .doc(driverId)
+            .get();
+          const driverUser = await admin
+            .firestore()
+            .collection("users")
+            .doc(driverId)
+            .get();
+          const driverToken =
+            driverDoc.data()?.fcmToken || driverUser.data()?.fcmToken;
+          const driverBody =
+            cancelledBy === "customer"
+              ? "The customer cancelled this trip"
+              : "This trip was cancelled";
+          await sendToToken(
+            driverToken,
+            "Trip cancelled",
+            driverBody,
+            { rideId, type: "ride_cancelled_driver", cancelledBy },
+            "default",
+          );
+        }
+      }
+    }
+
     if (becameAccepted && after.driverId && rewardsRuntime.mod) {
       try {
         await rewardsRuntime.mod.bumpOfferStats(
@@ -600,6 +702,45 @@ function normalizePhone(raw) {
   return `+964${digits}`;
 }
 
+async function writeAdminAuditLog({
+  adminId,
+  action,
+  entityType = "",
+  entityId = "",
+  details = {},
+  ipAddress = "",
+}) {
+  try {
+    let adminName = adminId || "";
+    if (adminId) {
+      const userDoc = await admin
+        .firestore()
+        .collection("users")
+        .doc(adminId)
+        .get();
+      if (userDoc.exists) {
+        const d = userDoc.data() || {};
+        adminName = d.fullName || d.name || d.email || adminId;
+      }
+    }
+    await admin.firestore().collection("adminAuditLogs").add({
+      adminId: adminId || "",
+      adminName,
+      action,
+      entityType,
+      entityId,
+      details: details && typeof details === "object" ? details : {},
+      ipAddress: ipAddress || "",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    functions.logger.warn("writeAdminAuditLog failed", {
+      action,
+      error: String(error),
+    });
+  }
+}
+
 async function assertAdminPermission(context, permission) {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
@@ -690,6 +831,7 @@ exports.createAssistant = functions.https.onCall(async (data, context) => {
     const email = String(payload.email || "").trim().toLowerCase();
     const password = String(payload.password || "");
     const permissions = Array.isArray(payload.permissions) ? payload.permissions : [];
+    const roleTemplate = String(payload.roleTemplate || "").trim();
 
     const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!name || !emailIsValid || password.length < 6) {
@@ -767,6 +909,7 @@ exports.createAssistant = functions.https.onCall(async (data, context) => {
         isBlocked: false,
         cancelledRidesCount: 0,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...(roleTemplate ? { roleTemplate } : {}),
       });
     } catch (error) {
       try {
@@ -880,7 +1023,75 @@ exports.savePricingConfig = functions.https.onCall(async (data, context) => {
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: "pricing.changed",
+    entityType: "pricing",
+    entityId: docId,
+    details: { districtId, subDistrictId, maxDistanceKm },
+  });
+
   return { ok: true, docId };
+});
+
+exports.saveAppConfig = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["appSettings"]);
+
+  const readBool = (value, fallback = false) => {
+    if (typeof value === "boolean") return value;
+    if (value === 1 || value === "1" || value === "true") return true;
+    if (value === 0 || value === "0" || value === "false") return false;
+    return fallback;
+  };
+  const readInt = (value, fallback = 0) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.trunc(n) : fallback;
+  };
+  const readString = (value) => String(value ?? "").trim();
+
+  const payload = {
+    maintenanceMode: readBool(data.maintenanceMode, false),
+    maintenanceMessageEn: readString(data.maintenanceMessageEn),
+    maintenanceMessageAr: readString(data.maintenanceMessageAr),
+    minAndroidBuild: readInt(data.minAndroidBuild, 0),
+    minIosBuild: readInt(data.minIosBuild, 0),
+    forceUpdateMessageEn: readString(data.forceUpdateMessageEn),
+    forceUpdateMessageAr: readString(data.forceUpdateMessageAr),
+    androidStoreUrl: readString(data.androidStoreUrl),
+    iosStoreUrl: readString(data.iosStoreUrl),
+    aboutEn: readString(data.aboutEn),
+    aboutAr: readString(data.aboutAr),
+    contactEn: readString(data.contactEn),
+    contactAr: readString(data.contactAr),
+    privacyEn: readString(data.privacyEn),
+    privacyAr: readString(data.privacyAr),
+    termsEn: readString(data.termsEn),
+    termsAr: readString(data.termsAr),
+    referralEnabled: readBool(data.referralEnabled, false),
+    referralRewardReferrerIqd: readInt(data.referralRewardReferrerIqd, 0),
+    referralRewardNewUserIqd: readInt(data.referralRewardNewUserIqd, 0),
+    complaintFlagThreshold: readInt(data.complaintFlagThreshold, 3),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedBy: context.auth.uid,
+  };
+
+  await admin.firestore().collection("config").doc("app").set(payload, { merge: true });
+
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: "app.config.updated",
+    entityType: "appConfig",
+    entityId: "app",
+    details: {
+      maintenanceMode: payload.maintenanceMode,
+      minAndroidBuild: payload.minAndroidBuild,
+      minIosBuild: payload.minIosBuild,
+      referralEnabled: payload.referralEnabled,
+      complaintFlagThreshold: payload.complaintFlagThreshold,
+    },
+  });
+
+  return { ok: true };
 });
 
 exports.savePromoConfig = functions.https.onCall(async (data, context) => {
@@ -920,8 +1131,25 @@ exports.savePromoConfig = functions.https.onCall(async (data, context) => {
       maxDiscountIqd,
       maxRides,
       description: String(data.description || "").trim(),
+      kind: String(data.kind || "both"),
+      districtIds: Array.isArray(data.districtIds) ? data.districtIds.map(String) : [],
+      minCompletedRidesForEligibility: Math.max(
+        0,
+        Math.trunc(Number(data.minCompletedRidesForEligibility) || 0),
+      ),
+      currentRedemptions: Math.max(
+        0,
+        Math.trunc(Number(data.currentRedemptions) || 0),
+      ),
+      maxTotalRedemptions:
+        data.maxTotalRedemptions == null || data.maxTotalRedemptions === ""
+          ? null
+          : Math.max(0, Math.trunc(Number(data.maxTotalRedemptions))),
+      expiresAt: data.expiresAt
+        ? admin.firestore.Timestamp.fromDate(new Date(data.expiresAt))
+        : null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    }, { merge: true });
 
   return { ok: true, code };
 });
@@ -1057,40 +1285,111 @@ exports.getDrivingRoute = functions.https.onCall(async (data) => {
 });
 
 exports.sendBroadcast = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
-  }
+  await assertAdminPermissionAny(context, ["notifications", "overview"]);
 
-  const managerDoc = await admin
-    .firestore()
-    .collection("users")
-    .doc(context.auth.uid)
-    .get();
-  if (!managerDoc.exists || managerDoc.data()?.role !== "manager") {
-    throw new functions.https.HttpsError("permission-denied", "Managers only.");
-  }
-
-  const audience = String(data.audience || "").trim();
-  const title = String(data.title || "").trim();
-  const body = String(data.message || data.body || "").trim();
+  const payload = parseCallableData(data);
+  const audience = String(payload.audience || "").trim();
+  const title = String(payload.title || "").trim();
+  const body = String(payload.message || payload.body || "").trim();
+  const provinceId = String(payload.provinceId || "").trim();
+  const districtId = String(payload.districtId || "").trim();
+  const subDistrictId = String(payload.subDistrictId || "").trim();
+  const targetUserId = String(payload.targetUserId || "").trim();
 
   if (!title || !body) {
     throw new functions.https.HttpsError("invalid-argument", "Title and message required.");
   }
-  if (audience !== "drivers" && audience !== "customers") {
-    throw new functions.https.HttpsError("invalid-argument", "Audience must be drivers or customers.");
+
+  const allowedAudiences = new Set([
+    "drivers",
+    "allDrivers",
+    "customers",
+    "allCustomers",
+    "businesses",
+    "province",
+    "district",
+    "subDistrict",
+    "individual",
+  ]);
+  if (!allowedAudiences.has(audience)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Unsupported audience.",
+    );
   }
 
   const tokens = new Set();
-  if (audience === "drivers") {
+  const normalizedAudience =
+    audience === "allDrivers"
+      ? "drivers"
+      : audience === "allCustomers"
+        ? "customers"
+        : audience;
+
+  const matchesGeo = (docData) => {
+    if (provinceId && String(docData.provinceId || "") !== provinceId) return false;
+    if (districtId && String(docData.assignedDistrictId || docData.districtId || "") !== districtId) {
+      return false;
+    }
+    if (
+      subDistrictId &&
+      String(docData.assignedSubDistrictId || docData.subDistrictId || "") !==
+        subDistrictId
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  if (normalizedAudience === "individual" && targetUserId) {
+    const driverDoc = await admin.firestore().collection("drivers").doc(targetUserId).get();
+    if (driverDoc.exists && driverDoc.data()?.fcmToken) {
+      tokens.add(driverDoc.data().fcmToken);
+    }
+    const userDoc = await admin.firestore().collection("users").doc(targetUserId).get();
+    if (userDoc.exists && userDoc.data()?.fcmToken) {
+      tokens.add(userDoc.data().fcmToken);
+    }
+  } else if (normalizedAudience === "businesses") {
+    const snapshot = await admin.firestore().collection("businesses").get();
+    for (const doc of snapshot.docs) {
+      const biz = doc.data() || {};
+      if (!matchesGeo(biz)) continue;
+      const ownerId = String(biz.ownerUserId || biz.ownerId || "").trim();
+      if (!ownerId) continue;
+      const userDoc = await admin.firestore().collection("users").doc(ownerId).get();
+      if (userDoc.exists && userDoc.data()?.fcmToken) {
+        tokens.add(userDoc.data().fcmToken);
+      }
+    }
+  } else if (
+    normalizedAudience === "drivers" ||
+    normalizedAudience === "province" ||
+    normalizedAudience === "district" ||
+    normalizedAudience === "subDistrict"
+  ) {
     const snapshot = await admin.firestore().collection("drivers").get();
     for (const doc of snapshot.docs) {
       const driver = doc.data() || {};
       if (driver.isBlocked || driver.isRemoved || driver.isFakeDriver) continue;
       if (driver.approvalStatus !== "approved") continue;
+      if (!matchesGeo(driver)) continue;
       if (driver.fcmToken) tokens.add(driver.fcmToken);
     }
-  } else {
+    if (normalizedAudience === "province" || normalizedAudience === "district" || normalizedAudience === "subDistrict") {
+      const customers = await admin
+        .firestore()
+        .collection("users")
+        .where("role", "==", "customer")
+        .get();
+      for (const doc of customers.docs) {
+        const user = doc.data() || {};
+        if (user.isBlocked) continue;
+        if (!matchesGeo(user)) continue;
+        if (user.fcmToken) tokens.add(user.fcmToken);
+      }
+    }
+  } else if (normalizedAudience === "customers") {
     const snapshot = await admin
       .firestore()
       .collection("users")
@@ -1099,6 +1398,7 @@ exports.sendBroadcast = functions.https.onCall(async (data, context) => {
     for (const doc of snapshot.docs) {
       const user = doc.data() || {};
       if (user.isBlocked) continue;
+      if (!matchesGeo(user)) continue;
       if (user.fcmToken) tokens.add(user.fcmToken);
     }
   }
@@ -1123,9 +1423,178 @@ exports.sendBroadcast = functions.https.onCall(async (data, context) => {
     totalTokens: tokens.size,
     createdBy: context.auth.uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...(provinceId ? { provinceId } : {}),
+    ...(districtId ? { districtId } : {}),
+    ...(subDistrictId ? { subDistrictId } : {}),
+    ...(targetUserId ? { targetUserId } : {}),
+  });
+
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: "notification.broadcast",
+    entityType: "announcement",
+    details: { audience, title, sent, total: tokens.size },
   });
 
   return { sent, total: tokens.size, audience };
+});
+
+async function getComplaintFlagThreshold() {
+  try {
+    const snap = await admin.firestore().collection("config").doc("app").get();
+    const val = Number(snap.data()?.complaintFlagThreshold);
+    return Number.isFinite(val) && val > 0 ? Math.trunc(val) : 3;
+  } catch (_) {
+    return 3;
+  }
+}
+
+async function evaluateComplaintTargetFlag(complaintData, actorUid = "system") {
+  const data = complaintData || {};
+  const targetUserId = String(data.targetUserId || "").trim();
+  if (!targetUserId) return;
+
+  const threshold = await getComplaintFlagThreshold();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+
+  const snap = await admin
+    .firestore()
+    .collection("complaints")
+    .where("targetUserId", "==", targetUserId)
+    .where("createdAt", ">=", admin.firestore.Timestamp.fromDate(cutoff))
+    .get();
+
+  const count = snap.docs.filter((doc) => {
+    const status = String(doc.data().status || "");
+    return status === "open" || status === "inProgress" || status === "resolved";
+  }).length;
+
+  if (count < threshold) return;
+
+  const targetRole = String(data.targetRole || "").trim().toLowerCase();
+  let collection = targetRole === "driver" ? "drivers" : "users";
+  let targetRef = admin.firestore().collection(collection).doc(targetUserId);
+  let targetSnap = await targetRef.get();
+  if (!targetSnap.exists) {
+    collection = collection === "drivers" ? "users" : "drivers";
+    targetRef = admin.firestore().collection(collection).doc(targetUserId);
+    targetSnap = await targetRef.get();
+    if (!targetSnap.exists) return;
+  }
+  if (targetSnap.data()?.reviewFlagged === true) return;
+
+  await targetRef.set(
+    {
+      reviewFlagged: true,
+      reviewFlagReason: "multiple_complaints",
+      reviewFlaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  await writeAdminAuditLog({
+    adminId: actorUid,
+    action: "complaint.auto_flag",
+    entityType: targetRole === "driver" ? "driver" : "user",
+    entityId: targetUserId,
+    details: {
+      complaintCount: count,
+      threshold,
+      targetName: String(data.targetName || ""),
+      targetRole,
+    },
+  });
+}
+
+exports.createComplaint = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+  const payload = parseCallableData(data);
+  const subject = String(payload.subject || "").trim();
+  const body = String(payload.body || "").trim();
+  if (!subject || !body) {
+    throw new functions.https.HttpsError("invalid-argument", "Subject and body required.");
+  }
+  const ref = admin.firestore().collection("complaints").doc();
+  const doc = {
+    userId: String(payload.userId || context.auth.uid).trim(),
+    userRole: String(payload.userRole || "customer").trim(),
+    userName: String(payload.userName || "").trim(),
+    subject,
+    body,
+    status: "open",
+    adminReply: "",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: context.auth.uid,
+  };
+  for (const key of [
+    "provinceId",
+    "districtId",
+    "subDistrictId",
+    "relatedRideId",
+    "targetUserId",
+    "targetRole",
+    "targetName",
+    "category",
+  ]) {
+    const value = String(payload[key] || "").trim();
+    if (value) doc[key] = value;
+  }
+  await ref.set(doc);
+  try {
+    const saved = await ref.get();
+    await evaluateComplaintTargetFlag(saved.data(), context.auth.uid);
+  } catch (error) {
+    functions.logger.warn("complaint auto-flag failed", {
+      complaintId: ref.id,
+      message: error.message,
+    });
+  }
+  return { ok: true, complaintId: ref.id };
+});
+
+exports.onComplaintCreated = functions.firestore
+  .document("complaints/{complaintId}")
+  .onCreate(async (snap) => {
+    try {
+      await evaluateComplaintTargetFlag(snap.data(), "system");
+    } catch (error) {
+      functions.logger.warn("complaint auto-flag trigger failed", {
+        complaintId: snap.id,
+        message: error.message,
+      });
+    }
+    return null;
+  });
+
+exports.logAdminLogin = onCall({ region: "us-central1" }, async (request) => {
+  const context = { auth: request.auth };
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+  const userDoc = await admin
+    .firestore()
+    .collection("users")
+    .doc(context.auth.uid)
+    .get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError("permission-denied", "User profile not found.");
+  }
+  const role = userDoc.data()?.role;
+  if (role !== "manager" && role !== "assistant") {
+    throw new functions.https.HttpsError("permission-denied", "Admin access required.");
+  }
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: "admin.login",
+    entityType: "admin",
+    entityId: context.auth.uid,
+    details: { role },
+  });
+  return { ok: true };
 });
 
 exports.sendWhatsAppOtp = onCall(
@@ -1240,6 +1709,14 @@ exports.setDriverApprovalStatus = functions.https.onCall(async (data, context) =
     driverId,
     status,
     reviewedBy: context.auth.uid,
+  });
+
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: status === "approved" ? "driver.approved" : `driver.${status}`,
+    entityType: "driver",
+    entityId: driverId,
+    details: { status },
   });
 
   return { ok: true, approvalStatus: status };
@@ -1695,6 +2172,56 @@ exports.getDriverPhotoForAdmin = authAdminCallable(async (data, context) => {
   const [exists] = await file.exists();
   if (!exists) {
     throw new functions.https.HttpsError("not-found", "Photo not found.");
+  }
+
+  const [buffer] = await file.download();
+  const [metadata] = await file.getMetadata();
+  return {
+    ok: true,
+    base64: buffer.toString("base64"),
+    contentType: metadata.contentType || "image/jpeg",
+  };
+});
+
+exports.getWalletReceiptForAdmin = authAdminCallable(async (data, context) => {
+  await assertAdminPermissionAny(context, ["wallet", "earnings"]);
+
+  const payload = parseCallableData(data);
+  const driverId = String(payload.driverId || "").trim();
+  const screenshotUrl = String(payload.screenshotUrl || payload.url || "").trim();
+
+  if (!driverId || !screenshotUrl) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "driverId and screenshotUrl required.",
+    );
+  }
+
+  const bucket = admin.storage().bucket();
+  let objectPath = "";
+
+  try {
+    const parsed = new URL(screenshotUrl);
+    const segments = parsed.pathname.split("/");
+    const oIndex = segments.indexOf("o");
+    if (oIndex >= 0 && segments[oIndex + 1]) {
+      objectPath = decodeURIComponent(segments[oIndex + 1]);
+    }
+  } catch (_) {
+    objectPath = "";
+  }
+
+  if (!objectPath || !objectPath.startsWith(`wallet_recharges/${driverId}/`)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Invalid wallet receipt path.",
+    );
+  }
+
+  const file = bucket.file(objectPath);
+  const [exists] = await file.exists();
+  if (!exists) {
+    throw new functions.https.HttpsError("not-found", "Receipt image not found.");
   }
 
   const [buffer] = await file.download();
@@ -2637,22 +3164,26 @@ exports.reviewWalletRechargeRequest = functions.https.onCall(async (data, contex
     });
   }
 
-  try {
-    const driverUser = await db.collection("users").doc(result.driverId).get();
-    const token = driverUser.data()?.fcmToken;
-    await sendToToken(
-      token,
-      result.approved ? "Wallet recharged" : "Recharge rejected",
-      result.approved
-        ? `Your wallet was credited ${result.amountIqd} IQD.`
-        : rejectionReason || "Your recharge request was rejected.",
-      {
-        type: result.approved ? "wallet_recharge_approved" : "wallet_recharge_rejected",
-        requestId,
-      },
-      "default",
-    );
-  } catch (_) {}
+  if (result.driverId) {
+    try {
+      const driverUser = await db.collection("users").doc(result.driverId).get();
+      const driverDoc = await db.collection("drivers").doc(result.driverId).get();
+      const token =
+        driverUser.data()?.fcmToken || driverDoc.data()?.fcmToken || null;
+      await sendToToken(
+        token,
+        result.approved ? "Wallet recharged" : "Recharge rejected",
+        result.approved
+          ? `Your wallet was credited ${result.amountIqd} IQD.`
+          : rejectionReason || "Your recharge request was rejected.",
+        {
+          type: result.approved ? "wallet_recharge_approved" : "wallet_recharge_rejected",
+          requestId,
+        },
+        "default",
+      );
+    } catch (_) {}
+  }
 
   return { ok: true, approved: result.approved };
 });
@@ -2674,6 +3205,13 @@ exports.adjustDriverWallet = functions.https.onCall(async (data, context) => {
     type: amountIqd > 0 ? "adjustment" : "penalty",
     createdBy: context.auth.uid,
     note,
+  });
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: amountIqd > 0 ? "wallet.recharged" : "wallet.deducted",
+    entityType: "driver",
+    entityId: driverId,
+    details: { amountIqd, note },
   });
   return { ok: true, ...result };
 });
@@ -2718,6 +3256,13 @@ exports.saveServiceArea = functions.https.onCall(async (data, context) => {
       { merge: true },
     );
   }
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: `serviceArea.${kind}.saved`,
+    entityType: kind,
+    entityId: id,
+    details: { mergeOnly },
+  });
   return { ok: true, id };
 });
 
@@ -2954,6 +3499,7 @@ rewardsRuntime.mod = createRewardsModule({
   applyWalletDelta,
   sendToToken,
   assertAdminPermissionAny,
+  writeAdminAuditLog,
 });
 exports.saveRewardCampaign = rewardsRuntime.mod.saveRewardCampaign;
 exports.setRewardCampaignStatus = rewardsRuntime.mod.setRewardCampaignStatus;
@@ -2989,6 +3535,7 @@ const businessModule = createBusinessModule({
   assertAdminPermissionAny,
   sendToToken,
   authAdminCallable,
+  writeAdminAuditLog,
 });
 exports.seedBusinessTypes = businessModule.seedBusinessTypes;
 exports.saveBusinessTypes = businessModule.saveBusinessTypes;
@@ -3005,3 +3552,184 @@ exports.duplicateBusinessProduct = businessModule.duplicateBusinessProduct;
 exports.bulkUpdateBusinessPrices = businessModule.bulkUpdateBusinessPrices;
 exports.placeBusinessOrder = businessModule.placeBusinessOrder;
 exports.updateBusinessOrderStatus = businessModule.updateBusinessOrderStatus;
+
+exports.applyReferralCode = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const uid = request.auth.uid;
+  const code = String(request.data?.referralCode || "")
+    .trim()
+    .toUpperCase();
+  if (!code) {
+    throw new functions.https.HttpsError("invalid-argument", "Referral code required.");
+  }
+
+  const db = admin.firestore();
+  const userRef = db.collection("users").doc(uid);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "User profile not found.");
+  }
+  const userData = userSnap.data() || {};
+  if (userData.referralAppliedAt) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Referral already claimed.",
+    );
+  }
+  if (userData.referralCode === code) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "You cannot use your own referral code.",
+    );
+  }
+
+  const referrerSnap = await db
+    .collection("users")
+    .where("referralCode", "==", code)
+    .limit(1)
+    .get();
+  if (referrerSnap.empty) {
+    throw new functions.https.HttpsError("not-found", "Invalid referral code.");
+  }
+  const referrerDoc = referrerSnap.docs[0];
+  const referrerId = referrerDoc.id;
+  if (referrerId === uid) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "You cannot refer yourself.",
+    );
+  }
+
+  const appConfigSnap = await db.collection("config").doc("app").get();
+  const appConfig = appConfigSnap.data() || {};
+  const referralEnabled = appConfig.referralEnabled === true;
+  const referrerReward = Math.max(
+    0,
+    Math.trunc(Number(appConfig.referralRewardReferrerIqd) || 0),
+  );
+  const newUserReward = Math.max(
+    0,
+    Math.trunc(Number(appConfig.referralRewardNewUserIqd) || 0),
+  );
+
+  if (!referralEnabled) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Referral program is not enabled.",
+    );
+  }
+
+  await db.runTransaction(async (tx) => {
+    const freshUser = await tx.get(userRef);
+    if (!freshUser.exists) {
+      throw new functions.https.HttpsError("not-found", "User profile not found.");
+    }
+    const freshData = freshUser.data() || {};
+    if (freshData.referralAppliedAt) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Referral already claimed.",
+      );
+    }
+
+    const referrerRef = db.collection("users").doc(referrerId);
+    const freshReferrer = await tx.get(referrerRef);
+    if (!freshReferrer.exists) {
+      throw new functions.https.HttpsError("not-found", "Referrer not found.");
+    }
+
+    const userUpdates = {
+      referralAppliedAt: admin.firestore.FieldValue.serverTimestamp(),
+      referralReferrerId: referrerId,
+      referredByCode: code,
+    };
+    if (newUserReward > 0) {
+      userUpdates.walletBalanceIqd =
+        (Number(freshData.walletBalanceIqd) || 0) + newUserReward;
+    }
+    tx.update(userRef, userUpdates);
+
+    if (referrerReward > 0) {
+      const referrerData = freshReferrer.data() || {};
+      tx.update(referrerRef, {
+        walletBalanceIqd:
+          (Number(referrerData.walletBalanceIqd) || 0) + referrerReward,
+        referralRewardsEarnedIqd:
+          (Number(referrerData.referralRewardsEarnedIqd) || 0) + referrerReward,
+      });
+    }
+  });
+
+  await writeAdminAuditLog({
+    adminId: uid,
+    action: "referral.applied",
+    entityType: "user",
+    entityId: uid,
+    details: {
+      referralCode: code,
+      referrerId,
+      referrerRewardIqd: referrerReward,
+      newUserRewardIqd: newUserReward,
+    },
+  });
+
+  return {
+    ok: true,
+    referrerId,
+    referrerRewardIqd: referrerReward,
+    newUserRewardIqd: newUserReward,
+  };
+});
+
+exports.warnDriver = onCall({ region: "us-central1" }, async (request) => {
+  const context = { auth: request.auth };
+  await assertAdminPermissionAny(context, ["driverPerformance", "allDrivers"]);
+
+  const driverId = String(request.data?.driverId || "").trim();
+  const reason = String(request.data?.reason || "").trim();
+  if (!driverId) {
+    throw new functions.https.HttpsError("invalid-argument", "driverId required.");
+  }
+
+  const db = admin.firestore();
+  const driverRef = db.collection("drivers").doc(driverId);
+  const driverSnap = await driverRef.get();
+  if (!driverSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "Driver not found.");
+  }
+  const driverData = driverSnap.data() || {};
+
+  await driverRef.update({
+    warningCount: admin.firestore.FieldValue.increment(1),
+    lastWarningAt: admin.firestore.FieldValue.serverTimestamp(),
+    lastWarningReason: reason || null,
+  });
+
+  const userSnap = await db.collection("users").doc(driverId).get();
+  const token = userSnap.data()?.fcmToken;
+  if (token) {
+    await sendToToken(
+      token,
+      "Performance warning",
+      reason || "Please review platform guidelines.",
+      { type: "driver_warning", driverId },
+      "customer_ride_accepted",
+    );
+  }
+
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: "driver.warned",
+    entityType: "driver",
+    entityId: driverId,
+    details: {
+      driverName: driverData.name || "",
+      reason: reason || "",
+    },
+  });
+
+  return { ok: true };
+});
