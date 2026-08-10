@@ -18,7 +18,6 @@ struct PlaceSearchView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var savedMessage: String?
     @State private var statusMessage: String?
-    private let searchService = PlaceSearchService()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -90,23 +89,33 @@ struct PlaceSearchView: View {
         }
 
         searchTask = Task {
-            try? await Task.sleep(nanoseconds: 280_000_000)
+            try? await Task.sleep(nanoseconds: 350_000_000)
             guard !Task.isCancelled else { return }
             await MainActor.run { isSearching = true }
-            let places = await searchService.search(
+
+            let google = GooglePlacesService()
+            let places = await google.searchPlaces(
                 query: trimmed,
                 center: center,
                 radiusKm: radiusKm,
                 languageCode: appState.language.rawValue,
-                regionLabel: regionLabel,
-                subDistrictId: subDistrictId
+                regionLabel: regionLabel
             )
             guard !Task.isCancelled else { return }
+
             await MainActor.run {
-                results = places
+                let scoped: [PlacesSearchResult]
+                if subDistrictId.isEmpty {
+                    scoped = places
+                } else {
+                    scoped = places.filter {
+                        BabilRegions.isWithin(subDistrictId: subDistrictId, point: $0.coordinate)
+                    }
+                }
+                results = scoped
                 isSearching = false
-                if places.isEmpty {
-                    statusMessage = emptyStateMessage(for: searchService.lastStatusMessage)
+                if scoped.isEmpty {
+                    statusMessage = emptyStateMessage(googleError: google.lastError)
                 } else {
                     statusMessage = nil
                 }
@@ -120,21 +129,17 @@ struct PlaceSearchView: View {
         return trimmed.count >= minLength
     }
 
-    private func emptyStateMessage(for code: String?) -> String {
+    private func emptyStateMessage(googleError: PlacesSearchError?) -> String {
         let isAr = appState.language == .arabic
-        switch code {
-        case "apiDenied":
+        switch googleError {
+        case .apiDenied:
             return isAr
                 ? "تعذر الوصول إلى خدمة البحث. حاول مرة أخرى أو اختر الموقع من الخريطة."
                 : "Place search is unavailable. Try again or pick on the map."
-        case "network":
+        case .network, .httpStatus:
             return isAr
                 ? "فشل الاتصال بخدمة البحث. تحقق من الإنترنت وحاول مجدداً."
                 : "Could not reach place search. Check your connection and retry."
-        case "no_results_in_area":
-            return isAr
-                ? "لا توجد نتائج في المنطقة المحددة"
-                : "No results in the selected area."
         default:
             return isAr
                 ? "لا توجد نتائج في المنطقة المحددة"

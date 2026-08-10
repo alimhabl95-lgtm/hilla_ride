@@ -76,27 +76,30 @@ final class GooglePlacesService {
             return []
         }
 
-        // Match Flutter: only append region context when a label is available.
-        // Always hard-appending "Babil Iraq" made short Arabic queries miss.
         let label = regionLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let enriched = label.isEmpty
-            ? trimmedQuery
+            ? "\(trimmedQuery) Babil Iraq"
             : "\(trimmedQuery) \(label) Babil Iraq"
 
         let lang = normalizedLanguageCode(languageCode)
-        // Soft bias (Flutter) — hard locationRestriction was dropping valid Iraqi hits.
+        // Hard rectangle around the selected sub-district — do not soften to locationBias.
+        let latDelta = radiusKm / 111.0
+        let lngDelta = radiusKm / (111.0 * max(0.1, cos(center.latitude * .pi / 180)))
         let body: [String: Any] = [
             "textQuery": enriched,
             "languageCode": lang,
             "regionCode": "iq",
             "maxResultCount": 20,
-            "locationBias": [
-                "circle": [
-                    "center": [
-                        "latitude": center.latitude,
-                        "longitude": center.longitude
+            "locationRestriction": [
+                "rectangle": [
+                    "low": [
+                        "latitude": center.latitude - latDelta,
+                        "longitude": center.longitude - lngDelta
                     ],
-                    "radius": max(1_000.0, radiusKm * 1_000.0)
+                    "high": [
+                        "latitude": center.latitude + latDelta,
+                        "longitude": center.longitude + lngDelta
+                    ]
                 ]
             ]
         ]

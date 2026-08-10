@@ -124,32 +124,12 @@ enum BabilRegions {
         return customerDistrict.subDistricts.first ?? seedDistricts[0].subDistricts[0]
     }
 
-    /// True when [point] falls inside the selected sub-district's search radius
-    /// and is assigned to that sub-district (not a neighboring one with overlapping radii).
+    /// True when [point] falls inside the selected sub-district's search radius.
     @MainActor
     static func isWithin(subDistrictId: String, point: CLLocationCoordinate2D) -> Bool {
         guard !subDistrictId.isEmpty else { return false }
         let sub = subDistrict(byId: subDistrictId)
-        guard GeoMath.distanceKm(from: sub.center, to: point) <= sub.searchRadiusKm else {
-            return false
-        }
-        return assignedSubDistrict(for: point)?.id == subDistrictId
-    }
-
-    /// Nearest sub-district whose radius contains [point], if any.
-    @MainActor
-    private static func assignedSubDistrict(for point: CLLocationCoordinate2D) -> BabilSubDistrict? {
-        var nearest: BabilSubDistrict?
-        var nearestKm = Double.greatestFiniteMagnitude
-        for district in districts {
-            for candidate in district.subDistricts {
-                let km = GeoMath.distanceKm(from: candidate.center, to: point)
-                guard km <= candidate.searchRadiusKm, km < nearestKm else { continue }
-                nearestKm = km
-                nearest = candidate
-            }
-        }
-        return nearest
+        return GeoMath.distanceKm(from: sub.center, to: point) <= sub.searchRadiusKm
     }
 
     @MainActor
