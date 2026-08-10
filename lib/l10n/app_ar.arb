@@ -35,7 +35,7 @@
   "pickup": "نقطة الانطلاق",
   "destination": "الوجهة",
   "searchPlaces": "ابحث عن أماكن في الحلة",
-  "noPlacesFound": "لم يتم العثور على أماكن. جرّب اسمًا أقصر أو استخدم تحديد على الخريطة.",
+  "noPlacesFound": "لا توجد نتائج في المنطقة المحددة",
   "searchAction": "بحث",
   "searchPlacesHint": "اكتب بالعربية ثم اضغط بحث. على المحاكي: Win+Space لاختيار لوحة العربية",
   "searchFieldHint": "ابحث أو اكتب بالإنجليزية (hospital, market)",

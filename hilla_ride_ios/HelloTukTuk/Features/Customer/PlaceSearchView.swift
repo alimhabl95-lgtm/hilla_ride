@@ -34,7 +34,7 @@ struct PlaceSearchView: View {
                     .padding(.vertical, 8)
             }
 
-            if let statusMessage, results.isEmpty, !isSearching, query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
+            if let statusMessage, results.isEmpty, !isSearching, queryMeetsMinLength {
                 Text(statusMessage)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -114,6 +114,12 @@ struct PlaceSearchView: View {
         }
     }
 
+    private var queryMeetsMinLength: Bool {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let minLength = trimmed.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) ? 1 : 2
+        return trimmed.count >= minLength
+    }
+
     private func emptyStateMessage(for code: String?) -> String {
         let isAr = appState.language == .arabic
         switch code {
@@ -125,10 +131,14 @@ struct PlaceSearchView: View {
             return isAr
                 ? "فشل الاتصال بخدمة البحث. تحقق من الإنترنت وحاول مجدداً."
                 : "Could not reach place search. Check your connection and retry."
+        case "no_results_in_area":
+            return isAr
+                ? "لا توجد نتائج في المنطقة المحددة"
+                : "No results in the selected area."
         default:
             return isAr
-                ? "لا نتائج في هذه المنطقة. جرّب اسماً أقرب أو اختر من الخريطة."
-                : "No places found nearby. Try a closer name or pick on the map."
+                ? "لا توجد نتائج في المنطقة المحددة"
+                : "No results in the selected area."
         }
     }
 

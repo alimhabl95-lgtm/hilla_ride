@@ -3,7 +3,7 @@ import Foundation
 import os.log
 
 /// Multi-source place search aligned with Flutter `GeocodingService.searchPlacesInRegion`:
-/// local catalog + Google Places (New) + Nominatim fallback.
+/// local catalog + Google Places + Photon + Overpass + Nominatim, then strict sub-district validation.
 final class PlaceSearchService {
     private let google = GooglePlacesService()
     private let session: URLSession
@@ -29,10 +29,15 @@ final class PlaceSearchService {
             lastStatusMessage = nil
             return []
         }
+        guard !subDistrictId.isEmpty else {
+            lastStatusMessage = "no_results_in_area"
+            return []
+        }
 
-        async let localTask = LocalPlacesCatalog.shared.search(
+        async let localTask = localPlacesMatching(
             query: trimmed,
-            preferArabic: languageCode.lowercased().hasPrefix("ar")
+            subDistrictId: subDistrictId,
+            languageCode: languageCode
         )
         async let googleTask = google.searchPlaces(
             query: trimmed,
@@ -41,105 +46,156 @@ final class PlaceSearchService {
             languageCode: languageCode,
             regionLabel: regionLabel
         )
-        async let nominatimTask = nominatimSearch(
+        async let photonTask = photonSearch(
             query: trimmed,
             center: center,
             radiusKm: radiusKm,
             languageCode: languageCode
         )
+        async let overpassTask = overpassSearch(
+            query: trimmed,
+            center: center,
+            radiusKm: radiusKm
+        )
+        async let nominatimTask = nominatimSearch(
+            query: trimmed,
+            center: center,
+            radiusKm: radiusKm,
+            languageCode: languageCode,
+            regionLabel: regionLabel
+        )
 
         let local = await localTask
         let googleResults = await googleTask
+        let photon = await photonTask
+        let overpass = await overpassTask
         let nominatim = await nominatimTask
 
-        let softRadius = max(radiusKm * 1.35, radiusKm + 8)
-        var merged = merge(
-            groups: [local, googleResults, nominatim],
+        var merged = await mergeInSubDistrict(
+            subDistrictId: subDistrictId,
             center: center,
-            maxDistanceKm: softRadius
+            groups: [local, googleResults, photon, overpass, nominatim]
         )
 
-        // If the tight radius wiped everything (common when Google biases to Hilla
-        // while the selected sub-district center is farther east), keep the nearest
-        // district-scoped hits instead of showing an empty list.
         if merged.isEmpty {
-            merged = merge(
-                groups: [local, googleResults, nominatim],
+            let categoryResults = await overpassCategorySearch(
+                query: trimmed,
                 center: center,
-                maxDistanceKm: max(45, softRadius)
+                radiusKm: radiusKm
+            )
+            merged = await mergeInSubDistrict(
+                subDistrictId: subDistrictId,
+                center: center,
+                groups: [categoryResults]
             )
         }
+
+        let rawCount = local.count + googleResults.count + photon.count + overpass.count + nominatim.count
 
         if merged.isEmpty {
             switch google.lastError {
-            case .apiDenied:
+            case .apiDenied where rawCount == 0:
                 lastStatusMessage = "apiDenied"
-            case .httpStatus, .network:
+            case .network, .httpStatus where rawCount == 0:
                 lastStatusMessage = "network"
             default:
-                lastStatusMessage = "no_results"
+                lastStatusMessage = "no_results_in_area"
             }
             log.warning(
-                "Place search empty q=\(trimmed, privacy: .public) google=\(googleResults.count) local=\(local.count) nominatim=\(nominatim.count) err=\(self.google.lastError?.debugDescription ?? "none", privacy: .public)"
+                "Place search empty q=\(trimmed, privacy: .public) sub=\(subDistrictId, privacy: .public) raw=\(rawCount) google=\(googleResults.count) local=\(local.count) nominatim=\(nominatim.count) overpass=\(overpass.count) err=\(self.google.lastError?.debugDescription ?? "none", privacy: .public)"
             )
         } else {
             lastStatusMessage = nil
-            log.info("Place search ok q=\(trimmed, privacy: .public) count=\(merged.count)")
+            log.info(
+                "Place search ok q=\(trimmed, privacy: .public) sub=\(subDistrictId, privacy: .public) count=\(merged.count)"
+            )
         }
 
-        _ = subDistrictId // retained for API parity; geo-scoping uses center + softRadius
         return Array(merged.prefix(25))
     }
 
-    private func merge(
-        groups: [[PlacesSearchResult]],
+    // MARK: - Region merge
+
+    private func mergeInSubDistrict(
+        subDistrictId: String,
         center: CLLocationCoordinate2D,
-        maxDistanceKm: Double
-    ) -> [PlacesSearchResult] {
-        var seen = Set<String>()
-        var scored: [(PlacesSearchResult, Double)] = []
+        groups: [[PlacesSearchResult]]
+    ) async -> [PlacesSearchResult] {
+        await MainActor.run {
+            var seen = Set<String>()
+            var scored: [(PlacesSearchResult, Double)] = []
 
-        for group in groups {
-            for place in group {
-                let distance = GeoMath.distanceKm(from: center, to: place.coordinate)
-                guard distance <= maxDistanceKm else { continue }
-                let key = String(format: "%.4f,%.4f", place.latitude, place.longitude)
-                guard seen.insert(key).inserted else { continue }
-                scored.append((place, distance))
+            for group in groups {
+                for place in group {
+                    guard BabilRegions.isWithin(subDistrictId: subDistrictId, point: place.coordinate) else {
+                        continue
+                    }
+                    let key = String(format: "%.4f,%.4f", place.latitude, place.longitude)
+                    guard seen.insert(key).inserted else { continue }
+                    let distance = GeoMath.distanceKm(from: center, to: place.coordinate)
+                    scored.append((place, distance))
+                }
             }
-        }
 
-        scored.sort { $0.1 < $1.1 }
-        return scored.map(\.0)
+            scored.sort { $0.1 < $1.1 }
+            return scored.map(\.0)
+        }
     }
+
+    private func localPlacesMatching(
+        query: String,
+        subDistrictId: String,
+        languageCode: String
+    ) async -> [PlacesSearchResult] {
+        let preferArabic = languageCode.lowercased().hasPrefix("ar")
+        let matches = await LocalPlacesCatalog.shared.search(query: query, preferArabic: preferArabic)
+        return await MainActor.run {
+            matches.filter { BabilRegions.isWithin(subDistrictId: subDistrictId, point: $0.coordinate) }
+        }
+    }
+
+    // MARK: - Nominatim
 
     private func nominatimSearch(
         query: String,
         center: CLLocationCoordinate2D,
         radiusKm: Double,
-        languageCode: String
+        languageCode: String,
+        regionLabel: String?
     ) async -> [PlacesSearchResult] {
+        let usesArabic = languageCode.lowercased().hasPrefix("ar") || containsArabic(query)
+        let label = regionLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let searchQuery: String
+        if label.isEmpty {
+            searchQuery = usesArabic ? "\(query), بابل, العراق" : "\(query), Babil, Iraq"
+        } else {
+            searchQuery = usesArabic
+                ? "\(query), \(label), بابل, العراق"
+                : "\(query), \(label), Babil, Iraq"
+        }
+
         let delta = max(0.05, radiusKm / 111.0)
         let left = center.longitude - delta
         let right = center.longitude + delta
         let top = center.latitude + delta
         let bottom = center.latitude - delta
-        let lang = languageCode.lowercased().hasPrefix("ar") ? "ar" : "en"
+        let lang = usesArabic ? "ar,en" : "en,ar"
 
         var components = URLComponents(string: "https://nominatim.openstreetmap.org/search")
         components?.queryItems = [
-            URLQueryItem(name: "q", value: "\(query) Iraq"),
-            URLQueryItem(name: "format", value: "jsonv2"),
-            URLQueryItem(name: "limit", value: "15"),
+            URLQueryItem(name: "q", value: searchQuery),
+            URLQueryItem(name: "format", value: "json"),
+            URLQueryItem(name: "limit", value: "25"),
             URLQueryItem(name: "countrycodes", value: "iq"),
-            URLQueryItem(name: "accept-language", value: lang),
+            URLQueryItem(name: "addressdetails", value: "1"),
             URLQueryItem(name: "viewbox", value: "\(left),\(top),\(right),\(bottom)"),
-            URLQueryItem(name: "bounded", value: "1")
+            URLQueryItem(name: "bounded", value: "0")
         ]
         guard let url = components?.url else { return [] }
 
         var request = URLRequest(url: url)
-        request.setValue("HelloTukTuk/1.0 (place-search)", forHTTPHeaderField: "User-Agent")
+        request.setValue("HelloTukTuk/1.0 (com.hillaride.hilla_ride)", forHTTPHeaderField: "User-Agent")
+        request.setValue(lang, forHTTPHeaderField: "Accept-Language")
         request.timeoutInterval = 10
 
         do {
@@ -164,10 +220,307 @@ final class PlaceSearchService {
         }
     }
 
+    // MARK: - Photon
+
+    private func photonSearch(
+        query: String,
+        center: CLLocationCoordinate2D,
+        radiusKm: Double,
+        languageCode: String
+    ) async -> [PlacesSearchResult] {
+        var components = URLComponents(string: "https://photon.komoot.io/api/")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "lat", value: String(center.latitude)),
+            URLQueryItem(name: "lon", value: String(center.longitude)),
+            URLQueryItem(name: "limit", value: "30"),
+            URLQueryItem(name: "lang", value: languageCode.lowercased().hasPrefix("ar") ? "ar" : "en")
+        ]
+        guard let url = components?.url else { return [] }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let features = json["features"] as? [[String: Any]] else {
+                return []
+            }
+
+            return features.compactMap { feature in
+                guard let geometry = feature["geometry"] as? [String: Any],
+                      let coords = geometry["coordinates"] as? [Any],
+                      coords.count >= 2,
+                      let lon = GooglePlacesService.doubleValue(coords[0]),
+                      let lat = GooglePlacesService.doubleValue(coords[1]) else {
+                    return nil
+                }
+                let props = feature["properties"] as? [String: Any] ?? [:]
+                let name = (props["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? query
+                let city = (props["city"] as? String) ?? (props["county"] as? String) ?? ""
+                let street = (props["street"] as? String) ?? ""
+                let parts = [name, street, city].filter { !$0.isEmpty }
+                let label = parts.joined(separator: ", ")
+                let distance = GeoMath.distanceKm(from: center, to: CLLocationCoordinate2D(latitude: lat, longitude: lon))
+                guard distance <= radiusKm else { return nil }
+                return PlacesSearchResult(label: label, latitude: lat, longitude: lon)
+            }
+        } catch {
+            return []
+        }
+    }
+
+    // MARK: - Overpass
+
+    private func overpassSearch(
+        query: String,
+        center: CLLocationCoordinate2D,
+        radiusKm: Double
+    ) async -> [PlacesSearchResult] {
+        let escaped = query.replacingOccurrences(of: "\"", with: "\\\"")
+        let delta = radiusKm / 111.0
+        let south = center.latitude - delta
+        let north = center.latitude + delta
+        let west = center.longitude - delta
+        let east = center.longitude + delta
+        let wordPattern = overpassWordPattern(query)
+        let categoryLines = overpassCategoryLines(
+            south: south, west: west, north: north, east: east, query: query
+        )
+
+        var body = """
+        [out:json][timeout:12];
+        (
+          nwr["name"~"\(escaped)",i](\(south),\(west),\(north),\(east));
+          nwr["name:ar"~"\(escaped)",i](\(south),\(west),\(north),\(east));
+        """
+        if !wordPattern.isEmpty {
+            body += """
+
+              nwr["name"~"\(wordPattern)",i](\(south),\(west),\(north),\(east));
+              nwr["name:ar"~"\(wordPattern)",i](\(south),\(west),\(north),\(east));
+            """
+        }
+        if !categoryLines.isEmpty {
+            body += "\n" + categoryLines.joined(separator: "\n")
+        }
+        body += """
+
+        );
+        out center 30;
+        """
+        return await runOverpassQuery(body)
+    }
+
+    private func overpassCategorySearch(
+        query: String,
+        center: CLLocationCoordinate2D,
+        radiusKm: Double
+    ) async -> [PlacesSearchResult] {
+        let delta = radiusKm / 111.0
+        let south = center.latitude - delta
+        let north = center.latitude + delta
+        let west = center.longitude - delta
+        let east = center.longitude + delta
+        let lines = overpassCategoryLines(
+            south: south, west: west, north: north, east: east, query: query
+        )
+        guard !lines.isEmpty else { return [] }
+
+        let body = """
+        [out:json][timeout:12];
+        (
+        \(lines.joined(separator: "\n"))
+        );
+        out center 40;
+        """
+        return await runOverpassQuery(body)
+    }
+
+    private func runOverpassQuery(_ overpass: String) async -> [PlacesSearchResult] {
+        let endpoints = [
+            "https://overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter"
+        ]
+
+        for endpoint in endpoints {
+            guard let url = URL(string: endpoint) else { continue }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.httpBody = formBody(name: "data", value: overpass)
+            request.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 12
+
+            do {
+                let (data, response) = try await session.data(for: request)
+                guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let elements = json["elements"] as? [[String: Any]] else {
+                    continue
+                }
+
+                return elements.compactMap { element in
+                    let tags = element["tags"] as? [String: Any] ?? [:]
+                    let lat = GooglePlacesService.doubleValue(element["lat"])
+                        ?? GooglePlacesService.doubleValue((element["center"] as? [String: Any])?["lat"])
+                    let lon = GooglePlacesService.doubleValue(element["lon"])
+                        ?? GooglePlacesService.doubleValue((element["center"] as? [String: Any])?["lon"])
+                    guard let lat, let lon else { return nil }
+                    return PlacesSearchResult(
+                        label: osmPlaceLabel(tags: tags),
+                        latitude: lat,
+                        longitude: lon
+                    )
+                }
+            } catch {
+                continue
+            }
+        }
+        return []
+    }
+
+    private func overpassWordPattern(_ query: String) -> String {
+        let words = query
+            .split { $0.isWhitespace || $0 == "," || $0 == "،" }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count >= 2 }
+            .map { $0.replacingOccurrences(of: "\"", with: "") }
+        guard !words.isEmpty else { return "" }
+        if words.count == 1 { return words[0] }
+        return words.joined(separator: "|")
+    }
+
+    private func overpassCategoryLines(
+        south: Double,
+        west: Double,
+        north: Double,
+        east: Double,
+        query: String
+    ) -> [String] {
+        let q = normalizeArabicQuery(query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        var lines: [String] = []
+        let bbox = "(\(south),\(west),\(north),\(east))"
+
+        func add(_ line: String) {
+            if !lines.contains(line) { lines.append("  \(line)") }
+        }
+
+        func matches(_ needles: [String]) -> Bool {
+            needles.contains { q.contains(normalizeArabicQuery($0)) }
+        }
+
+        if matches(["سوبر", "ماركت", "supermarket", "grocery", "بقال", "هايبر", "market"]) {
+            add("nwr[\"shop\"~\"supermarket|convenience|general|grocery|department_store|mall\"]\(bbox);")
+        }
+        if matches(["سيار", "معرض", "car", "dealer", "vehicle", "motors", "بيع"]) {
+            add("nwr[\"shop\"~\"car|car_repair|trade|tyres|motorcycle\"]\(bbox);")
+            add("nwr[\"amenity\"=\"car_dealer\"]\(bbox);")
+        }
+        if matches(["مطعم", "restaurant", "food", "كاف", "cafe", "وجبات"]) {
+            add("nwr[\"amenity\"~\"restaurant|cafe|fast_food|food_court\"]\(bbox);")
+        }
+        if matches(["صيدل", "pharmacy", "drug", "دواء"]) {
+            add("nwr[\"amenity\"=\"pharmacy\"]\(bbox);")
+            add("nwr[\"shop\"=\"chemist\"]\(bbox);")
+        }
+        if matches(["بنك", "bank", "atm", "صراف"]) {
+            add("nwr[\"amenity\"~\"bank|atm\"]\(bbox);")
+        }
+        if matches(["مدرس", "school", "روض"]) {
+            add("nwr[\"amenity\"~\"school|kindergarten\"]\(bbox);")
+        }
+        if matches(["جامع", "university", "college", "كلية"]) {
+            add("nwr[\"amenity\"~\"university|college\"]\(bbox);")
+        }
+        if matches(["محطة", "وقود", "fuel", "gas", "petrol", "بنزين"]) {
+            add("nwr[\"amenity\"=\"fuel\"]\(bbox);")
+        }
+        if matches(["مسجد", "mosque", "جامع"]) {
+            add("nwr[\"amenity\"=\"place_of_worship\"][\"religion\"=\"muslim\"]\(bbox);")
+        }
+        if matches(["مستشف", "hospital", "clinic", "عياد", "طب"]) {
+            add("nwr[\"amenity\"~\"hospital|clinic|doctors\"]\(bbox);")
+        }
+        if matches(["سوق", "shop", "store", "محل", "تجار"]) {
+            add("nwr[\"shop\"]\(bbox);")
+            add("nwr[\"amenity\"=\"marketplace\"]\(bbox);")
+        }
+
+        return lines
+    }
+
+    private func osmPlaceLabel(tags: [String: Any]) -> String {
+        if let nameAr = tags["name:ar"] as? String, !nameAr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return nameAr.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let name = tags["name"] as? String, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let shop = tags["shop"] as? String {
+            return osmTagLabelAr(shop)
+        }
+        if let amenity = tags["amenity"] as? String {
+            return osmTagLabelAr(amenity)
+        }
+        return "مكان"
+    }
+
+    private func osmTagLabelAr(_ tag: String) -> String {
+        let labels: [String: String] = [
+            "supermarket": "سوبرماركت",
+            "convenience": "بقالة",
+            "general": "محل",
+            "grocery": "بقالة",
+            "mall": "مجمع تجاري",
+            "department_store": "متجر",
+            "car": "معرض سيارات",
+            "car_repair": "ورشة سيارات",
+            "car_dealer": "معرض سيارات",
+            "trade": "معرض",
+            "restaurant": "مطعم",
+            "cafe": "مقهى",
+            "fast_food": "وجبات سريعة",
+            "pharmacy": "صيدلية",
+            "chemist": "صيدلية",
+            "bank": "بنك",
+            "atm": "صراف آلي",
+            "fuel": "محطة وقود",
+            "hospital": "مستشفى",
+            "clinic": "عيادة",
+            "school": "مدرسة",
+            "university": "جامعة",
+            "college": "كلية",
+            "place_of_worship": "مسجد",
+            "marketplace": "سوق"
+        ]
+        return labels[tag] ?? tag
+    }
+
+    // MARK: - Helpers
+
+    private func normalizeArabicQuery(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "أ", with: "ا")
+            .replacingOccurrences(of: "إ", with: "ا")
+            .replacingOccurrences(of: "آ", with: "ا")
+            .replacingOccurrences(of: "ى", with: "ي")
+            .replacingOccurrences(of: "ة", with: "ه")
+    }
+
     private func containsArabic(_ text: String) -> Bool {
         text.unicodeScalars.contains { scalar in
             (0x0600...0x06FF).contains(scalar.value)
         }
+    }
+
+    private func formBody(name: String, value: String) -> Data? {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._* ")
+        let encodedName = name.addingPercentEncoding(withAllowedCharacters: allowed) ?? name
+        let encodedValue = value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+        return "\(encodedName)=\(encodedValue)".data(using: .utf8)
     }
 }
 

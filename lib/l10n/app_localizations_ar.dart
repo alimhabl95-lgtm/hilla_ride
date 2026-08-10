@@ -116,7 +116,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noPlacesFound =>
-      'لم يتم العثور على أماكن. جرّب اسمًا أقصر أو استخدم تحديد على الخريطة.';
+      'لا توجد نتائج في المنطقة المحددة';
 
   @override
   String get searchAction => 'بحث';

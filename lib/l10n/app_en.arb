@@ -35,7 +35,7 @@
   "pickup": "Pickup",
   "destination": "Destination",
   "searchPlaces": "Search places in Hilla",
-  "noPlacesFound": "No places found. Try a shorter name or use Pin on map.",
+  "noPlacesFound": "No results in the selected area.",
   "searchAction": "Search",
   "searchPlacesHint": "Type in Arabic or English, then tap Search",
   "searchFieldHint": "Search or type English (hospital, market)",

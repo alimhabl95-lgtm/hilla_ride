@@ -116,7 +116,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noPlacesFound =>
-      'No places found. Try a shorter name or use Pin on map.';
+      'No results in the selected area.';
 
   @override
   String get searchAction => 'Search';

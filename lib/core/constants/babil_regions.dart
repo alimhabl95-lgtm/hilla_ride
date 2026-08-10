@@ -211,7 +211,28 @@ class BabilRegions {
   ) {
     final sub = subDistrictById(districtId, subDistrictId);
     final km = _distance.as(LengthUnit.Kilometer, sub.center, point);
-    return km <= sub.searchRadiusKm;
+    if (km > sub.searchRadiusKm) {
+      return false;
+    }
+    return _assignedSubDistrict(point)?.id == subDistrictId;
+  }
+
+  /// Nearest sub-district whose radius contains [point], if any.
+  static BabilSubDistrict? _assignedSubDistrict(LatLng point) {
+    BabilSubDistrict? nearest;
+    var nearestKm = double.infinity;
+
+    for (final district in districts) {
+      for (final candidate in district.subDistricts) {
+        final km = _distance.as(LengthUnit.Kilometer, candidate.center, point);
+        if (km <= candidate.searchRadiusKm && km < nearestKm) {
+          nearestKm = km;
+          nearest = candidate;
+        }
+      }
+    }
+
+    return nearest;
   }
 
   static bool isWithinDistrict(String districtId, LatLng point) {
