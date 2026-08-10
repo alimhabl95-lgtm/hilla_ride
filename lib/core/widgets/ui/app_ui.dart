@@ -82,6 +82,50 @@ class AppSecondaryButton extends StatelessWidget {
   }
 }
 
+class AppCircleIconButton extends StatelessWidget {
+  const AppCircleIconButton({
+    super.key,
+    required this.icon,
+    required this.onPressed,
+    this.tooltip,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.size = 42,
+  });
+
+  final IconData icon;
+  final VoidCallback onPressed;
+  final String? tooltip;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = Material(
+      color: backgroundColor ?? Colors.white,
+      shape: const CircleBorder(),
+      elevation: 2,
+      shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.12),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Icon(
+            icon,
+            size: size * 0.48,
+            color: foregroundColor ?? AppBrandAssets.brandTealDark,
+          ),
+        ),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip!, child: button);
+  }
+}
+
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -104,7 +148,9 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: AppBrandAssets.brandBorder),
+        border: Border.all(
+          color: AppBrandAssets.brandBorder.withValues(alpha: 0.7),
+        ),
         boxShadow: AppShadows.soft,
       ),
       child: child,

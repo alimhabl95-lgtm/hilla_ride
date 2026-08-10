@@ -333,21 +333,43 @@ struct ActiveRideMapView: View {
     @State private var driverTask: Task<Void, Never>?
     @State private var showChat = false
     @State private var lastRouteRefresh: Date?
+    @State private var recenterToken = 1
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 if MapsConfig.isConfigured {
                     GoogleMapView(
-                        cameraTarget: ride.pickupCoordinate,
+                        cameraTarget: driverCoordinate ?? ride.pickupCoordinate,
                         zoom: 14,
                         pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
                         destination: MapPlace(label: ride.destinationLabel, coordinate: ride.destinationCoordinate),
                         driverCoordinate: driverCoordinate,
                         driverHeading: driverHeading,
-                        routePath: routePath
+                        routePath: routePath,
+                        recenterToken: recenterToken
                     )
                     .ignoresSafeArea()
+                }
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            recenterToken += 1
+                        } label: {
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(BrandColors.tealDark)
+                                .frame(width: 48, height: 48)
+                                .background(.white, in: Circle())
+                                .shadow(color: BrandColors.navy.opacity(0.16), radius: 8, y: 3)
+                        }
+                        .accessibilityLabel(L10n.string(.myLocation, language: appState.language))
+                        .padding(.trailing, AppSpacing.lg)
+                        .padding(.bottom, 280)
+                    }
                 }
 
                 VStack(spacing: 0) {

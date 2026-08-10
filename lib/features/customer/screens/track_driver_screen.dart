@@ -11,7 +11,7 @@ import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/nearby_providers_service.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
-import 'package:hilla_ride/core/widgets/map_camera_helper.dart';
+import 'package:hilla_ride/core/widgets/map_camera_follow.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
 import 'package:hilla_ride/core/widgets/marker_animator.dart';
 import 'package:hilla_ride/features/customer/customer_ride_actions.dart';
@@ -42,8 +42,10 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
   static const _fareService = FareService();
   final _routeService = DrivingDistanceService();
   final _markerAnimator = MarkerAnimator();
+  final _cameraFollow = MapCameraFollowController();
   var _markersReady = false;
-  String? _lastCameraKey;
+  var _didInitialCameraFit = false;
+  List<LatLng> _lastCameraPoints = const [];
   BitmapDescriptor? _pickupMarkerIcon;
   BitmapDescriptor? _destinationMarkerIcon;
   String? _loadedMarkerKey;
@@ -99,18 +101,13 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
     });
   }
 
-  void _updateCamera(Iterable<LatLng> points) {
+  Future<void> _recenterCamera(Iterable<LatLng> points) async {
     final controller = _mapController;
     if (controller == null) return;
-
-    final key = points
-        .map((point) =>
-            '${point.latitude.toStringAsFixed(4)},${point.longitude.toStringAsFixed(4)}')
-        .join('|');
-    if (key == _lastCameraKey) return;
-    _lastCameraKey = key;
-
-    unawaited(MapCameraHelper.fitPoints(controller, points));
+    final list = points.toList();
+    if (list.isEmpty) return;
+    _lastCameraPoints = list;
+    await _cameraFollow.fitPoints(controller, list);
   }
 
   Future<void> _refreshRoute({
@@ -292,7 +289,7 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
                   _markerAnimator.markers['driver']?.position ?? driverPos;
               final cameraPoints = <LatLng>[pickup, destination];
               if (animatedPos != null) cameraPoints.add(animatedPos);
-              _updateCamera(cameraPoints);
+              _lastCameraPoints = cameraPoints;
 
               final markers = _buildMarkers(
                 pickup: pickup,
@@ -319,11 +316,38 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
                           zoom: 14,
                           markers: markers,
                           polylines: polylines,
+                          onCameraMove: (_) =>
+                              _cameraFollow.onUserCameraInteraction(),
                           onMapCreated: (c) {
                             _mapController = c;
-                            _lastCameraKey = null;
-                            _updateCamera(cameraPoints);
+                            if (!_didInitialCameraFit) {
+                              _didInitialCameraFit = true;
+                              unawaited(_recenterCamera(cameraPoints));
+                            }
                           },
+                        ),
+                        Positioned(
+                          right: AppSpacing.lg,
+                          bottom: AppSpacing.lg,
+                          child: Material(
+                            color: Colors.white,
+                            elevation: 4,
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: () => unawaited(
+                                _recenterCamera(_lastCameraPoints),
+                              ),
+                              child: const SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: Icon(
+                                  Icons.my_location,
+                                  color: AppBrandAssets.brandTealDark,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                         if (driverPos == null)
                           Positioned(

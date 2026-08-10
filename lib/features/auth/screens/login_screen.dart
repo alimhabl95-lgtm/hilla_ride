@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/features/auth/screens/forgot_password_screen.dart';
@@ -59,18 +60,22 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: AppBrandAssets.brandSurface,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 32),
               Text(
                 l10n.loginTitle,
-                style: Theme.of(context).textTheme.headlineMedium,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppBrandAssets.brandNavy,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
@@ -79,48 +84,70 @@ class _LoginScreenState extends State<LoginScreen> {
                     ? l10n.roleDriver
                     : l10n.roleCustomer,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: AppBrandAssets.brandMuted,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 36),
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
                   labelText: l10n.phoneHint,
-                  prefixIcon: const Icon(Icons.phone),
+                  prefixIcon: const Icon(
+                    Icons.phone_outlined,
+                    color: AppBrandAssets.brandTealDark,
+                  ),
                   hintText: '7701234567',
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               PasswordTextField(
                 controller: _passwordController,
                 label: l10n.passwordLabel,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _login(),
               ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Checkbox(
                     value: _rememberMe,
+                    activeColor: AppBrandAssets.brandTeal,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                     onChanged: (v) => setState(() => _rememberMe = v ?? true),
                   ),
-                  Expanded(child: Text(l10n.rememberMe)),
+                  Expanded(
+                    child: Text(
+                      l10n.rememberMe,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppBrandAssets.brandNavy,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ForgotPasswordScreen(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      l10n.forgotPassword,
+                      style: const TextStyle(
+                        color: AppBrandAssets.brandTealDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ForgotPasswordScreen(),
-                      ),
-                    );
-                  },
-                  child: Text(l10n.forgotPassword),
-                ),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               AppPrimaryButton(
                 label: l10n.loginButton,
                 onPressed: _login,
@@ -132,7 +159,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => SignupScreen(selectedMode: widget.selectedMode),
+                      builder: (_) =>
+                          SignupScreen(selectedMode: widget.selectedMode),
                     ),
                   );
                 },

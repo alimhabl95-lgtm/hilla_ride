@@ -22,6 +22,11 @@ struct CustomerHomeMapView: View {
     @State private var nearbyDrivers: [MapDriverMarker] = []
     @State private var nearbyTask: Task<Void, Never>?
     @State private var cameraCenter: CLLocationCoordinate2D?
+    /// Bump only for intentional camera moves (Recenter / booking place changes).
+    /// Starts at 1 so the first updateUIView performs an initial framing.
+    @State private var recenterToken = 1
+    @State private var cameraTargetOverride: CLLocationCoordinate2D?
+    @State private var preferTargetOnly = false
 
     private var hasSubDistrict: Bool {
         !selectedSubDistrictId.isEmpty
@@ -42,12 +47,19 @@ struct CustomerHomeMapView: View {
         return false
     }
 
+    private var mapCameraTarget: CLLocationCoordinate2D {
+        cameraTargetOverride
+            ?? pickup?.coordinate
+            ?? locationService.currentCoordinate
+            ?? subDistrict.center
+    }
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 if MapsConfig.isConfigured {
                     GoogleMapView(
-                        cameraTarget: pickup?.coordinate ?? subDistrict.center,
+                        cameraTarget: mapCameraTarget,
                         zoom: 14,
                         pickup: pickup,
                         destination: destination,
@@ -60,11 +72,31 @@ struct CustomerHomeMapView: View {
                             if pickup == nil {
                                 startNearbyWatch()
                             }
-                        }
+                        },
+                        recenterToken: recenterToken,
+                        preferTargetOnly: preferTargetOnly
                     )
                     .ignoresSafeArea(edges: .top)
                 } else {
                     mapsUnavailableView
+                }
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: recenterToMyLocation) {
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(BrandColors.tealDark)
+                                .frame(width: 48, height: 48)
+                                .background(.white, in: Circle())
+                                .shadow(color: BrandColors.navy.opacity(0.16), radius: 8, y: 3)
+                        }
+                        .accessibilityLabel(L10n.string(.myLocation, language: appState.language))
+                        .padding(.trailing, AppSpacing.lg)
+                        .padding(.bottom, 340)
+                    }
                 }
 
                 rideSearchPanel
@@ -124,7 +156,7 @@ struct CustomerHomeMapView: View {
                     subDistrictId: selectedSubDistrictId,
                     regionLabel: regionLabel,
                     onSelect: { place in
-                        pickup = place
+                        setPickup(place, recenter: true)
                     }
                 )
             }
@@ -136,7 +168,7 @@ struct CustomerHomeMapView: View {
                     subDistrictId: selectedSubDistrictId,
                     regionLabel: regionLabel,
                     onSelect: { place in
-                        destination = place
+                        setDestinationPlace(place, recenter: true)
                     }
                 )
             }
@@ -145,7 +177,7 @@ struct CustomerHomeMapView: View {
                     title: L10n.string(.pickupLabel, language: appState.language),
                     initialCenter: pickup?.coordinate ?? subDistrict.center
                 ) { place in
-                    pickup = place
+                    setPickup(place, recenter: true)
                 }
             }
             .navigationDestination(isPresented: $showDestinationPinPicker) {
@@ -153,7 +185,7 @@ struct CustomerHomeMapView: View {
                     title: L10n.string(.destinationLabel, language: appState.language),
                     initialCenter: destination?.coordinate ?? pickup?.coordinate ?? subDistrict.center
                 ) { place in
-                    destination = place
+                    setDestinationPlace(place, recenter: true)
                 }
             }
             .task {
@@ -161,7 +193,11 @@ struct CustomerHomeMapView: View {
                 startNearbyWatch()
             }
             .onChange(of: pickup) { _ in startNearbyWatch() }
-            .onChange(of: selectedSubDistrictId) { _ in startNearbyWatch() }
+            .onChange(of: selectedSubDistrictId) { _ in
+                startNearbyWatch()
+                // Region change is intentional booking context — one camera move.
+                requestRecenter(to: subDistrict.center, targetOnly: true)
+            }
             .onDisappear {
                 nearbyTask?.cancel()
                 nearbyTask = nil
@@ -237,7 +273,9 @@ struct CustomerHomeMapView: View {
                 }
 
                 SavedPlacesBar { place in
-                    if requireSubDistrict() { destination = place }
+                    if requireSubDistrict() {
+                        setDestinationPlace(place, recenter: true)
+                    }
                 }
 
                 VStack(spacing: AppSpacing.sm) {
@@ -309,10 +347,13 @@ struct CustomerHomeMapView: View {
     private func mapToolbarButton(systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(BrandColors.tealDark)
-                .frame(width: 44, height: 44)
+                .frame(width: 40, height: 40)
+                .background(.white, in: Circle())
+                .shadow(color: BrandColors.navy.opacity(0.12), radius: 4, y: 2)
         }
+        .buttonStyle(.plain)
     }
 
     private func locationCard(
@@ -368,21 +409,50 @@ struct CustomerHomeMapView: View {
         }
     }
 
+    private func requestRecenter(to coordinate: CLLocationCoordinate2D, targetOnly: Bool) {
+        cameraTargetOverride = coordinate
+        preferTargetOnly = targetOnly
+        recenterToken += 1
+    }
+
+    /// Recenter camera to GPS only — does not change pickup/destination.
+    private func recenterToMyLocation() {
+        locationService.requestAuthorizationIfNeeded()
+        locationService.refreshCurrentLocation()
+        if let coordinate = locationService.currentCoordinate {
+            requestRecenter(to: coordinate, targetOnly: true)
+        } else if let pickup {
+            requestRecenter(to: pickup.coordinate, targetOnly: true)
+        } else {
+            errorMessage = L10n.string(.locationUnavailable, language: appState.language)
+        }
+    }
+
+    private func setPickup(_ place: MapPlace, recenter: Bool) {
+        pickup = place
+        if recenter {
+            requestRecenter(to: place.coordinate, targetOnly: false)
+        }
+    }
+
+    private func setDestinationPlace(_ place: MapPlace, recenter: Bool) {
+        destination = place
+        if recenter {
+            requestRecenter(to: place.coordinate, targetOnly: false)
+        }
+    }
+
     private func useMyLocation() {
         guard requireSubDistrict() else { return }
         errorMessage = nil
-        if let coordinate = locationService.currentCoordinate {
-            pickup = MapPlace(
-                label: L10n.string(.myLocation, language: appState.language),
-                coordinate: coordinate
-            )
-            return
-        }
         locationService.refreshCurrentLocation()
         if let coordinate = locationService.currentCoordinate {
-            pickup = MapPlace(
-                label: L10n.string(.myLocation, language: appState.language),
-                coordinate: coordinate
+            setPickup(
+                MapPlace(
+                    label: L10n.string(.myLocation, language: appState.language),
+                    coordinate: coordinate
+                ),
+                recenter: true
             )
         } else {
             errorMessage = L10n.string(.locationUnavailable, language: appState.language)
@@ -392,9 +462,12 @@ struct CustomerHomeMapView: View {
     private func setDestination(at coordinate: CLLocationCoordinate2D) {
         guard requireSubDistrict() else { return }
         errorMessage = nil
-        destination = MapPlace(
-            label: L10n.string(.mapPinDestination, language: appState.language),
-            coordinate: coordinate
+        setDestinationPlace(
+            MapPlace(
+                label: L10n.string(.mapPinDestination, language: appState.language),
+                coordinate: coordinate
+            ),
+            recenter: true
         )
     }
 

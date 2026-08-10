@@ -27,10 +27,20 @@ struct GoogleMapView: UIViewRepresentable {
     var routePath: [CLLocationCoordinate2D] = []
     var onLongPress: ((CLLocationCoordinate2D) -> Void)?
     var onCameraIdle: ((CLLocationCoordinate2D) -> Void)?
+    /// Called when the user pans/zooms the map (gesture), so parents can stop follow mode.
+    var onUserCameraMove: (() -> Void)?
     var pinPickerMode = false
+    /// Bump this to request a one-shot camera move (Recenter / booking flow).
+    var recenterToken: Int = 0
+    /// When true, recenter animates to [cameraTarget] even if pickup+destination exist.
+    var preferTargetOnly: Bool = false
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onLongPress: onLongPress, onCameraIdle: onCameraIdle)
+        Coordinator(
+            onLongPress: onLongPress,
+            onCameraIdle: onCameraIdle,
+            onUserCameraMove: onUserCameraMove
+        )
     }
 
     func makeUIView(context: Context) -> GMSMapView {
@@ -49,23 +59,27 @@ struct GoogleMapView: UIViewRepresentable {
         )
         mapView.addGestureRecognizer(longPress)
         context.coordinator.startAnimating()
+        // Keep lastRecenterToken at -1 so the first intentional token (0+) can fit once.
         return mapView
     }
 
     func updateUIView(_ mapView: GMSMapView, context: Context) {
         context.coordinator.onLongPress = onLongPress
         context.coordinator.onCameraIdle = onCameraIdle
+        context.coordinator.onUserCameraMove = onUserCameraMove
         context.coordinator.mapView = mapView
 
         if pinPickerMode {
-            if abs(mapView.camera.target.latitude - cameraTarget.latitude) > 0.00001 ||
-                abs(mapView.camera.target.longitude - cameraTarget.longitude) > 0.00001 {
-                mapView.camera = GMSCameraPosition.camera(withTarget: cameraTarget, zoom: zoom)
+            // Pin picker: only jump when parent bumps recenterToken (or first bind).
+            if context.coordinator.lastRecenterToken != recenterToken {
+                context.coordinator.lastRecenterToken = recenterToken
+                context.coordinator.beginProgrammaticMove()
+                mapView.animate(to: GMSCameraPosition.camera(withTarget: cameraTarget, zoom: zoom))
             }
             return
         }
 
-        // Static pins (pickup / destination) redraw when needed.
+        // Markers / routes always update — never tied to camera.
         context.coordinator.syncStaticMarkers(
             pickup: pickup,
             destination: destination,
@@ -85,25 +99,32 @@ struct GoogleMapView: UIViewRepresentable {
         context.coordinator.syncDrivers(drivers, on: mapView)
         context.coordinator.syncRoute(routePath, on: mapView)
 
-        if pickup != nil && destination != nil {
-            var bounds = GMSCoordinateBounds()
-            if let pickup { bounds = bounds.includingCoordinate(pickup.coordinate) }
-            if let destination { bounds = bounds.includingCoordinate(destination.coordinate) }
+        // Camera moves ONLY on explicit recenterToken bump.
+        guard context.coordinator.lastRecenterToken != recenterToken else { return }
+        context.coordinator.lastRecenterToken = recenterToken
+        context.coordinator.beginProgrammaticMove()
+
+        if !preferTargetOnly, let pickup, let destination {
+            var bounds = GMSCoordinateBounds(
+                coordinate: pickup.coordinate,
+                coordinate: destination.coordinate
+            )
             if let driverCoordinate {
                 bounds = bounds.includingCoordinate(driverCoordinate)
             }
-            let update = GMSCameraUpdate.fit(bounds, withPadding: 80)
-            mapView.animate(with: update)
-        } else if mapView.camera.target.latitude != cameraTarget.latitude ||
-                    mapView.camera.target.longitude != cameraTarget.longitude {
-            mapView.animate(toLocation: cameraTarget)
+            mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 80))
+        } else {
+            mapView.animate(to: GMSCameraPosition.camera(withTarget: cameraTarget, zoom: zoom))
         }
     }
 
     final class Coordinator: NSObject, GMSMapViewDelegate {
         var onLongPress: ((CLLocationCoordinate2D) -> Void)?
         var onCameraIdle: ((CLLocationCoordinate2D) -> Void)?
+        var onUserCameraMove: (() -> Void)?
         weak var mapView: GMSMapView?
+        var lastRecenterToken: Int = -1
+        private var programmaticMoveDepth = 0
         private var pickupMarker: GMSMarker?
         private var destinationMarker: GMSMarker?
         private var driverMarkers: [String: GMSMarker] = [:]
@@ -114,10 +135,20 @@ struct GoogleMapView: UIViewRepresentable {
 
         init(
             onLongPress: ((CLLocationCoordinate2D) -> Void)?,
-            onCameraIdle: ((CLLocationCoordinate2D) -> Void)?
+            onCameraIdle: ((CLLocationCoordinate2D) -> Void)?,
+            onUserCameraMove: (() -> Void)?
         ) {
             self.onLongPress = onLongPress
             self.onCameraIdle = onCameraIdle
+            self.onUserCameraMove = onUserCameraMove
+        }
+
+        func beginProgrammaticMove() {
+            programmaticMoveDepth += 1
+        }
+
+        private func endProgrammaticMove() {
+            programmaticMoveDepth = max(0, programmaticMoveDepth - 1)
         }
 
         func startAnimating() {
@@ -199,10 +230,7 @@ struct GoogleMapView: UIViewRepresentable {
             }
             for driver in drivers {
                 targets[driver.id] = driver
-                if let existing = driverMarkers[driver.id] {
-                    // Animation loop moves toward target.
-                    _ = existing
-                } else {
+                if driverMarkers[driver.id] == nil {
                     let marker = GMSMarker(position: driver.coordinate)
                     marker.icon = TukTukMapMarker.image
                     marker.groundAnchor = CGPoint(x: 0.5, y: 0.55)
@@ -241,7 +269,16 @@ struct GoogleMapView: UIViewRepresentable {
             onLongPress?(coordinate)
         }
 
+        func mapView(_ mapView: GMSMapView, willMove gesture: Bool) {
+            if gesture {
+                onUserCameraMove?()
+            }
+        }
+
         func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
+            if programmaticMoveDepth > 0 {
+                endProgrammaticMove()
+            }
             onCameraIdle?(position.target)
         }
     }

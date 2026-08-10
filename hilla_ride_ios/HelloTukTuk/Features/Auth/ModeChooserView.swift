@@ -87,6 +87,7 @@ struct ModeChooserView: View {
 
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.forward")
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(color)
             }
             .frame(minHeight: 48)

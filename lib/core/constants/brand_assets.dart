@@ -6,13 +6,13 @@ class AppBrandAssets {
   static const logo = 'assets/images/app_logo.png';
 
   // Mockup-aligned Hello Tuk-Tuk palette
-  static const brandTeal = Color(0xFF00B3A6);
+  static const brandTeal = Color(0xFF12B2A2);
   static const brandTealDark = Color(0xFF0E948C);
   static const brandGold = Color(0xFFF8B728);
   static const brandGoldDark = Color(0xFFE6A800);
   static const brandNavy = Color(0xFF111827);
   static const brandBlack = Color(0xFF111111);
-  static const brandSurface = Color(0xFFF3F4F6);
+  static const brandSurface = Color(0xFFF5F8FA);
   static const brandMuted = Color(0xFF6B7280);
   static const brandSuccess = Color(0xFF16A34A);
   static const brandWarning = Color(0xFFF59E0B);
@@ -40,6 +40,8 @@ class AppRadii {
   static const double md = 14;
   static const double lg = 18;
   static const double xl = 24;
+  /// Auth fields / primary CTAs — soft pill look from mockups.
+  static const double field = 28;
   static const double pill = 999;
 }
 

@@ -74,9 +74,11 @@ class _RootScaffold extends StatelessWidget {
             !variant.isWebPortal && !isLoggedIn && selectedMode == null;
         final showBackToChooser =
             !variant.isWebPortal && !isLoggedIn && selectedMode != null;
+        // Logged-in customer/driver use their own immersive chrome (map/dashboard).
+        final hideRootAppBar = !variant.isWebPortal && isLoggedIn;
 
         return Scaffold(
-          appBar: onChooser
+          appBar: (onChooser || hideRootAppBar)
               ? null
               : AppBar(
                   title: Text(title),

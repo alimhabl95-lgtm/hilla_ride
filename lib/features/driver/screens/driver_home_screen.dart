@@ -5,6 +5,7 @@ import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/promo_models.dart';
 import 'package:hilla_ride/core/models/wallet_models.dart';
+import 'package:hilla_ride/core/providers/app_mode_provider.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
@@ -161,30 +162,86 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     return Scaffold(
       backgroundColor: AppBrandAssets.brandSurface,
-      appBar: AppBar(
-        title: Text(l10n.roleDriver),
-        actions: [
-          IconButton(
-            tooltip: isAr ? 'المكافآت' : 'Rewards',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => DriverRewardsScreen(driver: widget.driver),
-                ),
-              );
-            },
-            icon: const Icon(Icons.emoji_events_outlined),
-          ),
-          IconButton(
-            tooltip: isAr ? 'المحفظة' : 'Wallet',
-            onPressed: () => _openWallet(widget.driver),
-            icon: const Icon(Icons.account_balance_wallet_outlined),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-        ],
-      ),
       body: Column(
         children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  Material(
+                    color: AppBrandAssets.brandTeal.withValues(alpha: 0.15),
+                    shape: const CircleBorder(),
+                    child: PopupMenuButton<String>(
+                      tooltip: isAr ? 'القائمة' : 'Menu',
+                      offset: const Offset(0, 48),
+                      icon: const Icon(
+                        Icons.menu,
+                        color: AppBrandAssets.brandTealDark,
+                      ),
+                      onSelected: (value) async {
+                        switch (value) {
+                          case 'wallet':
+                            _openWallet(widget.driver);
+                          case 'rewards':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => DriverRewardsScreen(
+                                  driver: widget.driver,
+                                ),
+                              ),
+                            );
+                          case 'logout':
+                            await context.read<AppState>().authService.signOut();
+                            if (context.mounted) {
+                              context.read<AppModeProvider>().clearMode();
+                            }
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'wallet',
+                          child: Text(isAr ? 'المحفظة' : 'Wallet'),
+                        ),
+                        PopupMenuItem(
+                          value: 'rewards',
+                          child: Text(isAr ? 'المكافآت' : 'Rewards'),
+                        ),
+                        PopupMenuItem(
+                          value: 'logout',
+                          child: Text(l10n.logout),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      isAr ? 'لوحة السائق' : 'Driver dashboard',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppBrandAssets.brandNavy,
+                          ),
+                    ),
+                  ),
+                  AppCircleIconButton(
+                    tooltip: isAr ? 'المحفظة' : 'Wallet',
+                    icon: Icons.account_balance_wallet_outlined,
+                    backgroundColor:
+                        AppBrandAssets.brandTeal.withValues(alpha: 0.15),
+                    foregroundColor: AppBrandAssets.brandTealDark,
+                    onPressed: () => _openWallet(widget.driver),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const AnnouncementBanner(audience: 'drivers'),
           Expanded(
             child: StreamBuilder<DriverProfile?>(
@@ -321,6 +378,24 @@ class _IdleDriverPanel extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
+        Center(
+          child: ProfileAvatarCircle.driver(
+            driverId: driver.uid,
+            name: driver.name,
+            profilePhotoUrl: driver.profilePhotoUrl,
+            radius: 44,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          isAr ? 'حساب السائق' : 'Driver account',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: AppBrandAssets.brandNavy,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
         AppWalletCard(
           title: isAr ? 'رصيد المحفظة' : 'Wallet balance',
           balanceLabel: fareService.formatIqd(
@@ -342,7 +417,7 @@ class _IdleDriverPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isAr ? 'التوفر' : 'Availability',
+                      isAr ? 'الحالة' : 'Status',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: AppBrandAssets.brandNavy,
@@ -350,7 +425,9 @@ class _IdleDriverPanel extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      driver.isOnline ? l10n.goOnline : l10n.goOffline,
+                      driver.isOnline
+                          ? (isAr ? 'متصل' : 'Online')
+                          : (isAr ? 'غير متصل' : 'Offline'),
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: driver.isOnline
@@ -407,10 +484,10 @@ class _IdleDriverPanel extends StatelessWidget {
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: AppStatCard(
-                label: l10n.monthlyRidesCount,
-                value: '${driver.monthlyRideCount}',
-                icon: Icons.calendar_month_outlined,
-                accent: AppBrandAssets.brandGoldDark,
+                label: l10n.cancelledRidesCount,
+                value: '${driver.cancelledRidesCount}',
+                icon: Icons.cancel_outlined,
+                accent: AppBrandAssets.brandDanger,
               ),
             ),
           ],

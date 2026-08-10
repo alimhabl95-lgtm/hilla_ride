@@ -2,10 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/config/app_variant.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_mode_provider.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
+import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/admin/screens/admin_dashboard_screen.dart';
 import 'package:hilla_ride/features/auth/screens/missing_profile_recovery_screen.dart';
 import 'package:hilla_ride/features/auth/screens/mode_chooser_screen.dart';
@@ -593,6 +595,179 @@ class LogoutButton extends StatelessWidget {
         }
       },
       icon: const Icon(Icons.logout),
+    );
+  }
+}
+
+/// Floating circular action strip for immersive customer/driver map chrome.
+class MobileFloatingChrome extends StatelessWidget {
+  const MobileFloatingChrome({
+    super.key,
+    required this.role,
+  });
+
+  final UserRole role;
+
+  Widget _circleWrap(Widget child) {
+    return Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      elevation: 2,
+      shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.12),
+      child: SizedBox(width: 42, height: 42, child: Center(child: child)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final uid = context.read<AppState>().authService.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    Future<void> logout() async {
+      await context.read<AppState>().authService.signOut();
+      if (context.mounted) {
+        context.read<AppModeProvider>().clearMode();
+      }
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          iconTheme: const IconThemeData(
+            color: AppBrandAssets.brandTealDark,
+            size: 22,
+          ),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppCircleIconButton(
+                tooltip: l10n.myProfileTitle,
+                icon: Icons.person_outline,
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => UserProfileScreen(role: role),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              AppCircleIconButton(
+                tooltip: l10n.supportTitle,
+                icon: Icons.headset_mic_outlined,
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const HelpSupportScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              if (role == UserRole.customer)
+                AppCircleIconButton(
+                  tooltip: l10n.myTripsTitle,
+                  icon: Icons.receipt_long_outlined,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => RideHistoryScreen(
+                          customerId: uid,
+                          title: l10n.myTripsTitle,
+                        ),
+                      ),
+                    );
+                  },
+                )
+              else ...[
+                AppCircleIconButton(
+                  tooltip: l10n.completedRidesCount,
+                  icon: Icons.check_circle_outline,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => RideHistoryScreen(
+                          driverId: uid,
+                          statusFilter: RideStatus.completed,
+                          title: l10n.completedRidesCount,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                AppCircleIconButton(
+                  tooltip: l10n.cancelledRidesCount,
+                  icon: Icons.cancel_outlined,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => RideHistoryScreen(
+                          driverId: uid,
+                          statusFilter: RideStatus.cancelled,
+                          title: l10n.cancelledRidesCount,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+              const SizedBox(width: 8),
+              _circleWrap(
+                IconTheme(
+                  data: const IconThemeData(
+                    color: AppBrandAssets.brandTealDark,
+                    size: 22,
+                  ),
+                  child: const LegalDocumentsButton(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _circleWrap(AnnouncementIconButton(role: role)),
+              const SizedBox(width: 8),
+              _circleWrap(CurrentRideIconButton(role: role)),
+              const SizedBox(width: 8),
+              Material(
+                color: Colors.white,
+                shape: const CircleBorder(),
+                elevation: 2,
+                shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.12),
+                child: PopupMenuButton<Locale>(
+                  tooltip: 'Language',
+                  offset: const Offset(0, 48),
+                  icon: const Icon(
+                    Icons.language,
+                    color: AppBrandAssets.brandTealDark,
+                  ),
+                  onSelected: context.read<LocaleProvider>().setLocale,
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: const Locale('en'),
+                      child: Text(l10n.english),
+                    ),
+                    PopupMenuItem(
+                      value: const Locale('ar'),
+                      child: Text(l10n.arabic),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              AppCircleIconButton(
+                tooltip: l10n.logout,
+                icon: Icons.logout,
+                foregroundColor: AppBrandAssets.brandDanger,
+                onPressed: logout,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

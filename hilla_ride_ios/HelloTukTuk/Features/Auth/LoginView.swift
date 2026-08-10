@@ -30,6 +30,7 @@ struct LoginView: View {
     @State private var rememberMe = true
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var showPassword = false
 
     private var selectedMode: UserRole {
         appState.selectedMode ?? .customer
@@ -41,30 +42,68 @@ struct LoginView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(L10n.string(.loginTitle, language: appState.language))
                         .font(.largeTitle.bold())
+                        .foregroundStyle(BrandColors.navy)
                         .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 12)
 
                     Text(selectedMode == .driver
                          ? L10n.string(.roleDriver, language: appState.language)
                          : L10n.string(.roleCustomer, language: appState.language))
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(BrandColors.muted)
                         .frame(maxWidth: .infinity, alignment: .center)
 
-                    TextField(L10n.string(.phoneHint, language: appState.language), text: $phone)
+                    labeledField(systemImage: "phone") {
+                        TextField(
+                            L10n.string(.phoneHint, language: appState.language),
+                            text: $phone
+                        )
                         .keyboardType(.phonePad)
-                        .textFieldStyle(AppTextFieldStyle())
+                        .textInputAutocapitalization(.never)
+                    }
 
-                    SecureField(L10n.string(.passwordLabel, language: appState.language), text: $password)
-                        .textFieldStyle(AppTextFieldStyle())
+                    labeledField(systemImage: "lock") {
+                        HStack(spacing: 8) {
+                            Group {
+                                if showPassword {
+                                    TextField(
+                                        L10n.string(.passwordLabel, language: appState.language),
+                                        text: $password
+                                    )
+                                } else {
+                                    SecureField(
+                                        L10n.string(.passwordLabel, language: appState.language),
+                                        text: $password
+                                    )
+                                }
+                            }
+                            .textInputAutocapitalization(.never)
+
+                            Button {
+                                showPassword.toggle()
+                            } label: {
+                                Image(systemName: showPassword ? "eye" : "eye.slash")
+                                    .foregroundStyle(BrandColors.muted)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
 
                     HStack {
-                        Toggle(L10n.string(.rememberMe, language: appState.language), isOn: $rememberMe)
-                            .tint(BrandColors.teal)
+                        Toggle(isOn: $rememberMe) {
+                            Text(L10n.string(.rememberMe, language: appState.language))
+                                .font(.subheadline)
+                        }
+                        .toggleStyle(CheckboxToggleStyle())
+                        .tint(BrandColors.teal)
+
                         Spacer()
+
                         Button(L10n.string(.forgotPassword, language: appState.language)) {
                             showForgotPassword = true
                         }
-                        .font(.footnote)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(BrandColors.tealDark)
                     }
 
                     if let errorMessage {
@@ -78,6 +117,7 @@ struct LoginView: View {
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(isLoading)
+                    .padding(.top, 4)
 
                     Button(L10n.string(.createAccountButton, language: appState.language)) {
                         showSignup = true
@@ -90,11 +130,37 @@ struct LoginView: View {
 
             LoadingOverlay(isLoading: isLoading)
         }
+        .navigationTitle(L10n.string(.appTitle, language: appState.language))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(BrandColors.teal, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 LanguageToggle()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func labeledField<Content: View>(
+        systemImage: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .foregroundStyle(BrandColors.tealDark)
+                .frame(width: 22)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadii.field, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadii.field, style: .continuous)
+                .stroke(BrandColors.border, lineWidth: 1)
         }
     }
 
@@ -115,5 +181,23 @@ struct LoginView: View {
         } catch {
             errorMessage = AuthErrorMessages.message(for: error)
         }
+    }
+}
+
+/// Simple checkbox-style toggle for Remember me row.
+private struct CheckboxToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(configuration.isOn ? BrandColors.teal : BrandColors.muted)
+                    .font(.title3)
+                configuration.label
+                    .foregroundStyle(BrandColors.navy)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }

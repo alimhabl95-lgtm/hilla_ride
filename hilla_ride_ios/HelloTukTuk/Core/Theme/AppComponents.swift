@@ -7,7 +7,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity, minHeight: 54)
             .background(BrandColors.teal.opacity(configuration.isPressed ? 0.85 : 1))
             .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadii.field, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
@@ -23,7 +23,7 @@ struct SecondaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity, minHeight: 54)
             .foregroundStyle(color)
             .overlay {
-                RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadii.field, style: .continuous)
                     .stroke(color, lineWidth: 1.5)
             }
             .opacity(configuration.isPressed ? 0.85 : 1)
@@ -35,11 +35,12 @@ struct SecondaryButtonStyle: ButtonStyle {
 struct AppTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
-            .padding(14)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
             .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadii.field, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadii.field, style: .continuous)
                     .stroke(BrandColors.border, lineWidth: 1)
             }
     }

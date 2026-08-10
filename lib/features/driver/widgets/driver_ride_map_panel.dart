@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/services/driving_distance_service.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
+import 'package:hilla_ride/core/widgets/map_camera_follow.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:latlong2/latlong.dart' as latlng;
@@ -25,8 +27,10 @@ class DriverRideMapPanel extends StatefulWidget {
 
 class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
   final _routeService = DrivingDistanceService();
+  final _cameraFollow = MapCameraFollowController();
   gmaps.GoogleMapController? _mapController;
   var _markersReady = false;
+  var _didInitialCameraFit = false;
   gmaps.BitmapDescriptor? _pickupMarkerIcon;
   gmaps.BitmapDescriptor? _destinationMarkerIcon;
   String? _loadedMarkerKey;
@@ -145,7 +149,11 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
     } finally {
       if (mounted) {
         setState(() => _loadingRoutes = false);
-        _fitCamera();
+        // Routes/markers update freely — camera only on initial fit / Recenter.
+        if (!_didInitialCameraFit && _mapController != null) {
+          _didInitialCameraFit = true;
+          unawaited(_fitCamera(force: true));
+        }
       }
     }
   }
@@ -156,9 +164,10 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
         .toList();
   }
 
-  void _fitCamera() {
+  Future<void> _fitCamera({bool force = false}) async {
     final controller = _mapController;
     if (controller == null) return;
+    if (!force && !_cameraFollow.followEnabled) return;
 
     final points = <gmaps.LatLng>[
       gmaps.LatLng(widget.ride.pickupLat, widget.ride.pickupLng),
@@ -172,39 +181,8 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
       points.add(gmaps.LatLng(driverPos.latitude, driverPos.longitude));
     }
 
-    if (points.length < 2) return;
-
-    var minLat = points.first.latitude;
-    var maxLat = points.first.latitude;
-    var minLng = points.first.longitude;
-    var maxLng = points.first.longitude;
-
-    for (final point in points) {
-      minLat = minLat < point.latitude ? minLat : point.latitude;
-      maxLat = maxLat > point.latitude ? maxLat : point.latitude;
-      minLng = minLng < point.longitude ? minLng : point.longitude;
-      maxLng = maxLng > point.longitude ? maxLng : point.longitude;
-    }
-
-    const minSpan = 0.01;
-    if ((maxLat - minLat).abs() < minSpan) {
-      minLat -= minSpan / 2;
-      maxLat += minSpan / 2;
-    }
-    if ((maxLng - minLng).abs() < minSpan) {
-      minLng -= minSpan / 2;
-      maxLng += minSpan / 2;
-    }
-
-    controller.animateCamera(
-      gmaps.CameraUpdate.newLatLngBounds(
-        gmaps.LatLngBounds(
-          southwest: gmaps.LatLng(minLat, minLng),
-          northeast: gmaps.LatLng(maxLat, maxLng),
-        ),
-        56,
-      ),
-    );
+    if (points.isEmpty) return;
+    await _cameraFollow.fitPoints(controller, points);
   }
 
   Set<gmaps.Marker> _buildMarkers(AppLocalizations l10n) {
@@ -298,12 +276,36 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
             markers: _buildMarkers(l10n),
             polylines: _buildPolylines(),
             zoom: 14,
+            onCameraMove: (_) => _cameraFollow.onUserCameraInteraction(),
             onMapCreated: (controller) {
               _mapController = controller;
               Future<void>.delayed(const Duration(milliseconds: 350), () {
-                if (mounted) _fitCamera();
+                if (!mounted || _didInitialCameraFit) return;
+                _didInitialCameraFit = true;
+                unawaited(_fitCamera(force: true));
               });
             },
+          ),
+        ),
+        Positioned(
+          right: 12,
+          bottom: 88,
+          child: Material(
+            color: Colors.white,
+            elevation: 4,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => unawaited(_fitCamera(force: true)),
+              child: const SizedBox(
+                width: 48,
+                height: 48,
+                child: Icon(
+                  Icons.my_location,
+                  color: AppBrandAssets.brandTealDark,
+                ),
+              ),
+            ),
           ),
         ),
         if (_loadingRoutes)

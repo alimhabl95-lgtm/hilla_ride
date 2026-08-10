@@ -14,10 +14,11 @@ import 'package:hilla_ride/core/services/nearby_providers_service.dart';
 import 'package:hilla_ride/core/utils/ride_location_utils.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
-import 'package:hilla_ride/core/widgets/map_camera_helper.dart';
+import 'package:hilla_ride/core/widgets/map_camera_follow.dart';
 import 'package:hilla_ride/core/widgets/driver_marker_cluster.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
 import 'package:hilla_ride/core/widgets/marker_animator.dart';
+import 'package:hilla_ride/features/auth/screens/app_shell.dart';
 import 'package:hilla_ride/features/customer/screens/book_ride_screen.dart';
 import 'package:hilla_ride/features/customer/screens/google_map_pin_picker_screen.dart';
 import 'package:hilla_ride/features/customer/widgets/ride_search_panel.dart';
@@ -46,10 +47,12 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   BitmapDescriptor? _destinationMarkerIcon;
   final _nearbyService = NearbyProvidersService();
   final _markerAnimator = MarkerAnimator();
+  final _cameraFollow = MapCameraFollowController();
   StreamSubscription<List<MapPresence>>? _nearbySub;
   LatLng? _cameraTarget;
   LatLng? _lastWatchCenter;
   double _cameraZoom = 14;
+  LatLng? _lastKnownDeviceLocation;
 
   @override
   void initState() {
@@ -220,6 +223,8 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
             ),
           ).timeout(const Duration(seconds: 14));
           final candidate = ll.LatLng(position.latitude, position.longitude);
+          _lastKnownDeviceLocation =
+              LatLng(position.latitude, position.longitude);
           if (geocoding.isWithinRegion(_region, candidate)) {
             point = candidate;
             usedGps = true;
@@ -241,7 +246,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
           longitude: point.longitude,
         );
       });
-      _moveMap(LatLng(point.latitude, point.longitude));
+      await _moveMap(LatLng(point.latitude, point.longitude));
 
       final label = await geocoding
           .reverseGeocode(
@@ -452,15 +457,41 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     if (points.isEmpty) return;
 
     if (points.length == 1) {
-      _moveMap(points.first);
+      unawaited(_moveMap(points.first));
       return;
     }
 
-    unawaited(MapCameraHelper.fitPoints(controller, points));
+    unawaited(_cameraFollow.fitPoints(controller, points));
   }
 
-  void _moveMap(LatLng target) {
-    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(target, 15));
+  Future<void> _moveMap(LatLng target) async {
+    final controller = _mapController;
+    if (controller == null) return;
+    await _cameraFollow.moveTo(controller, target);
+  }
+
+  /// Recenter camera only — does not change pickup/destination.
+  Future<void> _recenterToMyLocation() async {
+    final controller = _mapController;
+    if (controller == null) return;
+
+    LatLng? target = _lastKnownDeviceLocation;
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        await Geolocator.requestPermission();
+      }
+      final pos = await Geolocator.getCurrentPosition();
+      target = LatLng(pos.latitude, pos.longitude);
+      _lastKnownDeviceLocation = target;
+    } catch (_) {
+      target ??= _pickup != null
+          ? LatLng(_pickup!.latitude, _pickup!.longitude)
+          : _cameraTarget;
+    }
+    if (target == null) return;
+    await _cameraFollow.moveTo(controller, target);
   }
 
   void _onSubDistrictChanged(String? id) {
@@ -474,7 +505,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     _clearPickupIfOutsideRegion();
     unawaited(_refreshTripMarkers());
     final sub = BabilRegions.subDistrictById(_districtId, id);
-    _moveMap(LatLng(sub.center.latitude, sub.center.longitude));
+    unawaited(_moveMap(LatLng(sub.center.latitude, sub.center.longitude)));
     _restartNearbyWatch(force: true);
     if (_pickup == null) {
       unawaited(_useCurrentLocation());
@@ -573,6 +604,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
             onMapCreated: (c) => _mapController = c,
             markers: markers,
             onCameraMove: (pos) {
+              _cameraFollow.onUserCameraInteraction();
               _cameraTarget = pos.target;
               _cameraZoom = pos.zoom;
             },
@@ -586,6 +618,23 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
             },
           ),
           Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  0,
+                ),
+                child: MobileFloatingChrome(role: UserRole.customer),
+              ),
+            ),
+          ),
+          Positioned(
             right: AppSpacing.lg,
             bottom: 340,
             child: SafeArea(
@@ -593,29 +642,18 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
               child: Material(
                 elevation: 4,
                 shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppRadii.md),
+                shape: const CircleBorder(),
                 color: Colors.white,
                 child: InkWell(
-                  onTap: _pickupLoading ? null : _useCurrentLocation,
-                  borderRadius: BorderRadius.circular(AppRadii.md),
-                  child: SizedBox(
+                  customBorder: const CircleBorder(),
+                  onTap: () => unawaited(_recenterToMyLocation()),
+                  child: const SizedBox(
                     width: 48,
                     height: 48,
-                    child: Center(
-                      child: _pickupLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppBrandAssets.brandTeal,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.my_location,
-                              color: AppBrandAssets.brandTealDark,
-                              size: 22,
-                            ),
+                    child: Icon(
+                      Icons.my_location,
+                      color: AppBrandAssets.brandTealDark,
+                      size: 22,
                     ),
                   ),
                 ),

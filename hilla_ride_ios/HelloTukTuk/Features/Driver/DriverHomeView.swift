@@ -187,12 +187,19 @@ struct DriverHomeView: View {
             Image("AppLogo")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 72, height: 72)
+                .frame(width: 88, height: 88)
                 .clipShape(RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous))
+                .shadow(color: BrandColors.navy.opacity(0.08), radius: 10, y: 4)
 
-            Text(currentDriver.name)
+            Text(appState.language == .arabic ? "حساب السائق" : "Driver account")
                 .font(.title3.weight(.bold))
                 .foregroundStyle(BrandColors.navy)
+
+            if !currentDriver.name.isEmpty {
+                Text(currentDriver.name)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(BrandColors.muted)
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -446,19 +453,7 @@ struct DriverHomeView: View {
 
     @ViewBuilder
     private func driverRidePanel(ride: Ride) -> some View {
-        ZStack(alignment: .bottom) {
-            if MapsConfig.isConfigured {
-                GoogleMapView(
-                    cameraTarget: ride.pickupCoordinate,
-                    zoom: 14,
-                    pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
-                    destination: MapPlace(label: ride.destinationLabel, coordinate: ride.destinationCoordinate)
-                )
-                .ignoresSafeArea()
-            } else {
-                BrandColors.surface.ignoresSafeArea()
-            }
-
+        DriverActiveRideMapPanel(ride: ride) {
             driverRideBottomPanel(ride: ride)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -754,6 +749,57 @@ struct DriverHomeView: View {
             try await RideRepository().confirmCashCollected(rideId: ride.id)
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+/// Active-ride map with one-shot recenter (markers/routes update without moving camera).
+private struct DriverActiveRideMapPanel<Bottom: View>: View {
+    @EnvironmentObject private var appState: AppState
+    let ride: Ride
+    @ViewBuilder var bottom: () -> Bottom
+
+    @State private var recenterToken = 1
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            if MapsConfig.isConfigured {
+                GoogleMapView(
+                    cameraTarget: ride.pickupCoordinate,
+                    zoom: 14,
+                    pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
+                    destination: MapPlace(
+                        label: ride.destinationLabel,
+                        coordinate: ride.destinationCoordinate
+                    ),
+                    recenterToken: recenterToken
+                )
+                .ignoresSafeArea()
+            } else {
+                BrandColors.surface.ignoresSafeArea()
+            }
+
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button {
+                        recenterToken += 1
+                    } label: {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(BrandColors.tealDark)
+                            .frame(width: 48, height: 48)
+                            .background(.white, in: Circle())
+                            .shadow(color: BrandColors.navy.opacity(0.16), radius: 8, y: 3)
+                    }
+                    .accessibilityLabel(L10n.string(.myLocation, language: appState.language))
+                    .padding(.trailing, AppSpacing.lg)
+                    .padding(.bottom, 280)
+                }
+            }
+
+            bottom()
         }
     }
 }
