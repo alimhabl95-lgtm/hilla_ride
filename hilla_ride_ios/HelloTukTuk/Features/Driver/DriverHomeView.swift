@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 struct DriverHomeView: View {
@@ -760,6 +761,7 @@ private struct DriverActiveRideMapPanel<Bottom: View>: View {
     @ViewBuilder var bottom: () -> Bottom
 
     @State private var recenterToken = 1
+    @State private var routePath: [CLLocationCoordinate2D] = []
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -772,6 +774,7 @@ private struct DriverActiveRideMapPanel<Bottom: View>: View {
                         label: ride.destinationLabel,
                         coordinate: ride.destinationCoordinate
                     ),
+                    routePath: routePath,
                     recenterToken: recenterToken
                 )
                 .ignoresSafeArea()
@@ -800,6 +803,16 @@ private struct DriverActiveRideMapPanel<Bottom: View>: View {
             }
 
             bottom()
+        }
+        .task(id: "\(ride.id)-\(ride.status.rawValue)") {
+            routePath = [ride.pickupCoordinate, ride.destinationCoordinate]
+            let path = await DirectionsRouteService().routePath(
+                from: ride.pickupCoordinate,
+                to: ride.destinationCoordinate
+            )
+            if path.count >= 2 {
+                routePath = path
+            }
         }
     }
 }

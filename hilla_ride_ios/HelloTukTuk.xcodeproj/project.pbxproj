@@ -80,6 +80,11 @@
 		A10000000000000000000054 /* TripCompletedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000050 /* TripCompletedView.swift */; };
 		A10000000000000000000055 /* SessionGuardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000051 /* SessionGuardView.swift */; };
 		A10000000000000000000056 /* GooglePlacesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000052 /* GooglePlacesService.swift */; };
+		A100000000000000000000A2 /* PlaceSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A2 /* PlaceSearchService.swift */; };
+		A100000000000000000000A3 /* hilla_places.json in Resources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A3 /* hilla_places.json */; };
+		A100000000000000000000A4 /* SavedPlacesManageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A4 /* SavedPlacesManageView.swift */; };
+		A100000000000000000000A5 /* CustomerRewardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A5 /* CustomerRewardsView.swift */; };
+		A100000000000000000000A6 /* DirectionsRouteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A6 /* DirectionsRouteService.swift */; };
 		A10000000000000000000057 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000053 /* ChatService.swift */; };
 		A10000000000000000000058 /* SupportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000054 /* SupportService.swift */; };
 		A10000000000000000000059 /* PromoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000055 /* PromoModels.swift */; };
@@ -176,6 +181,11 @@
 		A20000000000000000000050 /* TripCompletedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripCompletedView.swift; sourceTree = "<group>"; };
 		A20000000000000000000051 /* SessionGuardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGuardView.swift; sourceTree = "<group>"; };
 		A20000000000000000000052 /* GooglePlacesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooglePlacesService.swift; sourceTree = "<group>"; };
+		A200000000000000000000A2 /* PlaceSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSearchService.swift; sourceTree = "<group>"; };
+		A200000000000000000000A3 /* hilla_places.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = hilla_places.json; path = Resources/hilla_places.json; sourceTree = "<group>"; };
+		A200000000000000000000A4 /* SavedPlacesManageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesManageView.swift; sourceTree = "<group>"; };
+		A200000000000000000000A5 /* CustomerRewardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerRewardsView.swift; sourceTree = "<group>"; };
+		A200000000000000000000A6 /* DirectionsRouteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionsRouteService.swift; sourceTree = "<group>"; };
 		A20000000000000000000053 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
 		A20000000000000000000054 /* SupportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportService.swift; sourceTree = "<group>"; };
 		A20000000000000000000055 /* PromoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromoModels.swift; sourceTree = "<group>"; };
@@ -236,6 +246,7 @@
 				A40000000000000000000005 /* Core */,
 				A40000000000000000000006 /* Features */,
 				A20000000000000000000020 /* Assets.xcassets */,
+				A200000000000000000000A3 /* hilla_places.json */,
 				A20000000000000000000021 /* GoogleService-Info.plist */,
 				A20000000000000000000023 /* Info.plist */,
 				A20000000000000000000024 /* HelloTukTuk.entitlements */,
@@ -352,6 +363,8 @@
 				A20000000000000000000046 /* CommissionService.swift */,
 				A20000000000000000000047 /* DriverLocationPublisher.swift */,
 				A20000000000000000000052 /* GooglePlacesService.swift */,
+				A200000000000000000000A2 /* PlaceSearchService.swift */,
+				A200000000000000000000A6 /* DirectionsRouteService.swift */,
 				A20000000000000000000053 /* ChatService.swift */,
 				A20000000000000000000054 /* SupportService.swift */,
 				A20000000000000000000085 /* ComplaintRepository.swift */,
@@ -440,6 +453,8 @@
 				A20000000000000000000050 /* TripCompletedView.swift */,
 				A20000000000000000000056 /* PlaceSearchView.swift */,
 				A20000000000000000000075 /* SavedPlacesBar.swift */,
+				A200000000000000000000A4 /* SavedPlacesManageView.swift */,
+				A200000000000000000000A5 /* CustomerRewardsView.swift */,
 				A20000000000000000000081 /* MapPinPickerView.swift */,
 			);
 			path = Customer;
@@ -544,6 +559,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000020 /* Assets.xcassets in Resources */,
+				A100000000000000000000A3 /* hilla_places.json in Resources */,
 				A10000000000000000000021 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -615,6 +631,10 @@
 				A10000000000000000000054 /* TripCompletedView.swift in Sources */,
 				A10000000000000000000055 /* SessionGuardView.swift in Sources */,
 				A10000000000000000000056 /* GooglePlacesService.swift in Sources */,
+				A100000000000000000000A2 /* PlaceSearchService.swift in Sources */,
+				A100000000000000000000A6 /* DirectionsRouteService.swift in Sources */,
+				A100000000000000000000A4 /* SavedPlacesManageView.swift in Sources */,
+				A100000000000000000000A5 /* CustomerRewardsView.swift in Sources */,
 				A10000000000000000000057 /* ChatService.swift in Sources */,
 				A10000000000000000000058 /* SupportService.swift in Sources */,
 				A10000000000000000000059 /* PromoModels.swift in Sources */,

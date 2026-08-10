@@ -17,18 +17,28 @@ struct PlaceSearchView: View {
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
     @State private var savedMessage: String?
+    @State private var statusMessage: String?
+    private let searchService = PlaceSearchService()
 
     var body: some View {
         VStack(spacing: 0) {
             TextField(L10n.string(.searchPlacesHint, language: appState.language), text: $query)
                 .textFieldStyle(AppTextFieldStyle())
                 .padding()
-                  .onChange(of: query) { newValue in
+                .onChange(of: query) { newValue in
                     scheduleSearch(query: newValue)
                 }
 
             if isSearching {
                 ProgressView()
+                    .padding(.vertical, 8)
+            }
+
+            if let statusMessage, results.isEmpty, !isSearching, query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
+                Text(statusMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
                     .padding()
             }
 
@@ -42,6 +52,7 @@ struct PlaceSearchView: View {
                             Text(result.label)
                                 .font(.body)
                                 .foregroundStyle(BrandColors.navy)
+                                .multilineTextAlignment(.leading)
                         }
                     }
                     .buttonStyle(.plain)
@@ -51,6 +62,7 @@ struct PlaceSearchView: View {
                     } label: {
                         Image(systemName: "bookmark")
                     }
+                    .accessibilityLabel(L10n.string(.savedPlacesTitle, language: appState.language))
                 }
             }
             .listStyle(.plain)
@@ -69,30 +81,54 @@ struct PlaceSearchView: View {
     private func scheduleSearch(query: String) {
         searchTask?.cancel()
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 2 else {
+        let minLength = trimmed.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) ? 1 : 2
+        guard trimmed.count >= minLength else {
             results = []
+            statusMessage = nil
+            isSearching = false
             return
         }
 
         searchTask = Task {
-            try? await Task.sleep(nanoseconds: 350_000_000)
+            try? await Task.sleep(nanoseconds: 280_000_000)
             guard !Task.isCancelled else { return }
             await MainActor.run { isSearching = true }
-            let places = await GooglePlacesService().searchPlaces(
+            let places = await searchService.search(
                 query: trimmed,
                 center: center,
                 radiusKm: radiusKm,
                 languageCode: appState.language.rawValue,
-                regionLabel: regionLabel
+                regionLabel: regionLabel,
+                subDistrictId: subDistrictId
             )
             guard !Task.isCancelled else { return }
-            let scoped = subDistrictId.isEmpty
-                ? places
-                : places.filter { BabilRegions.isWithin(subDistrictId: subDistrictId, point: $0.coordinate) }
             await MainActor.run {
-                results = scoped
+                results = places
                 isSearching = false
+                if places.isEmpty {
+                    statusMessage = emptyStateMessage(for: searchService.lastStatusMessage)
+                } else {
+                    statusMessage = nil
+                }
             }
+        }
+    }
+
+    private func emptyStateMessage(for code: String?) -> String {
+        let isAr = appState.language == .arabic
+        switch code {
+        case "apiDenied":
+            return isAr
+                ? "تعذر الوصول إلى خدمة البحث. حاول مرة أخرى أو اختر الموقع من الخريطة."
+                : "Place search is unavailable. Try again or pick on the map."
+        case "network":
+            return isAr
+                ? "فشل الاتصال بخدمة البحث. تحقق من الإنترنت وحاول مجدداً."
+                : "Could not reach place search. Check your connection and retry."
+        default:
+            return isAr
+                ? "لا نتائج في هذه المنطقة. جرّب اسماً أقرب أو اختر من الخريطة."
+                : "No places found nearby. Try a closer name or pick on the map."
         }
     }
 

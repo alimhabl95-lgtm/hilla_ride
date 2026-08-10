@@ -18,6 +18,8 @@ struct CustomerHomeMapView: View {
     @State private var showHistory = false
     @State private var showSupport = false
     @State private var showAnnouncements = false
+    @State private var showSavedPlaces = false
+    @State private var showRewards = false
     @State private var errorMessage: String?
     @State private var nearbyDrivers: [MapDriverMarker] = []
     @State private var nearbyTask: Task<Void, Never>?
@@ -109,19 +111,9 @@ struct CustomerHomeMapView: View {
                         .tint(BrandColors.tealDark)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 8) {
                         CurrentRideIconButton(role: .customer)
-                        AnnouncementIconButton(showAnnouncements: $showAnnouncements)
-                        LegalDocumentsMenu()
-                        mapToolbarButton(systemImage: "list.bullet.rectangle") {
-                            showHistory = true
-                        }
-                        mapToolbarButton(systemImage: "headphones") {
-                            showSupport = true
-                        }
-                        mapToolbarButton(systemImage: "person.circle.fill") {
-                            showProfile = true
-                        }
+                        customerOverflowMenu
                     }
                 }
             }
@@ -147,6 +139,12 @@ struct CustomerHomeMapView: View {
             }
             .navigationDestination(isPresented: $showAnnouncements) {
                 AnnouncementsView()
+            }
+            .navigationDestination(isPresented: $showSavedPlaces) {
+                SavedPlacesManageView()
+            }
+            .navigationDestination(isPresented: $showRewards) {
+                CustomerRewardsView(user: user)
             }
             .navigationDestination(isPresented: $showPickupSearch) {
                 PlaceSearchView(
@@ -222,6 +220,66 @@ struct CustomerHomeMapView: View {
                 await MainActor.run { nearbyDrivers = markers }
             }
         }
+    }
+
+    private var customerOverflowMenu: some View {
+        Menu {
+            Button {
+                showProfile = true
+            } label: {
+                Label(L10n.string(.profileTitle, language: appState.language), systemImage: "person.circle")
+            }
+            Button {
+                showHistory = true
+            } label: {
+                Label(L10n.string(.rideHistoryTitle, language: appState.language), systemImage: "list.bullet.rectangle")
+            }
+            Button {
+                showAnnouncements = true
+            } label: {
+                Label(L10n.string(.announcementsTitle, language: appState.language), systemImage: "bell")
+            }
+            Button {
+                showRewards = true
+            } label: {
+                Label(
+                    appState.language == .arabic ? "المكافآت" : "Rewards",
+                    systemImage: "gift"
+                )
+            }
+            Button {
+                showSupport = true
+            } label: {
+                Label(L10n.string(.supportTitle, language: appState.language), systemImage: "headphones")
+            }
+            Button {
+                showSavedPlaces = true
+            } label: {
+                Label(L10n.string(.savedPlacesTitle, language: appState.language), systemImage: "mappin.and.ellipse")
+            }
+            Button {
+                showProfile = true
+            } label: {
+                Label(
+                    appState.language == .arabic ? "الإعدادات" : "Settings",
+                    systemImage: "gearshape"
+                )
+            }
+            Link(destination: LegalConfig.privacyPolicyURL(languageCode: appState.language.rawValue)) {
+                Label(L10n.string(.privacyPolicy, language: appState.language), systemImage: "lock.doc")
+            }
+            Divider()
+            Button(role: .destructive) {
+                Task { try? await appState.signOut() }
+            } label: {
+                Label(L10n.string(.logout, language: appState.language), systemImage: "rectangle.portrait.and.arrow.right")
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(BrandColors.tealDark)
+        }
+        .accessibilityLabel(appState.language == .arabic ? "القائمة" : "Menu")
     }
 
     private var mapsUnavailableView: some View {

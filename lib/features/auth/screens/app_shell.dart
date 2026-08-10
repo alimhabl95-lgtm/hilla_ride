@@ -15,12 +15,14 @@ import 'package:hilla_ride/features/auth/screens/admin_login_screen.dart';
 import 'package:hilla_ride/features/auth/screens/login_screen.dart';
 import 'package:hilla_ride/features/customer/widgets/customer_app_entry.dart';
 import 'package:hilla_ride/features/customer/screens/customer_profile_screen.dart';
+import 'package:hilla_ride/features/customer/screens/customer_saved_places_screen.dart';
 import 'package:hilla_ride/features/driver/screens/driver_home_screen.dart';
 import 'package:hilla_ride/features/driver/screens/driver_registration_screen.dart';
 import 'package:hilla_ride/features/manager/screens/manager_home_screen.dart';
 import 'package:hilla_ride/features/shared/screens/ride_history_screen.dart';
 import 'package:hilla_ride/features/shared/screens/help_support_screen.dart';
 import 'package:hilla_ride/features/shared/screens/user_profile_screen.dart';
+import 'package:hilla_ride/features/shared/screens/announcements_screen.dart';
 import 'package:hilla_ride/features/auth/widgets/session_guard.dart';
 import 'package:hilla_ride/features/shared/widgets/announcement_icon_button.dart';
 import 'package:hilla_ride/features/shared/widgets/current_ride_icon_button.dart';
@@ -621,6 +623,7 @@ class MobileFloatingChrome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isAr = l10n.localeName.startsWith('ar');
     final uid = context.read<AppState>().authService.currentUser?.uid;
     if (uid == null) return const SizedBox.shrink();
 
@@ -629,6 +632,151 @@ class MobileFloatingChrome extends StatelessWidget {
       if (context.mounted) {
         context.read<AppModeProvider>().clearMode();
       }
+    }
+
+    Future<void> openCustomerMenu() async {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (sheetContext) {
+          Widget item({
+            required IconData icon,
+            required String label,
+            required VoidCallback onTap,
+            Color? color,
+          }) {
+            return ListTile(
+              leading: Icon(icon, color: color ?? AppBrandAssets.brandTealDark),
+              title: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: color ?? AppBrandAssets.brandNavy,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                onTap();
+              },
+            );
+          }
+
+          return Directionality(
+            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 10, 8, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.black12,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    item(
+                      icon: Icons.person_outline,
+                      label: l10n.myProfileTitle,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => UserProfileScreen(role: role),
+                          ),
+                        );
+                      },
+                    ),
+                    item(
+                      icon: Icons.receipt_long_outlined,
+                      label: l10n.myTripsTitle,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => RideHistoryScreen(
+                              customerId: uid,
+                              title: l10n.myTripsTitle,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    item(
+                      icon: Icons.notifications_none,
+                      label: isAr ? 'الإشعارات' : 'Notifications',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const AnnouncementsScreen(audience: 'customers'),
+                          ),
+                        );
+                      },
+                    ),
+                    item(
+                      icon: Icons.card_giftcard_outlined,
+                      label: isAr ? 'المكافآت' : 'Rewards',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => UserProfileScreen(role: role),
+                          ),
+                        );
+                      },
+                    ),
+                    item(
+                      icon: Icons.headset_mic_outlined,
+                      label: l10n.supportTitle,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const HelpSupportScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    item(
+                      icon: Icons.bookmark_border,
+                      label: isAr ? 'الأماكن المحفوظة' : 'Saved places',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const CustomerSavedPlacesScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    item(
+                      icon: Icons.settings_outlined,
+                      label: isAr ? 'الإعدادات' : 'Settings',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => UserProfileScreen(role: role),
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(),
+                    item(
+                      icon: Icons.logout,
+                      label: l10n.logout,
+                      color: AppBrandAssets.brandDanger,
+                      onTap: logout,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
     }
 
     return Material(
@@ -640,11 +788,45 @@ class MobileFloatingChrome extends StatelessWidget {
             size: 22,
           ),
         ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _circleWrap(CurrentRideIconButton(role: role)),
+            const SizedBox(width: 8),
+            Material(
+              color: Colors.white,
+              shape: const CircleBorder(),
+              elevation: 2,
+              shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.12),
+              child: PopupMenuButton<Locale>(
+                tooltip: isAr ? 'اللغة' : 'Language',
+                offset: const Offset(0, 48),
+                icon: const Icon(
+                  Icons.language,
+                  color: AppBrandAssets.brandTealDark,
+                ),
+                onSelected: context.read<LocaleProvider>().setLocale,
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: const Locale('en'),
+                    child: Text(l10n.english),
+                  ),
+                  PopupMenuItem(
+                    value: const Locale('ar'),
+                    child: Text(l10n.arabic),
+                  ),
+                ],
+              ),
+            ),
+            if (role == UserRole.customer) ...[
+              const SizedBox(width: 8),
+              AppCircleIconButton(
+                tooltip: isAr ? 'القائمة' : 'Menu',
+                icon: Icons.menu,
+                onPressed: openCustomerMenu,
+              ),
+            ] else ...[
+              const SizedBox(width: 8),
               AppCircleIconButton(
                 tooltip: l10n.myProfileTitle,
                 icon: Icons.person_outline,
@@ -669,94 +851,7 @@ class MobileFloatingChrome extends StatelessWidget {
                 },
               ),
               const SizedBox(width: 8),
-              if (role == UserRole.customer)
-                AppCircleIconButton(
-                  tooltip: l10n.myTripsTitle,
-                  icon: Icons.receipt_long_outlined,
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => RideHistoryScreen(
-                          customerId: uid,
-                          title: l10n.myTripsTitle,
-                        ),
-                      ),
-                    );
-                  },
-                )
-              else ...[
-                AppCircleIconButton(
-                  tooltip: l10n.completedRidesCount,
-                  icon: Icons.check_circle_outline,
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => RideHistoryScreen(
-                          driverId: uid,
-                          statusFilter: RideStatus.completed,
-                          title: l10n.completedRidesCount,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(width: 8),
-                AppCircleIconButton(
-                  tooltip: l10n.cancelledRidesCount,
-                  icon: Icons.cancel_outlined,
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => RideHistoryScreen(
-                          driverId: uid,
-                          statusFilter: RideStatus.cancelled,
-                          title: l10n.cancelledRidesCount,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-              const SizedBox(width: 8),
-              _circleWrap(
-                IconTheme(
-                  data: const IconThemeData(
-                    color: AppBrandAssets.brandTealDark,
-                    size: 22,
-                  ),
-                  child: const LegalDocumentsButton(),
-                ),
-              ),
-              const SizedBox(width: 8),
               _circleWrap(AnnouncementIconButton(role: role)),
-              const SizedBox(width: 8),
-              _circleWrap(CurrentRideIconButton(role: role)),
-              const SizedBox(width: 8),
-              Material(
-                color: Colors.white,
-                shape: const CircleBorder(),
-                elevation: 2,
-                shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.12),
-                child: PopupMenuButton<Locale>(
-                  tooltip: 'Language',
-                  offset: const Offset(0, 48),
-                  icon: const Icon(
-                    Icons.language,
-                    color: AppBrandAssets.brandTealDark,
-                  ),
-                  onSelected: context.read<LocaleProvider>().setLocale,
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: const Locale('en'),
-                      child: Text(l10n.english),
-                    ),
-                    PopupMenuItem(
-                      value: const Locale('ar'),
-                      child: Text(l10n.arabic),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(width: 8),
               AppCircleIconButton(
                 tooltip: l10n.logout,
@@ -765,7 +860,7 @@ class MobileFloatingChrome extends StatelessWidget {
                 onPressed: logout,
               ),
             ],
-          ),
+          ],
         ),
       ),
     );

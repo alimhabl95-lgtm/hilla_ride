@@ -540,7 +540,26 @@ struct ActiveRideMapView: View {
         let km = NearbyProvidersService.distanceKm(from: driverCoordinate, to: target)
         distanceKm = km
         etaMinutes = NearbyProvidersService.estimateMinutes(distanceKm: km)
+        // Keep a straight fallback immediately, then upgrade to a road polyline.
         routePath = [driverCoordinate, target]
+        let origin = driverCoordinate
+        Task {
+            let path = await DirectionsRouteService().routePath(from: origin, to: target)
+            await MainActor.run {
+                guard path.count >= 2 else { return }
+                routePath = path
+                if path.count > 2 {
+                    var roadKm = 0.0
+                    for i in 1..<path.count {
+                        roadKm += NearbyProvidersService.distanceKm(from: path[i - 1], to: path[i])
+                    }
+                    if roadKm > 0 {
+                        distanceKm = roadKm
+                        etaMinutes = NearbyProvidersService.estimateMinutes(distanceKm: roadKm)
+                    }
+                }
+            }
+        }
     }
 
     private func startWatchingDriver() {
