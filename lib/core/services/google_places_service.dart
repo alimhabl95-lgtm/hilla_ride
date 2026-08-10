@@ -45,7 +45,7 @@ class GooglePlacesService {
     }
 
     final enrichedQuery = regionLabel == null || regionLabel.isEmpty
-        ? query.trim()
+        ? '${query.trim()} Babil Iraq'
         : '${query.trim()} $regionLabel Babil Iraq';
 
     try {

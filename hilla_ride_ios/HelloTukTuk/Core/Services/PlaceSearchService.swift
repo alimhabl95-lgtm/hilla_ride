@@ -517,10 +517,11 @@ final class PlaceSearchService {
 
     private func formBody(name: String, value: String) -> Data? {
         var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "-._* ")
-        let encodedName = name.addingPercentEncoding(withAllowedCharacters: allowed) ?? name
-        let encodedValue = value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
-        return "\(encodedName)=\(encodedValue)".data(using: .utf8)
+        allowed.insert(charactersIn: "-._~")
+        func encode(_ string: String) -> String {
+            string.addingPercentEncoding(withAllowedCharacters: allowed) ?? string
+        }
+        return "\(encode(name))=\(encode(value))".data(using: .utf8)
     }
 }
 

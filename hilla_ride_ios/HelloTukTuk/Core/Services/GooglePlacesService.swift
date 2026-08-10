@@ -82,24 +82,19 @@ final class GooglePlacesService {
             : "\(trimmedQuery) \(label) Babil Iraq"
 
         let lang = normalizedLanguageCode(languageCode)
-        // Hard rectangle around the selected sub-district — do not soften to locationBias.
-        let latDelta = radiusKm / 111.0
-        let lngDelta = radiusKm / (111.0 * max(0.1, cos(center.latitude * .pi / 180)))
+        // Soft bias to fetch candidates; sub-district filtering happens after merge.
         let body: [String: Any] = [
             "textQuery": enriched,
             "languageCode": lang,
             "regionCode": "iq",
             "maxResultCount": 20,
-            "locationRestriction": [
-                "rectangle": [
-                    "low": [
-                        "latitude": center.latitude - latDelta,
-                        "longitude": center.longitude - lngDelta
+            "locationBias": [
+                "circle": [
+                    "center": [
+                        "latitude": center.latitude,
+                        "longitude": center.longitude
                     ],
-                    "high": [
-                        "latitude": center.latitude + latDelta,
-                        "longitude": center.longitude + lngDelta
-                    ]
+                    "radius": max(1_000.0, radiusKm * 1_000.0)
                 ]
             ]
         ]

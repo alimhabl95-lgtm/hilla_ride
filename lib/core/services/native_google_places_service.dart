@@ -38,7 +38,7 @@ class NativeGooglePlacesService {
     if (_failed || query.trim().isEmpty) return const [];
 
     final enrichedQuery = regionLabel == null || regionLabel.isEmpty
-        ? query.trim()
+        ? '${query.trim()} Babil Iraq'
         : '${query.trim()} $regionLabel Babil Iraq';
 
     try {
@@ -46,7 +46,7 @@ class NativeGooglePlacesService {
           .searchByText(
             enrichedQuery,
             fields: _fields,
-            locationRestriction: _bounds(center, radiusKm),
+            locationBias: _bounds(center, radiusKm),
             regionCode: 'iq',
             maxResultCount: 20,
           )
