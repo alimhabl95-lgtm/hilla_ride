@@ -104,6 +104,7 @@ enum L10nKey {
     case subDistrict
     case selectSubDistrictFirst
     case selectSubDistrictHint
+    case searchOutsideRegion
     case estimatedFare
     case distance
     case confirmBooking
@@ -433,6 +434,10 @@ enum L10n {
         .subDistrict: [.english: "Area", .arabic: "المنطقة"],
         .selectSubDistrictFirst: [.english: "Please select your area first", .arabic: "الرجاء اختيار المنطقة أولاً"],
         .selectSubDistrictHint: [.english: "Select area", .arabic: "اختر المنطقة"],
+        .searchOutsideRegion: [
+            .english: "This location is outside the selected area.",
+            .arabic: "هذا الموقع خارج المنطقة المحددة."
+        ],
         .estimatedFare: [.english: "Estimated fare", .arabic: "الأجرة التقديرية"],
         .distance: [.english: "Distance", .arabic: "المسافة"],
         .confirmBooking: [.english: "Confirm booking", .arabic: "تأكيد الحجز"],

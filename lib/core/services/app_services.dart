@@ -1194,6 +1194,7 @@ class RideService {
       districtId: resolvedDistrictId,
       subDistrictId: resolvedSubDistrictId,
       pickup: pickup,
+      destination: destination,
     );
     if (areaError != null) {
       throw StateError(areaError);

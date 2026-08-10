@@ -324,6 +324,7 @@ class ServiceAreaCatalog extends ChangeNotifier {
     required String districtId,
     required String subDistrictId,
     LatLng? pickup,
+    LatLng? destination,
   }) {
     if (_synced) {
       final sub = _subById[subDistrictId];
@@ -336,12 +337,17 @@ class ServiceAreaCatalog extends ChangeNotifier {
             ? 'area_inactive'
             : 'area_closed';
       }
-      if (pickup != null) {
-        const distance = Distance();
-        final km = distance.as(LengthUnit.Kilometer, sub.center, pickup);
-        if (km > sub.searchRadiusKm) {
-          return 'outside_area';
-        }
+      const distance = Distance();
+      bool withinSub(LatLng point) {
+        final km = distance.as(LengthUnit.Kilometer, sub.center, point);
+        return km <= sub.searchRadiusKm;
+      }
+
+      if (pickup != null && !withinSub(pickup)) {
+        return 'outside_area';
+      }
+      if (destination != null && !withinSub(destination)) {
+        return 'outside_area';
       }
       return null;
     }

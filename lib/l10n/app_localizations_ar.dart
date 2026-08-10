@@ -115,8 +115,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get searchPlaces => 'ابحث عن أماكن في الحلة';
 
   @override
-  String get noPlacesFound =>
-      'لا توجد نتائج في المنطقة المحددة';
+  String get noPlacesFound => 'لا توجد نتائج في المنطقة المحددة';
 
   @override
   String get searchAction => 'بحث';
@@ -1110,7 +1109,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get statusLabel => 'الحالة';
 
   @override
-  String get myProfileTitle => 'ملفي';
+  String get myProfileTitle => 'الملف الشخصي';
 
   @override
   String get myTripsTitle => 'رحلاتي';
@@ -1764,6 +1763,28 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get announcementsTitle => 'الإعلانات';
+
+  @override
+  String get rewardsTitle => 'المكافآت';
+
+  @override
+  String get rewardsOffersHeading => 'المكافآت والعروض';
+
+  @override
+  String get rewardsEmptyHint =>
+      'لا توجد مكافآت نشطة حالياً. راقب الإعلانات للعروض الجديدة.';
+
+  @override
+  String rewardsPromoUsed(String code) {
+    return 'تم استخدام عرض $code.';
+  }
+
+  @override
+  String get rewardsFooterHint =>
+      'احفظ الأماكن المفضلة واطلب رحلات أكثر لفتح عروض مستقبلية.';
+
+  @override
+  String get settingsTitle => 'الإعدادات';
 
   @override
   String get announcementsEmpty => 'لا توجد إعلانات من المدير بعد.';

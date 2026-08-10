@@ -15,7 +15,9 @@ import 'package:hilla_ride/features/auth/screens/admin_login_screen.dart';
 import 'package:hilla_ride/features/auth/screens/login_screen.dart';
 import 'package:hilla_ride/features/customer/widgets/customer_app_entry.dart';
 import 'package:hilla_ride/features/customer/screens/customer_profile_screen.dart';
+import 'package:hilla_ride/features/customer/screens/customer_rewards_screen.dart';
 import 'package:hilla_ride/features/customer/screens/customer_saved_places_screen.dart';
+import 'package:hilla_ride/features/shared/screens/legal_content_screen.dart';
 import 'package:hilla_ride/features/driver/screens/driver_home_screen.dart';
 import 'package:hilla_ride/features/driver/screens/driver_registration_screen.dart';
 import 'package:hilla_ride/features/manager/screens/manager_home_screen.dart';
@@ -709,7 +711,7 @@ class MobileFloatingChrome extends StatelessWidget {
                     ),
                     item(
                       icon: Icons.notifications_none,
-                      label: isAr ? 'الإشعارات' : 'Notifications',
+                      label: l10n.announcementsTitle,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -721,11 +723,11 @@ class MobileFloatingChrome extends StatelessWidget {
                     ),
                     item(
                       icon: Icons.card_giftcard_outlined,
-                      label: isAr ? 'المكافآت' : 'Rewards',
+                      label: l10n.rewardsTitle,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => UserProfileScreen(role: role),
+                            builder: (_) => CustomerRewardsRoute(uid: uid),
                           ),
                         );
                       },
@@ -743,7 +745,7 @@ class MobileFloatingChrome extends StatelessWidget {
                     ),
                     item(
                       icon: Icons.bookmark_border,
-                      label: isAr ? 'الأماكن المحفوظة' : 'Saved places',
+                      label: l10n.savedPlacesTitle,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -754,12 +756,29 @@ class MobileFloatingChrome extends StatelessWidget {
                     ),
                     item(
                       icon: Icons.settings_outlined,
-                      label: isAr ? 'الإعدادات' : 'Settings',
+                      label: l10n.settingsTitle,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => UserProfileScreen(role: role),
                           ),
+                        );
+                      },
+                    ),
+                    item(
+                      icon: Icons.lock_outline,
+                      label: l10n.privacyPolicy,
+                      onTap: () async {
+                        final config = await context
+                            .read<AppState>()
+                            .appConfigService
+                            .getConfig();
+                        if (!context.mounted) return;
+                        await LegalContentScreen.open(
+                          context: context,
+                          kind: LegalContentKind.privacy,
+                          config: config,
+                          languageCode: l10n.localeName.startsWith('ar') ? 'ar' : 'en',
                         );
                       },
                     ),

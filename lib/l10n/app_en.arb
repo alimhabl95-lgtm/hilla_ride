@@ -397,7 +397,7 @@
   "tripMapTitle": "Trip map",
   "tripStatusLabel": "Trip status",
   "statusLabel": "Status",
-  "myProfileTitle": "My profile",
+  "myProfileTitle": "Profile",
   "myTripsTitle": "My trips",
   "accountInformation": "Account information",
   "accountTypeLabel": "Account type",
@@ -733,5 +733,18 @@
   "resetLinkOpened": "Password reset page opened. Set your new password there.",
   "resetWhileLoggedInHint": "If you are signed in, open Profile → Edit profile → Change password.",
   "announcementsTitle": "Announcements",
+  "rewardsTitle": "Rewards",
+  "rewardsOffersHeading": "Rewards & offers",
+  "rewardsEmptyHint": "No active rewards right now. Check announcements for new offers.",
+  "rewardsPromoUsed": "Promo {code} has been used.",
+  "@rewardsPromoUsed": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "rewardsFooterHint": "Save favorite places and take more trips to unlock future offers.",
+  "settingsTitle": "Settings",
   "announcementsEmpty": "No announcements from the manager yet."
 }

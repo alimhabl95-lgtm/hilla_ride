@@ -397,7 +397,7 @@
   "tripMapTitle": "خريطة الرحلة",
   "tripStatusLabel": "حالة الرحلة",
   "statusLabel": "الحالة",
-  "myProfileTitle": "ملفي",
+  "myProfileTitle": "الملف الشخصي",
   "myTripsTitle": "رحلاتي",
   "accountInformation": "معلومات الحساب",
   "accountTypeLabel": "نوع الحساب",
@@ -722,5 +722,18 @@
   "resetLinkOpened": "تم فتح صفحة إعادة تعيين كلمة المرور. عيّن كلمة مرورك الجديدة هناك.",
   "resetWhileLoggedInHint": "إذا كنت مسجلاً الدخول، افتح الملف الشخصي → تعديل الملف → تغيير كلمة المرور.",
   "announcementsTitle": "الإعلانات",
-  "announcementsEmpty": "لا توجد إعلانات من المدير بعد."
+  "announcementsEmpty": "لا توجد إعلانات من المدير بعد.",
+  "rewardsTitle": "المكافآت",
+  "rewardsOffersHeading": "المكافآت والعروض",
+  "rewardsEmptyHint": "لا توجد مكافآت نشطة حالياً. راقب الإعلانات للعروض الجديدة.",
+  "rewardsPromoUsed": "تم استخدام عرض {code}.",
+  "@rewardsPromoUsed": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "rewardsFooterHint": "احفظ الأماكن المفضلة واطلب رحلات أكثر لفتح عروض مستقبلية.",
+  "settingsTitle": "الإعدادات"
 }

@@ -173,7 +173,8 @@ struct CustomerHomeMapView: View {
             .navigationDestination(isPresented: $showPickupPinPicker) {
                 MapPinPickerView(
                     title: L10n.string(.pickupLabel, language: appState.language),
-                    initialCenter: pickup?.coordinate ?? subDistrict.center
+                    initialCenter: pickup?.coordinate ?? subDistrict.center,
+                    subDistrictId: selectedSubDistrictId
                 ) { place in
                     setPickup(place, recenter: true)
                 }
@@ -181,7 +182,8 @@ struct CustomerHomeMapView: View {
             .navigationDestination(isPresented: $showDestinationPinPicker) {
                 MapPinPickerView(
                     title: L10n.string(.destinationLabel, language: appState.language),
-                    initialCenter: destination?.coordinate ?? pickup?.coordinate ?? subDistrict.center
+                    initialCenter: destination?.coordinate ?? pickup?.coordinate ?? subDistrict.center,
+                    subDistrictId: selectedSubDistrictId
                 ) { place in
                     setDestinationPlace(place, recenter: true)
                 }
@@ -192,6 +194,7 @@ struct CustomerHomeMapView: View {
             }
             .onChange(of: pickup) { _ in startNearbyWatch() }
             .onChange(of: selectedSubDistrictId) { _ in
+                clearLocationsOutsideSelectedArea()
                 startNearbyWatch()
                 // Region change is intentional booking context — one camera move.
                 requestRecenter(to: subDistrict.center, targetOnly: true)
@@ -486,7 +489,32 @@ struct CustomerHomeMapView: View {
         }
     }
 
+    private func isWithinSelectedArea(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        guard hasSubDistrict else { return false }
+        return BabilRegions.isWithin(subDistrictId: selectedSubDistrictId, point: coordinate)
+    }
+
+    @discardableResult
+    private func guardSelectedArea(for coordinate: CLLocationCoordinate2D) -> Bool {
+        guard isWithinSelectedArea(coordinate) else {
+            errorMessage = L10n.string(.searchOutsideRegion, language: appState.language)
+            return false
+        }
+        return true
+    }
+
+    private func clearLocationsOutsideSelectedArea() {
+        if let pickup, !isWithinSelectedArea(pickup.coordinate) {
+            self.pickup = nil
+        }
+        if let destination, !isWithinSelectedArea(destination.coordinate) {
+            self.destination = nil
+        }
+    }
+
     private func setPickup(_ place: MapPlace, recenter: Bool) {
+        guard guardSelectedArea(for: place.coordinate) else { return }
+        errorMessage = nil
         pickup = place
         if recenter {
             requestRecenter(to: place.coordinate, targetOnly: false)
@@ -494,6 +522,8 @@ struct CustomerHomeMapView: View {
     }
 
     private func setDestinationPlace(_ place: MapPlace, recenter: Bool) {
+        guard guardSelectedArea(for: place.coordinate) else { return }
+        errorMessage = nil
         destination = place
         if recenter {
             requestRecenter(to: place.coordinate, targetOnly: false)
@@ -519,7 +549,6 @@ struct CustomerHomeMapView: View {
 
     private func setDestination(at coordinate: CLLocationCoordinate2D) {
         guard requireSubDistrict() else { return }
-        errorMessage = nil
         setDestinationPlace(
             MapPlace(
                 label: L10n.string(.mapPinDestination, language: appState.language),
@@ -532,17 +561,20 @@ struct CustomerHomeMapView: View {
     private func attemptBookRide() {
         guard requireSubDistrict() else { return }
         errorMessage = nil
-        guard pickup != nil else {
+        guard let pickup else {
             errorMessage = L10n.string(.selectPickup, language: appState.language)
             return
         }
-        guard destination != nil else {
+        guard let destination else {
             errorMessage = L10n.string(.selectDestination, language: appState.language)
             return
         }
-        if let pickup, let destination,
-           !RideLocationRules.areDistinct(pickup.coordinate, destination.coordinate) {
+        if !RideLocationRules.areDistinct(pickup.coordinate, destination.coordinate) {
             errorMessage = L10n.string(.pickupDestinationSame, language: appState.language)
+            return
+        }
+        guard guardSelectedArea(for: pickup.coordinate),
+              guardSelectedArea(for: destination.coordinate) else {
             return
         }
         showBookRide = true

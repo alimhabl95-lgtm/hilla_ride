@@ -535,20 +535,16 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
       return;
     }
 
-    final resolved = BabilRegions.resolveFromPoint(
-      ll.LatLng(pickup.latitude, pickup.longitude),
-    );
-    final allowedDistrictIds = {
-      for (final d in BabilRegions.customerDistricts) d.id,
-    };
-    if (!allowedDistrictIds.contains(resolved.districtId)) {
+    final geocoding = context.read<AppState>().geocodingService;
+    final pickupPoint = ll.LatLng(pickup.latitude, pickup.longitude);
+    final destinationPoint = ll.LatLng(destination.latitude, destination.longitude);
+    if (!geocoding.isWithinRegion(_region, pickupPoint) ||
+        !geocoding.isWithinRegion(_region, destinationPoint)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.searchOutsideRegion)),
       );
       return;
     }
-    _districtId = resolved.districtId;
-    _subDistrictId = resolved.subDistrictId;
 
     try {
       final activeRide = await context

@@ -115,8 +115,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchPlaces => 'Search places in Hilla';
 
   @override
-  String get noPlacesFound =>
-      'No results in the selected area.';
+  String get noPlacesFound => 'No results in the selected area.';
 
   @override
   String get searchAction => 'Search';
@@ -1123,7 +1122,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusLabel => 'Status';
 
   @override
-  String get myProfileTitle => 'My profile';
+  String get myProfileTitle => 'Profile';
 
   @override
   String get myTripsTitle => 'My trips';
@@ -1786,6 +1785,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get announcementsTitle => 'Announcements';
+
+  @override
+  String get rewardsTitle => 'Rewards';
+
+  @override
+  String get rewardsOffersHeading => 'Rewards & offers';
+
+  @override
+  String get rewardsEmptyHint =>
+      'No active rewards right now. Check announcements for new offers.';
+
+  @override
+  String rewardsPromoUsed(String code) {
+    return 'Promo $code has been used.';
+  }
+
+  @override
+  String get rewardsFooterHint =>
+      'Save favorite places and take more trips to unlock future offers.';
+
+  @override
+  String get settingsTitle => 'Settings';
 
   @override
   String get announcementsEmpty => 'No announcements from the manager yet.';

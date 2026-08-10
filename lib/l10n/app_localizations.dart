@@ -311,7 +311,7 @@ abstract class AppLocalizations {
   /// No description provided for @noPlacesFound.
   ///
   /// In en, this message translates to:
-  /// **'No places found. Try a shorter name or use Pin on map.'**
+  /// **'No results in the selected area.'**
   String get noPlacesFound;
 
   /// No description provided for @searchAction.
@@ -2135,7 +2135,7 @@ abstract class AppLocalizations {
   /// No description provided for @myProfileTitle.
   ///
   /// In en, this message translates to:
-  /// **'My profile'**
+  /// **'Profile'**
   String get myProfileTitle;
 
   /// No description provided for @myTripsTitle.
@@ -3295,6 +3295,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Announcements'**
   String get announcementsTitle;
+
+  /// No description provided for @rewardsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards'**
+  String get rewardsTitle;
+
+  /// No description provided for @rewardsOffersHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards & offers'**
+  String get rewardsOffersHeading;
+
+  /// No description provided for @rewardsEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No active rewards right now. Check announcements for new offers.'**
+  String get rewardsEmptyHint;
+
+  /// No description provided for @rewardsPromoUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo {code} has been used.'**
+  String rewardsPromoUsed(String code);
+
+  /// No description provided for @rewardsFooterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Save favorite places and take more trips to unlock future offers.'**
+  String get rewardsFooterHint;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
 
   /// No description provided for @announcementsEmpty.
   ///

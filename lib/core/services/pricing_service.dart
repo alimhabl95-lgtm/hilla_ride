@@ -422,6 +422,7 @@ class PricingService {
       districtId: districtId,
       subDistrictId: subDistrictId?.trim() ?? '',
       pickup: pickup,
+      destination: destination,
     );
     if (areaError != null && (subDistrictId ?? '').trim().isNotEmpty) {
       return const RideQuote(

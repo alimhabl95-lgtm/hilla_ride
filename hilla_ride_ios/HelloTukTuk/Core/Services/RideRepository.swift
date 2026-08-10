@@ -83,7 +83,8 @@ final class RideRepository {
         if await ServiceAreaCatalog.shared.validateForNewRide(
             districtId: districtId,
             subDistrictId: subDistrictId,
-            pickup: pickup.coordinate
+            pickup: pickup.coordinate,
+            destination: destination.coordinate
         ) != nil {
             throw RideServiceError.outOfService
         }

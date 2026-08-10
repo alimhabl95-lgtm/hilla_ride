@@ -7,16 +7,24 @@ struct MapPinPickerView: View {
 
     let title: String
     let initialCenter: CLLocationCoordinate2D
+    var subDistrictId: String = ""
     let onConfirm: (MapPlace) -> Void
 
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var label = ""
     @State private var isLoadingLabel = false
     @State private var labelTask: Task<Void, Never>?
+    @State private var outsideRegionMessage: String?
 
-    init(title: String, initialCenter: CLLocationCoordinate2D, onConfirm: @escaping (MapPlace) -> Void) {
+    init(
+        title: String,
+        initialCenter: CLLocationCoordinate2D,
+        subDistrictId: String = "",
+        onConfirm: @escaping (MapPlace) -> Void
+    ) {
         self.title = title
         self.initialCenter = initialCenter
+        self.subDistrictId = subDistrictId
         self.onConfirm = onConfirm
         _mapCenter = State(initialValue: initialCenter)
     }
@@ -30,6 +38,7 @@ struct MapPinPickerView: View {
                         zoom: 16,
                         onCameraIdle: { coordinate in
                             mapCenter = coordinate
+                            outsideRegionMessage = nil
                             scheduleLabelLoad(for: coordinate)
                         },
                         pinPickerMode: true
@@ -54,13 +63,13 @@ struct MapPinPickerView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
+                if let outsideRegionMessage {
+                    Text(outsideRegionMessage)
+                        .font(.footnote)
+                        .foregroundStyle(BrandColors.danger)
+                }
                 Button(L10n.string(.confirmPinLocation, language: appState.language)) {
-                    let place = MapPlace(
-                        label: label.isEmpty ? L10n.string(.mapPinDestination, language: appState.language) : label,
-                        coordinate: mapCenter
-                    )
-                    onConfirm(place)
-                    dismiss()
+                    confirmSelection()
                 }
                 .buttonStyle(PrimaryButtonStyle())
             }
@@ -74,6 +83,20 @@ struct MapPinPickerView: View {
         .onDisappear {
             labelTask?.cancel()
         }
+    }
+
+    private func confirmSelection() {
+        if !subDistrictId.isEmpty,
+           !BabilRegions.isWithin(subDistrictId: subDistrictId, point: mapCenter) {
+            outsideRegionMessage = L10n.string(.searchOutsideRegion, language: appState.language)
+            return
+        }
+        let place = MapPlace(
+            label: label.isEmpty ? L10n.string(.mapPinDestination, language: appState.language) : label,
+            coordinate: mapCenter
+        )
+        onConfirm(place)
+        dismiss()
     }
 
     private func scheduleLabelLoad(for coordinate: CLLocationCoordinate2D) {

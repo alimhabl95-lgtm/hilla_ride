@@ -90,7 +90,8 @@ final class ServiceAreaCatalog: ObservableObject {
     func validateForNewRide(
         districtId: String,
         subDistrictId: String,
-        pickup: CLLocationCoordinate2D?
+        pickup: CLLocationCoordinate2D? = nil,
+        destination: CLLocationCoordinate2D? = nil
     ) -> String? {
         if !synced {
             let ok = BabilRegions.seedDistricts.contains {
@@ -103,8 +104,13 @@ final class ServiceAreaCatalog: ObservableObject {
         else {
             return "area_inactive"
         }
-        if let pickup,
-           GeoMath.distanceKm(from: sub.center, to: pickup) > sub.searchRadiusKm {
+        func withinSub(_ point: CLLocationCoordinate2D) -> Bool {
+            GeoMath.distanceKm(from: sub.center, to: point) <= sub.searchRadiusKm
+        }
+        if let pickup, !withinSub(pickup) {
+            return "outside_area"
+        }
+        if let destination, !withinSub(destination) {
             return "outside_area"
         }
         return nil
