@@ -9,6 +9,7 @@ import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/features/admin/screens/admin_driver_wallet_screen.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_wallet_withdrawals_tab.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -27,7 +28,7 @@ class _AdminWalletPanelState extends State<AdminWalletPanel>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -47,6 +48,7 @@ class _AdminWalletPanelState extends State<AdminWalletPanel>
           controller: _tabs,
           tabs: [
             Tab(text: isAr ? 'طلبات الشحن' : 'Recharges'),
+            Tab(text: isAr ? 'السحب' : 'Withdrawals'),
             Tab(text: isAr ? 'تعديل رصيد' : 'Adjust'),
             Tab(text: isAr ? 'الإعدادات' : 'Settings'),
           ],
@@ -56,6 +58,7 @@ class _AdminWalletPanelState extends State<AdminWalletPanel>
             controller: _tabs,
             children: [
               _PendingRechargesTab(fare: _fare, isAr: isAr),
+              AdminWalletWithdrawalsTab(fare: _fare, isAr: isAr),
               _AdjustWalletTab(fare: _fare, isAr: isAr),
               _WalletSettingsTab(isAr: isAr),
             ],
@@ -707,11 +710,14 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
   final _whatsappCtrl = TextEditingController();
   final _minCtrl = TextEditingController();
   final _lowCtrl = TextEditingController();
+  final _minWithdrawCtrl = TextEditingController();
+  final _maxWithdrawCtrl = TextEditingController();
   final _enCtrl = TextEditingController();
   final _arCtrl = TextEditingController();
   var _loaded = false;
   var _busy = false;
   var _backfilling = false;
+  var _withdrawalsEnabled = true;
 
   @override
   void dispose() {
@@ -720,6 +726,8 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
     _whatsappCtrl.dispose();
     _minCtrl.dispose();
     _lowCtrl.dispose();
+    _minWithdrawCtrl.dispose();
+    _maxWithdrawCtrl.dispose();
     _enCtrl.dispose();
     _arCtrl.dispose();
     super.dispose();
@@ -733,6 +741,10 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
     _whatsappCtrl.text = config.managerWhatsappNumber;
     _minCtrl.text = '${config.minBalanceIqd < 1 ? 1 : config.minBalanceIqd}';
     _lowCtrl.text = '${config.lowBalanceWarningIqd}';
+    _minWithdrawCtrl.text = '${config.minWithdrawalIqd}';
+    _maxWithdrawCtrl.text =
+        config.maxWithdrawalIqd > 0 ? '${config.maxWithdrawalIqd}' : '';
+    _withdrawalsEnabled = config.withdrawalsEnabled;
     _enCtrl.text = config.rechargeInstructionsEn;
     _arCtrl.text = config.rechargeInstructionsAr;
   }
@@ -743,6 +755,9 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
       final config = WalletConfig(
         minBalanceIqd: int.tryParse(_minCtrl.text.trim()) ?? 0,
         lowBalanceWarningIqd: int.tryParse(_lowCtrl.text.trim()) ?? 5000,
+        minWithdrawalIqd: int.tryParse(_minWithdrawCtrl.text.trim()) ?? 5000,
+        maxWithdrawalIqd: int.tryParse(_maxWithdrawCtrl.text.trim()) ?? 0,
+        withdrawalsEnabled: _withdrawalsEnabled,
         companySuperQiNumber: _numberCtrl.text.trim(),
         companySuperQiName: _nameCtrl.text.trim().isEmpty
             ? 'Hello Tuk-Tuk'
@@ -855,6 +870,34 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
                 labelText: widget.isAr
                     ? 'تحذير الرصيد المنخفض (د.ع)'
                     : 'Low-balance warning (IQD)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                widget.isAr ? 'تفعيل السحب للسائقين' : 'Enable driver withdrawals',
+              ),
+              value: _withdrawalsEnabled,
+              onChanged: (v) => setState(() => _withdrawalsEnabled = v),
+            ),
+            TextField(
+              controller: _minWithdrawCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: widget.isAr
+                    ? 'الحد الأدنى للسحب (د.ع)'
+                    : 'Min withdrawal (IQD)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _maxWithdrawCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: widget.isAr
+                    ? 'الحد الأقصى للسحب (د.ع، فارغ = بلا حد)'
+                    : 'Max withdrawal (IQD, empty = no max)',
               ),
             ),
             const SizedBox(height: 12),

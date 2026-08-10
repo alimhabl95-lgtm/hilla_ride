@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
@@ -17,12 +16,10 @@ import 'package:hilla_ride/core/services/monthly_prize_service.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
 import 'package:hilla_ride/core/services/pricing_service.dart';
 import 'package:hilla_ride/core/services/promo_service.dart';
-import 'package:hilla_ride/core/services/ride_number_service.dart';
 import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/core/services/session_service.dart';
 import 'package:hilla_ride/core/utils/geohash.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:uuid/uuid.dart';
 
 class AuthService {
   AuthService({
@@ -1132,19 +1129,24 @@ class DriverService {
 class RideService {
   RideService({
     FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
     required DriverService driverService,
     CommissionService? commissionService,
     MonthlyPrizeService? monthlyPrizeService,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _functions = functions ??
+            FirebaseFunctions.instanceFor(region: 'us-central1'),
         _driverService = driverService,
-        _commissionService = commissionService ?? CommissionService(),
-        _monthlyPrizeService = monthlyPrizeService ?? MonthlyPrizeService();
+        _monthlyPrizeService = monthlyPrizeService ?? MonthlyPrizeService() {
+    // Optional commissionService kept so AppState call sites stay unchanged.
+    // Ride earnings/commission now apply only in Cloud Functions.
+    assert(commissionService == null || true);
+  }
 
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
   final DriverService _driverService;
-  final CommissionService _commissionService;
   final MonthlyPrizeService _monthlyPrizeService;
-  final _uuid = const Uuid();
 
   static const _activeCustomerRideStatuses = [
     RideStatus.searching,
@@ -1154,43 +1156,12 @@ class RideService {
     RideStatus.awaitingCashPayment,
   ];
 
-  Future<void> _ensureCustomerHasNoActiveRide(String customerId) async {
-    final snapshot = await _firestore
-        .collection('rides')
-        .where('customerId', isEqualTo: customerId)
-        .where(
-          'status',
-          whereIn: _activeCustomerRideStatuses
-              .map((status) => status.value)
-              .toList(),
-        )
-        .limit(1)
-        .get();
-    if (snapshot.docs.isNotEmpty) {
-      throw StateError('active_ride_exists');
+  Never _rethrowRideCallable(Object error) {
+    if (error is FirebaseFunctionsException) {
+      final code = error.message ?? error.code;
+      throw StateError(code);
     }
-  }
-
-  Set<String> _rejectedDriverIdsFromData(Map<String, dynamic> data) {
-    return (data['rejectedDriverIds'] as List<dynamic>?)
-            ?.map((value) => value.toString())
-            .where((value) => value.isNotEmpty)
-            .toSet() ??
-        const {};
-  }
-
-  Future<void> _setDriverActiveRide(String driverId, bool hasActiveRide) async {
-    if (driverId.isEmpty) return;
-    final driverDoc = await _firestore.collection('drivers').doc(driverId).get();
-    final isOnline = driverDoc.data()?['isOnline'] as bool? ?? false;
-    await _firestore.collection('drivers').doc(driverId).update({
-      'hasActiveRide': hasActiveRide,
-      'operationalStatus': hasActiveRide
-          ? DriverOperationalStatus.arrivingPickup.value
-          : (isOnline
-              ? DriverOperationalStatus.available.value
-              : DriverOperationalStatus.offline.value),
-    });
+    throw error;
   }
 
   Future<Ride> bookRide({
@@ -1211,8 +1182,6 @@ class RideService {
       throw StateError('pickup_destination_same');
     }
 
-    await _ensureCustomerHasNoActiveRide(customerId);
-
     final pickupRegion = BabilRegions.resolveFromPoint(pickup);
     final resolvedDistrictId = districtId.trim().isNotEmpty
         ? districtId.trim()
@@ -1230,200 +1199,58 @@ class RideService {
       throw StateError(areaError);
     }
 
-    final rideId = _uuid.v4();
-    final rideRef = _firestore.collection('rides').doc(rideId);
-    final rideNumber = await RideNumberService(firestore: _firestore)
-        .allocateRideNumber();
-
-    final ride = Ride(
-      id: rideId,
-      customerId: customerId,
-      pickupLabel: pickupLabel,
-      destinationLabel: destinationLabel,
-      pickupLat: pickup.latitude,
-      pickupLng: pickup.longitude,
-      destinationLat: destination.latitude,
-      destinationLng: destination.longitude,
-      status: RideStatus.searching,
-      createdAt: DateTime.now(),
-      fareAmountIqd: fareAmountIqd,
-      paymentMethod: PaymentMethod.cash,
-    );
-
-    await rideRef.set({
-      ...ride.toMap(),
-      'rideNumber': rideNumber,
-      'districtId': resolvedDistrictId,
-      'subDistrictId': resolvedSubDistrictId,
-      'distanceKm': distanceKm,
-      if (originalFareIqd > 0) 'originalFareIqd': originalFareIqd,
-      if (promoDiscountIqd > 0) 'promoDiscountIqd': promoDiscountIqd,
-      if (promoCode.isNotEmpty) 'promoCode': promoCode,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
     try {
-      await _assignNearestDriverImpl(rideId);
-    } catch (error, stackTrace) {
-      if (kDebugMode) {
-        debugPrint('Driver assignment failed for $rideId: $error\n$stackTrace');
+      final result = await _functions.httpsCallable('createRide').call({
+        'pickupLabel': pickupLabel,
+        'destinationLabel': destinationLabel,
+        'pickupLat': pickup.latitude,
+        'pickupLng': pickup.longitude,
+        'destinationLat': destination.latitude,
+        'destinationLng': destination.longitude,
+        'districtId': resolvedDistrictId,
+        'subDistrictId': resolvedSubDistrictId,
+        'fareAmountIqd': fareAmountIqd,
+        'distanceKm': distanceKm,
+        if (originalFareIqd > 0) 'originalFareIqd': originalFareIqd,
+        if (promoDiscountIqd > 0) 'promoDiscountIqd': promoDiscountIqd,
+        if (promoCode.isNotEmpty) 'promoCode': promoCode,
+      });
+      final data = Map<String, dynamic>.from(result.data as Map? ?? {});
+      final rideId = data['rideId'] as String? ?? '';
+      final rideMap = Map<String, dynamic>.from(data['ride'] as Map? ?? {});
+      if (rideId.isEmpty) {
+        throw StateError('ride_create_failed');
       }
+      if (rideMap.isNotEmpty) {
+        return Ride.fromMap(rideId, rideMap);
+      }
+      final latest = await _firestore.collection('rides').doc(rideId).get();
+      if (latest.exists && latest.data() != null) {
+        return Ride.fromMap(rideId, latest.data()!);
+      }
+      throw StateError('ride_create_failed');
+    } catch (error) {
+      _rethrowRideCallable(error);
     }
-
-    final latest = await rideRef.get();
-    if (latest.exists && latest.data() != null) {
-      return Ride.fromMap(rideId, latest.data()!);
-    }
-    return Ride(
-      id: rideId,
-      customerId: customerId,
-      pickupLabel: pickupLabel,
-      destinationLabel: destinationLabel,
-      pickupLat: pickup.latitude,
-      pickupLng: pickup.longitude,
-      destinationLat: destination.latitude,
-      destinationLng: destination.longitude,
-      status: RideStatus.searching,
-      createdAt: ride.createdAt,
-      fareAmountIqd: fareAmountIqd,
-      paymentMethod: PaymentMethod.cash,
-      districtId: resolvedDistrictId,
-      subDistrictId: resolvedSubDistrictId,
-    );
   }
 
   Future<Ride> assignNearestDriver(
     String rideId, {
     Set<String> excludeDriverIds = const {},
-  }) {
-    return _assignNearestDriverImpl(
-      rideId,
-      excludeDriverIds: excludeDriverIds,
-    ).timeout(const Duration(seconds: 30));
-  }
-
-  Future<Ride> _assignNearestDriverImpl(
-    String rideId, {
-    Set<String> excludeDriverIds = const {},
   }) async {
-    final rideRef = _firestore.collection('rides').doc(rideId);
-    final snapshot = await rideRef.get();
-    if (!snapshot.exists || snapshot.data() == null) {
+    try {
+      await _functions.httpsCallable('assignNearestDriver').call({
+        'rideId': rideId,
+        'excludeDriverIds': excludeDriverIds.toList(),
+      }).timeout(const Duration(seconds: 30));
+      final latest = await _firestore.collection('rides').doc(rideId).get();
+      if (latest.exists && latest.data() != null) {
+        return Ride.fromMap(rideId, latest.data()!);
+      }
       throw StateError('ride_not_found');
+    } catch (error) {
+      _rethrowRideCallable(error);
     }
-
-    final ride = Ride.fromMap(rideId, snapshot.data()!);
-    if (ride.status == RideStatus.matched ||
-        ride.status == RideStatus.accepted ||
-        ride.status == RideStatus.inProgress ||
-        ride.status == RideStatus.awaitingCashPayment) {
-      return ride;
-    }
-    if (ride.status == RideStatus.cancelled ||
-        ride.status == RideStatus.completed) {
-      throw StateError('ride_cancelled');
-    }
-
-    var districtId = ride.districtId.trim();
-    var subDistrictId = ride.subDistrictId.trim();
-    if (districtId.isEmpty || subDistrictId.isEmpty) {
-      final resolved = BabilRegions.resolveFromPoint(
-        LatLng(ride.pickupLat, ride.pickupLng),
-      );
-      districtId = districtId.isEmpty ? resolved.districtId : districtId;
-      subDistrictId =
-          subDistrictId.isEmpty ? resolved.subDistrictId : subDistrictId;
-    }
-
-    final rejectedDriverIds = _rejectedDriverIdsFromData(snapshot.data()!);
-    final districtDrivers = await _driverService.findDriversForRide(
-      districtId: districtId,
-      subDistrictId: subDistrictId,
-      pickup: LatLng(ride.pickupLat, ride.pickupLng),
-      excludeDriverIds: {...excludeDriverIds, ...rejectedDriverIds},
-    );
-
-    if (districtDrivers.isEmpty) {
-      throw StateError('no_drivers');
-    }
-
-    DriverProfile? autoAcceptDriver;
-    for (final driver in districtDrivers) {
-      if (driver.isFakeDriver && driver.autoAcceptRides) {
-        autoAcceptDriver = driver;
-        break;
-      }
-    }
-
-    if (autoAcceptDriver != null) {
-      final matchedDriver = autoAcceptDriver;
-      final acceptedRide = await _firestore.runTransaction((transaction) async {
-        final latest = await transaction.get(rideRef);
-        final latestData = latest.data();
-        if (latestData == null) {
-          throw StateError('ride_not_found');
-        }
-
-        final latestStatus =
-            RideStatusX.fromString(latestData['status'] as String?);
-        if (latestStatus == RideStatus.cancelled ||
-            latestStatus == RideStatus.completed) {
-          throw StateError('ride_cancelled');
-        }
-        if (latestStatus != RideStatus.searching) {
-          throw StateError('ride_unavailable');
-        }
-
-        transaction.update(rideRef, {
-          'driverId': matchedDriver.uid,
-          'offeredDriverIds': [matchedDriver.uid],
-          'status': RideStatus.accepted.value,
-          'matchedAt': FieldValue.serverTimestamp(),
-          'acceptedAt': FieldValue.serverTimestamp(),
-          'notifyCustomer': true,
-        });
-
-        return Ride.fromMap(rideId, latestData).copyWith(
-          driverId: matchedDriver.uid,
-          status: RideStatus.accepted,
-          offeredDriverIds: [matchedDriver.uid],
-        );
-      });
-      await _setDriverActiveRide(matchedDriver.uid, true);
-      return acceptedRide;
-    }
-
-    final offeredDriverIds = districtDrivers.map((driver) => driver.uid).toList();
-
-    return _firestore.runTransaction((transaction) async {
-      final latest = await transaction.get(rideRef);
-      final latestData = latest.data();
-      if (latestData == null) {
-        throw StateError('ride_not_found');
-      }
-
-      final latestStatus =
-          RideStatusX.fromString(latestData['status'] as String?);
-      if (latestStatus == RideStatus.cancelled ||
-          latestStatus == RideStatus.completed) {
-        throw StateError('ride_cancelled');
-      }
-      if (latestStatus != RideStatus.searching) {
-        throw StateError('ride_unavailable');
-      }
-
-      transaction.update(rideRef, {
-        'offeredDriverIds': offeredDriverIds,
-        'status': RideStatus.matched.value,
-        'matchedAt': FieldValue.serverTimestamp(),
-        'notifyDrivers': true,
-      });
-
-      return Ride.fromMap(rideId, latestData).copyWith(
-        status: RideStatus.matched,
-        offeredDriverIds: offeredDriverIds,
-      );
-    });
   }
 
   Future<Ride> requestRide({
@@ -1766,288 +1593,57 @@ class RideService {
     required String rideId,
     required String driverId,
   }) async {
-    final ref = _firestore.collection('rides').doc(rideId);
-    final driverRef = _firestore.collection('drivers').doc(driverId);
-    final walletConfig = await _driverService.fetchWalletConfig();
-
-    await _firestore.runTransaction((transaction) async {
-      final driverSnap = await transaction.get(driverRef);
-      if (driverSnap.data()?['hasActiveRide'] == true) {
-        throw StateError('driver_busy');
-      }
-      final walletStatus =
-          driverSnap.data()?['walletStatus'] as String? ?? 'active';
-      final walletBalance =
-          (driverSnap.data()?['walletBalanceIqd'] as num?)?.toInt() ?? 0;
-      final minBalance = walletConfig.minBalanceIqd < 1
-          ? 1
-          : walletConfig.minBalanceIqd;
-      if (walletStatus == 'blocked' ||
-          walletBalance <= 0 ||
-          walletBalance < minBalance) {
-        throw StateError('wallet_blocked');
-      }
-
-      final snapshot = await transaction.get(ref);
-      final data = snapshot.data();
-      if (data == null) {
-        throw StateError('ride_not_found');
-      }
-
-      final estimatedCommission =
-          (data['platformCommissionIqd'] as num?)?.toInt() ?? 0;
-      if (estimatedCommission > 0 && walletBalance < estimatedCommission) {
-        throw StateError('wallet_blocked');
-      }
-
-      final status = RideStatusX.fromString(data['status'] as String?);
-      if (status != RideStatus.matched && status != RideStatus.searching) {
-        throw StateError('ride_unavailable');
-      }
-
-      final assignedDriverId = data['driverId'] as String?;
-      if (assignedDriverId != null &&
-          assignedDriverId.isNotEmpty &&
-          assignedDriverId != driverId) {
-        throw StateError('ride_taken');
-      }
-
-      if (status == RideStatus.searching) {
-        final rideDistrictId = data['districtId'] as String? ?? '';
-        final rideSubDistrictId = data['subDistrictId'] as String? ?? '';
-        final driverDistrictId =
-            driverSnap.data()?['assignedDistrictId'] as String? ?? '';
-        final driverSubDistrictId =
-            driverSnap.data()?['assignedSubDistrictId'] as String? ?? '';
-        if (rideDistrictId.isEmpty ||
-            rideSubDistrictId.isEmpty ||
-            driverDistrictId != rideDistrictId ||
-            driverSubDistrictId != rideSubDistrictId) {
-          throw StateError('ride_unavailable');
-        }
-      } else {
-        final offeredDriverIds = (data['offeredDriverIds'] as List<dynamic>?)
-                ?.map((value) => value.toString())
-                .where((value) => value.isNotEmpty)
-                .toList() ??
-            const <String>[];
-        if (assignedDriverId == null &&
-            offeredDriverIds.isNotEmpty &&
-            !offeredDriverIds.contains(driverId)) {
-          throw StateError('ride_unavailable');
-        }
-      }
-
-      transaction.update(ref, {
-        'driverId': driverId,
-        'status': RideStatus.accepted.value,
-        'acceptedAt': FieldValue.serverTimestamp(),
-        'offeredDriverIds': <String>[],
-        'notifyDrivers': false,
-        'notifyCustomer': true,
-      });
-      transaction.update(driverRef, {
-        'hasActiveRide': true,
-        'operationalStatus': DriverOperationalStatus.arrivingPickup.value,
-      });
-    });
-
-    NotificationService.clearDriverRideOffer(rideId);
+    try {
+      await _functions.httpsCallable('acceptRide').call({'rideId': rideId});
+      NotificationService.clearDriverRideOffer(rideId);
+    } catch (error) {
+      _rethrowRideCallable(error);
+    }
   }
 
   Future<void> rejectRide({
     required String rideId,
     required String driverId,
   }) async {
-    final ref = _firestore.collection('rides').doc(rideId);
-    var shouldReassign = false;
-    final rejectedIds = <String>{driverId};
-
-    await _firestore.runTransaction((transaction) async {
-      final snapshot = await transaction.get(ref);
-      final data = snapshot.data();
-      if (data == null) {
-        throw StateError('ride_not_found');
-      }
-
-      final status = RideStatusX.fromString(data['status'] as String?);
-      if (status != RideStatus.matched) {
-        throw StateError('ride_unavailable');
-      }
-
-      if (data['driverId'] != null) {
-        throw StateError('ride_taken');
-      }
-
-      final offeredDriverIds = (data['offeredDriverIds'] as List<dynamic>?)
-              ?.map((value) => value.toString())
-              .where((value) => value.isNotEmpty)
-              .toList() ??
-          const <String>[];
-      if (!offeredDriverIds.contains(driverId)) {
-        throw StateError('ride_unavailable');
-      }
-
-      rejectedIds.addAll(_rejectedDriverIdsFromData(data));
-      final remainingOffers =
-          offeredDriverIds.where((id) => id != driverId).toList();
-
-      if (remainingOffers.isEmpty) {
-        shouldReassign = true;
-        transaction.update(ref, {
-          'offeredDriverIds': <String>[],
-          'rejectedDriverIds': rejectedIds.toList(),
-          'status': RideStatus.searching.value,
-          'notifyDrivers': false,
-        });
-      } else {
-        transaction.update(ref, {
-          'offeredDriverIds': remainingOffers,
-          'rejectedDriverIds': rejectedIds.toList(),
-        });
-      }
-    });
-
-    NotificationService.clearDriverRideOffer(rideId);
-
-    if (shouldReassign) {
-      try {
-        await assignNearestDriver(
-          rideId,
-          excludeDriverIds: rejectedIds,
-        );
-      } on StateError catch (error) {
-        if (error.message != 'no_drivers' &&
-            error.message != 'ride_unavailable') {
-          rethrow;
-        }
-      }
+    try {
+      await _functions.httpsCallable('rejectRide').call({'rideId': rideId});
+      NotificationService.clearDriverRideOffer(rideId);
+    } catch (error) {
+      _rethrowRideCallable(error);
     }
   }
 
   Future<void> startRide(String rideId) async {
-    final rideDoc = await _firestore.collection('rides').doc(rideId).get();
-    final driverId = rideDoc.data()?['driverId'] as String?;
-    await _firestore.collection('rides').doc(rideId).update({
-      'status': RideStatus.inProgress.value,
-      'startedAt': FieldValue.serverTimestamp(),
-    });
-    if (driverId != null && driverId.isNotEmpty) {
-      await _firestore.collection('drivers').doc(driverId).update({
-        'operationalStatus': DriverOperationalStatus.onTrip.value,
-      });
+    try {
+      await _functions.httpsCallable('startRide').call({'rideId': rideId});
+    } catch (error) {
+      _rethrowRideCallable(error);
     }
   }
 
   Future<void> endRideAwaitingCash(String rideId) async {
-    await _firestore.collection('rides').doc(rideId).update({
-      'status': RideStatus.awaitingCashPayment.value,
-      'endedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _functions
+          .httpsCallable('endRideAwaitingCash')
+          .call({'rideId': rideId});
+    } catch (error) {
+      _rethrowRideCallable(error);
+    }
   }
 
   Future<void> confirmCashCollected(String rideId) async {
-    final ref = _firestore.collection('rides').doc(rideId);
-    final config = await _commissionService.getConfig();
-    String? prizeDriverId;
-
-    await _firestore.runTransaction((transaction) async {
-      final snapshot = await transaction.get(ref);
-      final data = snapshot.data();
-      if (data == null) {
-        throw StateError('ride_not_found');
-      }
-
-      if (data['earningsApplied'] == true) {
-        prizeDriverId = data['driverId'] as String?;
-        return;
-      }
-
-      final status = RideStatusX.fromString(data['status'] as String?);
-      if (status == RideStatus.cancelled) return;
-      if (status != RideStatus.awaitingCashPayment &&
-          status != RideStatus.completed) {
-        throw StateError('ride_not_ready');
-      }
-
-      final fare = (data['fareAmountIqd'] as num?)?.toInt() ?? 0;
-      final driverId = data['driverId'] as String?;
-      final subId = data['subDistrictId'] as String? ?? '';
-      final area = ServiceAreaCatalog.instance.subDistrictConfig(subId);
-      final commissionPercent = (area != null &&
-              !area.useGlobalCommission &&
-              area.commissionPercent != null)
-          ? area.commissionPercent!
-          : config.platformPercent;
-      final split = _commissionService.splitFare(fare, commissionPercent);
-
-      transaction.update(ref, {
-        'cashCollectedByDriver': true,
-        'status': RideStatus.completed.value,
-        'completedAt': FieldValue.serverTimestamp(),
-        'commissionPercent': split.commissionPercent,
-        'platformCommissionIqd': split.platformCommissionIqd,
-        'driverEarningsIqd': split.driverEarningsIqd,
-        'earningsApplied': true,
-      });
-
+    try {
+      await _functions
+          .httpsCallable('confirmCashCollected')
+          .call({'rideId': rideId});
+      final latest = await _firestore.collection('rides').doc(rideId).get();
+      final driverId = latest.data()?['driverId'] as String?;
       if (driverId != null && driverId.isNotEmpty) {
-        prizeDriverId = driverId;
-        transaction.update(_firestore.collection('drivers').doc(driverId), {
-          'totalFareCollectedIqd': FieldValue.increment(fare),
-          'totalPlatformCommissionIqd':
-              FieldValue.increment(split.platformCommissionIqd),
-          'outstandingPlatformCommissionIqd':
-              FieldValue.increment(split.platformCommissionIqd),
-          'totalDriverEarningsIqd':
-              FieldValue.increment(split.driverEarningsIqd),
-          'outstandingDriverEarningsIqd':
-              FieldValue.increment(split.driverEarningsIqd),
-          'completedRidesCount': FieldValue.increment(1),
-          'hasActiveRide': false,
-          'operationalStatus': DriverOperationalStatus.available.value,
-        });
+        unawaited(_monthlyPrizeService.incrementDriverMonthlyRide(driverId));
       }
-
-      final customerId = data['customerId'] as String?;
-      final promoCode = data['promoCode'] as String? ?? '';
-      if (customerId != null &&
-          customerId.isNotEmpty &&
-          promoCode.isNotEmpty &&
-          (data['promoDiscountIqd'] as num?)?.toInt() != null &&
-          (data['promoDiscountIqd'] as num).toInt() > 0) {
-        transaction.update(_firestore.collection('users').doc(customerId), {
-          'promoRidesUsed': FieldValue.increment(1),
-        });
-      }
-    });
-
-    if (prizeDriverId != null && prizeDriverId!.isNotEmpty) {
-      unawaited(_monthlyPrizeService.incrementDriverMonthlyRide(prizeDriverId!));
+    } catch (error) {
+      _rethrowRideCallable(error);
     }
-  }
-
-  /// Applies commission split and updates driver totals for a paid ride.
-  /// Safe to retry when cash was collected but earnings were not applied yet.
-  Future<void> finishRideAndApplyEarnings(String rideId) async {
-    await _completeRide(_firestore.collection('rides').doc(rideId));
-  }
-
-  /// Backfills rides where cash was collected but earnings were never applied.
-  Future<int> applyPendingEarnings({int limit = 100}) async {
-    final snapshot = await _firestore
-        .collection('rides')
-        .where('cashCollectedByDriver', isEqualTo: true)
-        .limit(limit)
-        .get();
-
-    var applied = 0;
-    for (final doc in snapshot.docs) {
-      if (doc.data()['earningsApplied'] == true) continue;
-      await _completeRide(doc.reference);
-      applied++;
-    }
-    return applied;
   }
 
   Future<void> submitDriverRating({
@@ -2059,125 +1655,40 @@ class RideService {
     if (rating < 1 || rating > 5) {
       throw ArgumentError.value(rating, 'rating', 'Must be between 1 and 5');
     }
-
-    final ref = _firestore.collection('rides').doc(rideId);
-    final snapshot = await ref.get();
-    final data = snapshot.data();
-    if (data == null) return;
-
-    if (data['customerId'] != customerId) return;
-    if (data['status'] != RideStatus.completed.value) return;
-    if (data['driverRating'] != null) return;
-
-    final driverId = data['driverId'] as String?;
-    final batch = _firestore.batch();
-
-    batch.update(ref, {
-      'driverRating': rating,
-      'driverFeedback': feedback.trim(),
-      'ratedAt': FieldValue.serverTimestamp(),
-    });
-
-    if (driverId != null && driverId.isNotEmpty) {
-      final driverRef = _firestore.collection('drivers').doc(driverId);
-      final driverSnap = await driverRef.get();
-      final driverData = driverSnap.data() ?? {};
-      final oldCount = (driverData['ratingCount'] as num?)?.toInt() ?? 0;
-      final oldRating = (driverData['rating'] as num?)?.toDouble() ?? 5.0;
-      final newCount = oldCount + 1;
-      final newRating = ((oldRating * oldCount) + rating) / newCount;
-
-      batch.update(driverRef, {
-        'rating': newRating,
-        'ratingCount': newCount,
+    try {
+      await _functions.httpsCallable('submitDriverRating').call({
+        'rideId': rideId,
+        'rating': rating,
+        'feedback': feedback.trim(),
       });
+    } catch (error) {
+      _rethrowRideCallable(error);
     }
-
-    await batch.commit();
   }
 
-  Future<void> _completeRide(DocumentReference<Map<String, dynamic>> ref) async {
-    final snapshot = await ref.get();
-    final data = snapshot.data();
-    if (data == null) return;
-
-    final collected = data['cashCollectedByDriver'] as bool? ?? false;
-    if (!collected) return;
-
-    if (data['earningsApplied'] == true) {
-      if (data['status'] != RideStatus.completed.value) {
-        await ref.update({
-          'status': RideStatus.completed.value,
-          'completedAt': FieldValue.serverTimestamp(),
-        });
-      }
-      final driverId = data['driverId'] as String?;
-      if (driverId != null && driverId.isNotEmpty) {
-        await _setDriverActiveRide(driverId, false);
-      }
-      return;
-    }
-
-    final status = RideStatusX.fromString(data['status'] as String?);
-    if (status == RideStatus.cancelled) return;
-    if (status != RideStatus.awaitingCashPayment &&
-        status != RideStatus.completed) {
-      return;
-    }
-
-    final fare = (data['fareAmountIqd'] as num?)?.toInt() ?? 0;
-    final driverId = data['driverId'] as String?;
-    final config = await _commissionService.getConfig();
-    final subId = data['subDistrictId'] as String? ?? '';
-    final area = ServiceAreaCatalog.instance.subDistrictConfig(subId);
-    final commissionPercent =
-        (area != null && !area.useGlobalCommission && area.commissionPercent != null)
-            ? area.commissionPercent!
-            : config.platformPercent;
-    final split = _commissionService.splitFare(fare, commissionPercent);
-
-    final batch = _firestore.batch();
-    batch.update(ref, {
-      'status': RideStatus.completed.value,
-      'completedAt': FieldValue.serverTimestamp(),
-      'commissionPercent': split.commissionPercent,
-      'platformCommissionIqd': split.platformCommissionIqd,
-      'driverEarningsIqd': split.driverEarningsIqd,
-      'earningsApplied': true,
-    });
-
-    if (driverId != null && driverId.isNotEmpty) {
-      batch.update(_firestore.collection('drivers').doc(driverId), {
-        'totalFareCollectedIqd': FieldValue.increment(fare),
-        'totalPlatformCommissionIqd':
-            FieldValue.increment(split.platformCommissionIqd),
-        'outstandingPlatformCommissionIqd':
-            FieldValue.increment(split.platformCommissionIqd),
-        'totalDriverEarningsIqd': FieldValue.increment(split.driverEarningsIqd),
-        'outstandingDriverEarningsIqd':
-            FieldValue.increment(split.driverEarningsIqd),
-        'completedRidesCount': FieldValue.increment(1),
-        'hasActiveRide': false,
-        'operationalStatus': DriverOperationalStatus.available.value,
+  /// Applies commission split and updates driver totals for a paid ride.
+  /// Safe to retry when cash was collected but earnings were not applied yet.
+  Future<void> finishRideAndApplyEarnings(String rideId) async {
+    try {
+      await _functions.httpsCallable('applyPendingRideEarnings').call({
+        'rideId': rideId,
+        'limit': 1,
       });
+    } catch (error) {
+      _rethrowRideCallable(error);
     }
+  }
 
-    final customerId = data['customerId'] as String?;
-    final promoCode = data['promoCode'] as String? ?? '';
-    if (customerId != null &&
-        customerId.isNotEmpty &&
-        promoCode.isNotEmpty &&
-        (data['promoDiscountIqd'] as num?)?.toInt() != null &&
-        (data['promoDiscountIqd'] as num).toInt() > 0) {
-      batch.update(_firestore.collection('users').doc(customerId), {
-        'promoRidesUsed': FieldValue.increment(1),
-      });
-    }
-
-    await batch.commit();
-
-    if (driverId != null && driverId.isNotEmpty) {
-      await _monthlyPrizeService.incrementDriverMonthlyRide(driverId);
+  /// Backfills rides where cash was collected but earnings were never applied.
+  Future<int> applyPendingEarnings({int limit = 100}) async {
+    try {
+      final result = await _functions
+          .httpsCallable('applyPendingRideEarnings')
+          .call({'limit': limit});
+      final data = Map<String, dynamic>.from(result.data as Map? ?? {});
+      return (data['applied'] as num?)?.toInt() ?? 0;
+    } catch (error) {
+      _rethrowRideCallable(error);
     }
   }
 
@@ -2185,55 +1696,14 @@ class RideService {
     String rideId, {
     UserRole cancelledBy = UserRole.customer,
   }) async {
-    final ref = _firestore.collection('rides').doc(rideId);
-    final snapshot = await ref.get();
-    final data = snapshot.data();
-    if (data == null) return;
-
-    final status = RideStatusX.fromString(data['status'] as String?);
-    if (status == RideStatus.completed || status == RideStatus.cancelled) {
-      return;
-    }
-    if (cancelledBy == UserRole.customer &&
-        (status == RideStatus.inProgress ||
-            status == RideStatus.awaitingCashPayment)) {
-      throw StateError('Ride can no longer be cancelled after it has started.');
-    }
-
-    await ref.update({
-      'status': RideStatus.cancelled.value,
-      'cancelledAt': FieldValue.serverTimestamp(),
-      'cancelledBy': cancelledBy.value,
-      'offeredDriverIds': <String>[],
-      'notifyDrivers': false,
-      'notifyCustomer': false,
-    });
-
-    final assignedDriverId = data['driverId'] as String?;
-    if (assignedDriverId != null && assignedDriverId.isNotEmpty) {
-      await _setDriverActiveRide(assignedDriverId, false);
-    }
-
-    NotificationService.clearDriverRideOffer(rideId);
-
     try {
-      if (cancelledBy == UserRole.customer) {
-        final customerId = data['customerId'] as String?;
-        if (customerId != null && customerId.isNotEmpty) {
-          await _firestore.collection('users').doc(customerId).update({
-            'cancelledRidesCount': FieldValue.increment(1),
-          });
-        }
-      } else if (cancelledBy == UserRole.driver) {
-        final driverId = data['driverId'] as String?;
-        if (driverId != null && driverId.isNotEmpty) {
-          await _firestore.collection('drivers').doc(driverId).update({
-            'cancelledRidesCount': FieldValue.increment(1),
-          });
-        }
-      }
-    } catch (_) {
-      // Ride is already cancelled; stats update is best-effort.
+      await _functions.httpsCallable('cancelRide').call({
+        'rideId': rideId,
+        'cancelledBy': cancelledBy.value,
+      });
+      NotificationService.clearDriverRideOffer(rideId);
+    } catch (error) {
+      _rethrowRideCallable(error);
     }
   }
 }

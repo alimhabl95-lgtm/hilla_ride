@@ -437,8 +437,11 @@ function createRewardsModule({
         type: "reward",
         createdBy: actorUid,
         note: `Reward: ${titleEn} (${campaign.id})`,
+        description: `Reward: ${titleEn}`,
         rewardCampaignId: campaign.id,
         rewardGrantId: grantId,
+        referenceId: grantId,
+        status: "posted",
       });
     } else {
       await applyNonWalletReward({ driverId, campaign, grantId });

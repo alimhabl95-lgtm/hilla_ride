@@ -221,11 +221,16 @@ class _AdminDriverWalletScreenState extends State<AdminDriverWalletScreen> {
                                 isAr ? 'غرامة' : 'Penalty',
                               WalletLedgerType.reward =>
                                 isAr ? 'حافز / مكافأة' : 'Reward',
+                              WalletLedgerType.withdrawal =>
+                                isAr ? 'سحب' : 'Withdrawal',
                             },
                           ),
                           subtitle: Text(
                             [
-                              if (e.note.isNotEmpty) e.note,
+                              if (e.displayDescription.isNotEmpty)
+                                e.displayDescription,
+                              if (e.referenceId.isNotEmpty)
+                                '${isAr ? 'مرجع' : 'Ref'}: ${e.referenceId}',
                               if (e.createdAt != null)
                                 e.createdAt!
                                     .toLocal()

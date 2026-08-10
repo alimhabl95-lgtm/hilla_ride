@@ -9,10 +9,14 @@ struct DriverWalletView: View {
     @State private var liveDriver: DriverProfile?
     @State private var config = WalletConfig.default
     @State private var ledger: [WalletLedgerEntry] = []
+    @State private var withdrawals: [WalletWithdrawalRequest] = []
     @State private var showRecharge = false
+    @State private var showWithdraw = false
     @State private var driverTask: Task<Void, Never>?
     @State private var configTask: Task<Void, Never>?
     @State private var ledgerTask: Task<Void, Never>?
+    @State private var withdrawalsTask: Task<Void, Never>?
+    @State private var cancellingId: String?
 
     private var current: DriverProfile { liveDriver ?? driver }
     private var isAr: Bool { appState.language == .arabic }
@@ -29,6 +33,19 @@ struct DriverWalletView: View {
                     showRecharge = true
                 }
 
+                if config.withdrawalsEnabled {
+                    Button {
+                        showWithdraw = true
+                    } label: {
+                        Label(
+                            isAr ? "طلب سحب" : "Request withdrawal",
+                            systemImage: "creditcard.fill"
+                        )
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(isBlocked)
+                }
+
                 if isLow || isBlocked {
                     AppBanner(
                         message: isAr
@@ -37,6 +54,10 @@ struct DriverWalletView: View {
                         systemImage: "exclamationmark.triangle.fill",
                         tone: isBlocked ? .danger : .warning
                     )
+                }
+
+                if config.withdrawalsEnabled {
+                    withdrawalsSection
                 }
 
                 VStack(alignment: .leading, spacing: AppSpacing.md) {
@@ -77,12 +98,94 @@ struct DriverWalletView: View {
         .navigationDestination(isPresented: $showRecharge) {
             DriverWalletRechargeView(driver: current, config: config)
         }
+        .navigationDestination(isPresented: $showWithdraw) {
+            DriverWalletWithdrawView(driver: current, config: config)
+        }
         .onAppear { startWatching() }
         .onDisappear {
             driverTask?.cancel()
             configTask?.cancel()
             ledgerTask?.cancel()
+            withdrawalsTask?.cancel()
         }
+    }
+
+    private var withdrawalsSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            Text(isAr ? "طلبات السحب" : "Withdrawals")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(BrandColors.navy)
+                .padding(.horizontal, AppSpacing.xs)
+
+            if withdrawals.isEmpty {
+                AppEmptyState(
+                    title: isAr ? "لا طلبات سحب" : "No withdrawals yet",
+                    message: isAr
+                        ? "اطلب سحباً إلى بطاقة ماستركارد من الزر أعلاه"
+                        : "Request a Mastercard withdrawal using the button above",
+                    systemImage: "creditcard"
+                )
+                .frame(maxWidth: .infinity)
+                .appCard()
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(withdrawals.enumerated()), id: \.element.id) { index, req in
+                        withdrawalRow(req)
+                        if index < withdrawals.count - 1 {
+                            Divider()
+                                .padding(.leading, AppSpacing.lg)
+                        }
+                    }
+                }
+                .appCard()
+            }
+        }
+    }
+
+    private func withdrawalRow(_ req: WalletWithdrawalRequest) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            HStack {
+                Text(formatIqd(req.amountIqd))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(BrandColors.navy)
+                Spacer(minLength: AppSpacing.sm)
+                Text(withdrawalStatusLabel(req.status))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(BrandColors.muted)
+            }
+
+            Text("**** \(req.cardLast4) • \(req.cardholderName)")
+                .font(.caption)
+                .foregroundStyle(BrandColors.muted)
+
+            if !req.referenceId.isEmpty {
+                Text("\(isAr ? "مرجع" : "Ref"): \(req.referenceId)")
+                    .font(.caption)
+                    .foregroundStyle(BrandColors.muted)
+            }
+
+            if !req.rejectionReason.isEmpty {
+                Text(req.rejectionReason)
+                    .font(.caption)
+                    .foregroundStyle(BrandColors.danger)
+            }
+
+            if req.status == .pending {
+                Button {
+                    Task { await cancelWithdrawal(req.id) }
+                } label: {
+                    if cancellingId == req.id {
+                        ProgressView()
+                    } else {
+                        Text(isAr ? "إلغاء الطلب" : "Cancel request")
+                    }
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .disabled(cancellingId != nil)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, AppSpacing.sm)
     }
 
     private func ledgerRow(_ entry: WalletLedgerEntry) -> some View {
@@ -100,8 +203,13 @@ struct DriverWalletView: View {
                 Text(ledgerTypeLabel(entry.type, language: appState.language))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(BrandColors.navy)
-                if !entry.note.isEmpty {
-                    Text(entry.note)
+                if !entry.displayDescription.isEmpty {
+                    Text(entry.displayDescription)
+                        .font(.caption)
+                        .foregroundStyle(BrandColors.muted)
+                }
+                if !entry.referenceId.isEmpty {
+                    Text("\(isAr ? "مرجع" : "Ref"): \(entry.referenceId)")
                         .font(.caption)
                         .foregroundStyle(BrandColors.muted)
                 }
@@ -124,6 +232,7 @@ struct DriverWalletView: View {
         case "bonus", "reward": return "gift.fill"
         case "refund": return "arrow.uturn.backward.circle.fill"
         case "penalty": return "exclamationmark.circle.fill"
+        case "withdrawal": return "arrow.up.right.circle.fill"
         default: return "arrow.left.arrow.right"
         }
     }
@@ -162,7 +271,29 @@ struct DriverWalletView: View {
         case "bonus": return ar ? "مكافأة" : "Bonus"
         case "penalty": return ar ? "غرامة" : "Penalty"
         case "reward": return ar ? "حافز / مكافأة" : "Reward"
+        case "withdrawal": return ar ? "سحب" : "Withdrawal"
         default: return type.capitalized
+        }
+    }
+
+    private func withdrawalStatusLabel(_ status: WalletWithdrawalStatus) -> String {
+        switch status {
+        case .pending: return isAr ? "قيد الانتظار" : "Pending"
+        case .approved: return isAr ? "موافق عليه" : "Approved"
+        case .processing: return isAr ? "قيد التحويل" : "Processing"
+        case .completed: return isAr ? "مكتمل" : "Completed"
+        case .rejected: return isAr ? "مرفوض" : "Rejected"
+        case .cancelled: return isAr ? "ملغى" : "Cancelled"
+        }
+    }
+
+    private func cancelWithdrawal(_ requestId: String) async {
+        cancellingId = requestId
+        defer { cancellingId = nil }
+        do {
+            try await WalletService().cancelWithdrawalRequest(requestId: requestId)
+        } catch {
+            // Keep list live via stream; errors surface on next interaction.
         }
     }
 
@@ -185,6 +316,152 @@ struct DriverWalletView: View {
                 guard !Task.isCancelled else { break }
                 await MainActor.run { ledger = entries }
             }
+        }
+        withdrawalsTask = Task {
+            for await items in WalletService().watchMyWithdrawals(driverId: uid) {
+                guard !Task.isCancelled else { break }
+                await MainActor.run { withdrawals = items }
+            }
+        }
+    }
+}
+
+struct DriverWalletWithdrawView: View {
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    let driver: DriverProfile
+    let config: WalletConfig
+
+    @State private var amountText = ""
+    @State private var cardholderName = ""
+    @State private var cardNumber = ""
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+
+    private var isAr: Bool { appState.language == .arabic }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: AppSpacing.lg) {
+                VStack(alignment: .leading, spacing: AppSpacing.md) {
+                    Text(
+                        isAr
+                            ? "الرصيد المتاح: \(formatIqd(driver.walletBalanceIqd))"
+                            : "Available: \(formatIqd(driver.walletBalanceIqd))"
+                    )
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(BrandColors.navy)
+
+                    withdrawField(
+                        title: isAr ? "المبلغ (د.ع)" : "Amount (IQD)",
+                        text: $amountText,
+                        keyboard: .numberPad,
+                        helper: isAr
+                            ? "الحد الأدنى \(config.minWithdrawalIqd)"
+                            : "Minimum \(config.minWithdrawalIqd)"
+                    )
+                    withdrawField(
+                        title: isAr ? "اسم حامل البطاقة" : "Cardholder name",
+                        text: $cardholderName
+                    )
+                    withdrawField(
+                        title: isAr ? "رقم ماستركارد" : "Mastercard number",
+                        text: $cardNumber,
+                        keyboard: .numberPad,
+                        helper: isAr
+                            ? "يُحفظ بشكل آمن ولا يظهر لاحقاً إلا للإدارة"
+                            : "Stored securely; only admins can reveal full number"
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .appCard()
+
+                if let errorMessage {
+                    AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
+                }
+
+                Button {
+                    Task { await submit() }
+                } label: {
+                    if isSubmitting {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text(isAr ? "إرسال الطلب" : "Submit request")
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(isSubmitting)
+            }
+            .padding(AppSpacing.lg)
+        }
+        .background(BrandColors.surface.ignoresSafeArea())
+        .navigationTitle(isAr ? "طلب سحب" : "Withdraw")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func withdrawField(
+        title: String,
+        text: Binding<String>,
+        keyboard: UIKeyboardType = .default,
+        helper: String? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(BrandColors.muted)
+            TextField(title, text: text)
+                .keyboardType(keyboard)
+                .textFieldStyle(AppTextFieldStyle())
+            if let helper {
+                Text(helper)
+                    .font(.caption2)
+                    .foregroundStyle(BrandColors.muted)
+            }
+        }
+    }
+
+    private func formatIqd(_ amount: Int) -> String {
+        isAr ? "\(amount) د.ع" : "\(amount) IQD"
+    }
+
+    private func submit() async {
+        errorMessage = nil
+        let amount = Int(amountText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let name = cardholderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let digits = cardNumber.filter(\.isNumber)
+
+        if amount < config.minWithdrawalIqd {
+            errorMessage = isAr
+                ? "الحد الأدنى \(config.minWithdrawalIqd) د.ع"
+                : "Minimum is \(config.minWithdrawalIqd) IQD"
+            return
+        }
+        if config.maxWithdrawalIqd > 0, amount > config.maxWithdrawalIqd {
+            errorMessage = isAr
+                ? "الحد الأقصى \(config.maxWithdrawalIqd) د.ع"
+                : "Maximum is \(config.maxWithdrawalIqd) IQD"
+            return
+        }
+        if name.count < 2 || digits.count != 16 {
+            errorMessage = isAr
+                ? "أدخل اسم حامل البطاقة ورقم ماستركارد صالحاً"
+                : "Enter cardholder name and a valid Mastercard number"
+            return
+        }
+
+        isSubmitting = true
+        defer { isSubmitting = false }
+        do {
+            _ = try await WalletService().submitWithdrawalRequest(
+                amountIqd: amount,
+                cardholderName: name,
+                cardNumber: digits
+            )
+            dismiss()
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 }

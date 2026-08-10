@@ -9,6 +9,7 @@ enum WalletServiceError: LocalizedError {
     case invalidAmount
     case screenshotRequired
     case uploadFailed
+    case invalidWithdrawal
 
     var errorDescription: String? {
         switch self {
@@ -16,8 +17,14 @@ enum WalletServiceError: LocalizedError {
         case .invalidAmount: return "Minimum recharge is 1000 IQD."
         case .screenshotRequired: return "Payment screenshot is required."
         case .uploadFailed: return "Could not upload screenshot."
+        case .invalidWithdrawal: return "Invalid withdrawal request."
         }
     }
+}
+
+struct WalletWithdrawalSubmitResult: Equatable {
+    let requestId: String
+    let referenceId: String
 }
 
 final class WalletService {
@@ -55,6 +62,50 @@ final class WalletService {
                 }
             continuation.onTermination = { _ in listener.remove() }
         }
+    }
+
+    func watchMyWithdrawals(driverId: String) -> AsyncStream<[WalletWithdrawalRequest]> {
+        AsyncStream { continuation in
+            let listener = firestore.collection("walletWithdrawalRequests")
+                .whereField("driverId", isEqualTo: driverId)
+                .order(by: "createdAt", descending: true)
+                .limit(to: 40)
+                .addSnapshotListener { snapshot, _ in
+                    let items = snapshot?.documents.compactMap {
+                        WalletWithdrawalRequest(documentID: $0.documentID, data: $0.data())
+                    } ?? []
+                    continuation.yield(items)
+                }
+            continuation.onTermination = { _ in listener.remove() }
+        }
+    }
+
+    func submitWithdrawalRequest(
+        amountIqd: Int,
+        cardholderName: String,
+        cardNumber: String
+    ) async throws -> WalletWithdrawalSubmitResult {
+        let digits = cardNumber.filter(\.isNumber)
+        guard amountIqd > 0, !cardholderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw WalletServiceError.invalidWithdrawal
+        }
+        let result = try await functions.httpsCallable("submitWalletWithdrawalRequest").call([
+            "amountIqd": amountIqd,
+            "cardholderName": cardholderName.trimmingCharacters(in: .whitespacesAndNewlines),
+            "cardNumber": digits
+        ])
+        let data = result.data as? [String: Any] ?? [:]
+        return WalletWithdrawalSubmitResult(
+            requestId: data["requestId"] as? String ?? "",
+            referenceId: data["referenceId"] as? String ?? ""
+        )
+    }
+
+    func cancelWithdrawalRequest(requestId: String) async throws {
+        guard !requestId.isEmpty else { throw WalletServiceError.invalidWithdrawal }
+        _ = try await functions.httpsCallable("cancelWalletWithdrawalRequest").call([
+            "requestId": requestId
+        ])
     }
 
     func uploadRechargeScreenshot(driverId: String, data: Data) async throws -> String {

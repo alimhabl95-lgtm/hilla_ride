@@ -2846,6 +2846,9 @@ async function getWalletConfig() {
   return {
     minBalanceIqd: Math.max(1, Number(data.minBalanceIqd) || 1),
     lowBalanceWarningIqd: Number(data.lowBalanceWarningIqd) || 5000,
+    minWithdrawalIqd: Math.max(1000, Number(data.minWithdrawalIqd) || 5000),
+    maxWithdrawalIqd: Math.max(0, Number(data.maxWithdrawalIqd) || 0),
+    withdrawalsEnabled: data.withdrawalsEnabled !== false,
     companySuperQiNumber: String(data.companySuperQiNumber || ""),
     companySuperQiName: String(data.companySuperQiName || "Hello Tuk-Tuk"),
     managerWhatsappNumber: String(data.managerWhatsappNumber || ""),
@@ -2863,21 +2866,67 @@ async function getWalletConfig() {
   };
 }
 
+function luhnCheck(cardNumber) {
+  let sum = 0;
+  let alternate = false;
+  for (let i = cardNumber.length - 1; i >= 0; i -= 1) {
+    let n = Number(cardNumber[i]);
+    if (!Number.isFinite(n)) return false;
+    if (alternate) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alternate = !alternate;
+  }
+  return sum % 10 === 0;
+}
+
+function isValidMastercard(cardNumber) {
+  const digits = String(cardNumber || "").replace(/\D/g, "");
+  if (digits.length !== 16) return false;
+  const prefix2 = Number(digits.slice(0, 2));
+  const prefix4 = Number(digits.slice(0, 4));
+  const isMc =
+    (prefix2 >= 51 && prefix2 <= 55) || (prefix4 >= 2221 && prefix4 <= 2720);
+  return isMc && luhnCheck(digits);
+}
+
+function makeWithdrawalReferenceId() {
+  const d = new Date();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `WD-${y}${m}${day}-${rand}`;
+}
+
 async function applyWalletDelta({
   driverId,
   amountIqd,
   type,
   createdBy,
   note = "",
+  description = "",
   rideId = "",
   rechargeRequestId = "",
+  withdrawalRequestId = "",
   rewardCampaignId = "",
   rewardGrantId = "",
+  referenceId = "",
+  status = "posted",
 }) {
   const db = admin.firestore();
   const driverRef = db.collection("drivers").doc(driverId);
   const ledgerRef = db.collection("walletLedger").doc();
   const config = await getWalletConfig();
+  const resolvedReferenceId =
+    referenceId ||
+    withdrawalRequestId ||
+    rechargeRequestId ||
+    rideId ||
+    rewardGrantId ||
+    ledgerRef.id;
 
   return db.runTransaction(async (tx) => {
     const driverSnap = await tx.get(driverRef);
@@ -2907,15 +2956,24 @@ async function applyWalletDelta({
       type,
       amountIqd,
       balanceAfterIqd: next,
+      status: status || "posted",
+      description: description || note || "",
+      referenceId: resolvedReferenceId,
       rideId: rideId || null,
       rechargeRequestId: rechargeRequestId || null,
+      withdrawalRequestId: withdrawalRequestId || null,
       rewardCampaignId: rewardCampaignId || null,
       rewardGrantId: rewardGrantId || null,
       createdBy: createdBy || "system",
       note: note || "",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    return { balanceAfterIqd: next, walletStatus };
+    return {
+      balanceAfterIqd: next,
+      walletStatus,
+      ledgerEntryId: ledgerRef.id,
+      referenceId: resolvedReferenceId,
+    };
   });
 }
 
@@ -2930,10 +2988,23 @@ exports.saveWalletConfig = functions.https.onCall(async (data, context) => {
     ? data.enabledMethods.map(String)
     : ["superQi", "cash", "bankTransfer"];
 
+  const minWithdrawalIqd = Math.max(
+    1000,
+    Math.trunc(Number(data.minWithdrawalIqd) || 5000),
+  );
+  const maxWithdrawalIqd = Math.max(
+    0,
+    Math.trunc(Number(data.maxWithdrawalIqd) || 0),
+  );
+  const withdrawalsEnabled = data.withdrawalsEnabled !== false;
+
   await admin.firestore().collection("config").doc("wallet").set(
     {
       minBalanceIqd,
       lowBalanceWarningIqd,
+      minWithdrawalIqd,
+      maxWithdrawalIqd,
+      withdrawalsEnabled,
       companySuperQiNumber: String(data.companySuperQiNumber || "").trim(),
       companySuperQiName:
         String(data.companySuperQiName || "Hello Tuk-Tuk").trim() ||
@@ -3205,6 +3276,8 @@ exports.adjustDriverWallet = functions.https.onCall(async (data, context) => {
     type: amountIqd > 0 ? "adjustment" : "penalty",
     createdBy: context.auth.uid,
     note,
+    description: note,
+    referenceId: `ADJ-${Date.now()}`,
   });
   await writeAdminAuditLog({
     adminId: context.auth.uid,
@@ -3214,6 +3287,452 @@ exports.adjustDriverWallet = functions.https.onCall(async (data, context) => {
     details: { amountIqd, note },
   });
   return { ok: true, ...result };
+});
+
+const OPEN_WITHDRAWAL_STATUSES = new Set(["pending", "approved", "processing"]);
+
+exports.submitWalletWithdrawalRequest = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+  const amountIqd = Math.trunc(Number(data.amountIqd));
+  const cardholderName = String(data.cardholderName || "").trim();
+  const cardNumber = String(data.cardNumber || "").replace(/\D/g, "");
+  const config = await getWalletConfig();
+
+  if (!config.withdrawalsEnabled) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Withdrawals are temporarily disabled.",
+    );
+  }
+  if (!Number.isFinite(amountIqd) || amountIqd < config.minWithdrawalIqd) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `Minimum withdrawal is ${config.minWithdrawalIqd} IQD.`,
+    );
+  }
+  if (config.maxWithdrawalIqd > 0 && amountIqd > config.maxWithdrawalIqd) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      `Maximum withdrawal is ${config.maxWithdrawalIqd} IQD.`,
+    );
+  }
+  if (!cardholderName || cardholderName.length < 2) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Cardholder name is required.",
+    );
+  }
+  if (!isValidMastercard(cardNumber)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Enter a valid Mastercard number.",
+    );
+  }
+
+  const driverId = context.auth.uid;
+  const db = admin.firestore();
+  const driverDoc = await db.collection("drivers").doc(driverId).get();
+  if (!driverDoc.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "Driver profile required.");
+  }
+  const driver = driverDoc.data() || {};
+  const balance = Number(driver.walletBalanceIqd) || 0;
+  if (balance < amountIqd) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Insufficient wallet balance.",
+    );
+  }
+
+  const openSnap = await db
+    .collection("walletWithdrawalRequests")
+    .where("driverId", "==", driverId)
+    .where("status", "in", ["pending", "approved", "processing"])
+    .limit(1)
+    .get();
+  if (!openSnap.empty) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "You already have an open withdrawal request.",
+    );
+  }
+
+  const referenceId = makeWithdrawalReferenceId();
+  const requestRef = db.collection("walletWithdrawalRequests").doc();
+  const secretRef = db.collection("walletWithdrawalSecrets").doc(requestRef.id);
+  const batch = db.batch();
+  batch.set(requestRef, {
+    driverId,
+    driverName: String(driver.name || ""),
+    driverPhone: String(driver.phone || ""),
+    districtId: String(driver.assignedDistrictId || "").trim(),
+    subDistrictId: String(driver.assignedSubDistrictId || "").trim(),
+    amountIqd,
+    cardholderName,
+    cardLast4: cardNumber.slice(-4),
+    cardBrand: "mastercard",
+    status: "pending",
+    adminNote: "",
+    rejectionReason: "",
+    referenceId,
+    ledgerEntryId: "",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  batch.set(secretRef, {
+    cardNumber,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  await batch.commit();
+
+  try {
+    const managers = await db
+      .collection("users")
+      .where("role", "==", "manager")
+      .limit(20)
+      .get();
+    for (const doc of managers.docs) {
+      await sendToToken(
+        doc.data()?.fcmToken,
+        "Wallet withdrawal request",
+        `${driver.name || "Driver"} requested ${amountIqd} IQD`,
+        { type: "wallet_withdrawal_pending", requestId: requestRef.id },
+        "default",
+      );
+    }
+  } catch (error) {
+    functions.logger.warn("wallet withdrawal manager notify failed", {
+      message: error.message,
+    });
+  }
+
+  return { ok: true, requestId: requestRef.id, referenceId };
+});
+
+exports.cancelWalletWithdrawalRequest = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+  const requestId = String(data.requestId || "").trim();
+  if (!requestId) {
+    throw new functions.https.HttpsError("invalid-argument", "requestId required.");
+  }
+  const db = admin.firestore();
+  const ref = db.collection("walletWithdrawalRequests").doc(requestId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "Request not found.");
+    }
+    const req = snap.data() || {};
+    if (req.driverId !== context.auth.uid) {
+      throw new functions.https.HttpsError("permission-denied", "Not your request.");
+    }
+    if (req.status !== "pending") {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Only pending requests can be cancelled.",
+      );
+    }
+    tx.update(ref, {
+      status: "cancelled",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  return { ok: true };
+});
+
+exports.reviewWalletWithdrawalRequest = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["wallet", "earnings"]);
+  const requestId = String(data.requestId || "").trim();
+  const action = String(data.action || "").trim().toLowerCase();
+  const adminNote = String(data.adminNote || "").trim();
+  const rejectionReason = String(data.rejectionReason || "").trim();
+  if (!requestId || !["approve", "reject"].includes(action)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "requestId and action (approve|reject) required.",
+    );
+  }
+  if (action === "reject" && !rejectionReason) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Rejection reason is required.",
+    );
+  }
+
+  const db = admin.firestore();
+  const ref = db.collection("walletWithdrawalRequests").doc(requestId);
+  const result = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "Request not found.");
+    }
+    const req = snap.data() || {};
+    const status = String(req.status || "");
+    if (action === "approve") {
+      if (status !== "pending") {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Only pending requests can be approved.",
+        );
+      }
+      tx.update(ref, {
+        status: "approved",
+        adminNote,
+        rejectionReason: "",
+        reviewedBy: context.auth.uid,
+        reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      if (!["pending", "approved", "processing"].includes(status)) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Request cannot be rejected in its current status.",
+        );
+      }
+      tx.update(ref, {
+        status: "rejected",
+        adminNote,
+        rejectionReason,
+        reviewedBy: context.auth.uid,
+        reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    return {
+      driverId: String(req.driverId || ""),
+      amountIqd: Number(req.amountIqd) || 0,
+      approved: action === "approve",
+      referenceId: String(req.referenceId || ""),
+    };
+  });
+
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: action === "approve" ? "wallet.withdrawal_approved" : "wallet.withdrawal_rejected",
+    entityType: "walletWithdrawalRequest",
+    entityId: requestId,
+    details: {
+      amountIqd: result.amountIqd,
+      referenceId: result.referenceId,
+      rejectionReason,
+      adminNote,
+    },
+  });
+
+  if (result.driverId) {
+    try {
+      const driverUser = await db.collection("users").doc(result.driverId).get();
+      const driverDoc = await db.collection("drivers").doc(result.driverId).get();
+      const token =
+        driverUser.data()?.fcmToken || driverDoc.data()?.fcmToken || null;
+      await sendToToken(
+        token,
+        result.approved ? "Withdrawal approved" : "Withdrawal rejected",
+        result.approved
+          ? `Your withdrawal of ${result.amountIqd} IQD was approved.`
+          : rejectionReason || "Your withdrawal request was rejected.",
+        {
+          type: result.approved
+            ? "wallet_withdrawal_approved"
+            : "wallet_withdrawal_rejected",
+          requestId,
+        },
+        "default",
+      );
+    } catch (_) {}
+  }
+
+  return { ok: true, approved: result.approved };
+});
+
+exports.processWalletWithdrawalRequest = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["wallet", "earnings"]);
+  const requestId = String(data.requestId || "").trim();
+  const adminNote = String(data.adminNote || "").trim();
+  if (!requestId) {
+    throw new functions.https.HttpsError("invalid-argument", "requestId required.");
+  }
+  const db = admin.firestore();
+  const ref = db.collection("walletWithdrawalRequests").doc(requestId);
+  const result = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "Request not found.");
+    }
+    const req = snap.data() || {};
+    if (req.status !== "approved") {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Only approved requests can move to processing.",
+      );
+    }
+    tx.update(ref, {
+      status: "processing",
+      adminNote: adminNote || req.adminNote || "",
+      processedBy: context.auth.uid,
+      processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {
+      driverId: String(req.driverId || ""),
+      amountIqd: Number(req.amountIqd) || 0,
+      referenceId: String(req.referenceId || ""),
+    };
+  });
+
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: "wallet.withdrawal_processing",
+    entityType: "walletWithdrawalRequest",
+    entityId: requestId,
+    details: result,
+  });
+
+  if (result.driverId) {
+    try {
+      const driverUser = await db.collection("users").doc(result.driverId).get();
+      const driverDoc = await db.collection("drivers").doc(result.driverId).get();
+      const token =
+        driverUser.data()?.fcmToken || driverDoc.data()?.fcmToken || null;
+      await sendToToken(
+        token,
+        "Withdrawal processing",
+        `Your withdrawal of ${result.amountIqd} IQD is being processed.`,
+        { type: "wallet_withdrawal_processing", requestId },
+        "default",
+      );
+    } catch (_) {}
+  }
+
+  return { ok: true };
+});
+
+exports.completeWalletWithdrawalRequest = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["wallet", "earnings"]);
+  const requestId = String(data.requestId || "").trim();
+  const adminNote = String(data.adminNote || "").trim();
+  if (!requestId) {
+    throw new functions.https.HttpsError("invalid-argument", "requestId required.");
+  }
+
+  const db = admin.firestore();
+  const ref = db.collection("walletWithdrawalRequests").doc(requestId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new functions.https.HttpsError("not-found", "Request not found.");
+  }
+  const req = snap.data() || {};
+  if (req.status !== "processing" && req.status !== "approved") {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Only approved/processing requests can be completed.",
+    );
+  }
+  if (req.ledgerEntryId) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Withdrawal already completed.",
+    );
+  }
+
+  const driverId = String(req.driverId || "");
+  const amountIqd = Math.trunc(Number(req.amountIqd) || 0);
+  const referenceId = String(req.referenceId || requestId);
+  if (!driverId || amountIqd <= 0) {
+    throw new functions.https.HttpsError("failed-precondition", "Invalid withdrawal.");
+  }
+
+  const delta = await applyWalletDelta({
+    driverId,
+    amountIqd: -amountIqd,
+    type: "withdrawal",
+    createdBy: context.auth.uid,
+    note: `Withdrawal ${referenceId}`,
+    description: `Mastercard withdrawal ${referenceId}`,
+    withdrawalRequestId: requestId,
+    referenceId,
+    status: "posted",
+  });
+
+  await ref.update({
+    status: "completed",
+    adminNote: adminNote || req.adminNote || "",
+    ledgerEntryId: delta.ledgerEntryId,
+    processedBy: req.processedBy || context.auth.uid,
+    processedAt: req.processedAt || admin.firestore.FieldValue.serverTimestamp(),
+    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: "wallet.withdrawal_completed",
+    entityType: "walletWithdrawalRequest",
+    entityId: requestId,
+    details: {
+      amountIqd,
+      referenceId,
+      ledgerEntryId: delta.ledgerEntryId,
+      balanceAfterIqd: delta.balanceAfterIqd,
+    },
+  });
+
+  try {
+    const driverUser = await db.collection("users").doc(driverId).get();
+    const driverDoc = await db.collection("drivers").doc(driverId).get();
+    const token =
+      driverUser.data()?.fcmToken || driverDoc.data()?.fcmToken || null;
+    await sendToToken(
+      token,
+      "Withdrawal completed",
+      `${amountIqd} IQD was sent to your Mastercard.`,
+      { type: "wallet_withdrawal_completed", requestId },
+      "default",
+    );
+  } catch (_) {}
+
+  return { ok: true, ...delta };
+});
+
+exports.getWithdrawalCardForAdmin = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["wallet", "earnings"]);
+  const requestId = String(data.requestId || "").trim();
+  if (!requestId) {
+    throw new functions.https.HttpsError("invalid-argument", "requestId required.");
+  }
+  const db = admin.firestore();
+  const [reqSnap, secretSnap] = await Promise.all([
+    db.collection("walletWithdrawalRequests").doc(requestId).get(),
+    db.collection("walletWithdrawalSecrets").doc(requestId).get(),
+  ]);
+  if (!reqSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "Request not found.");
+  }
+  if (!secretSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "Card details not found.");
+  }
+  const cardNumber = String(secretSnap.data()?.cardNumber || "").replace(/\D/g, "");
+  await writeAdminAuditLog({
+    adminId: context.auth.uid,
+    action: "wallet.withdrawal_card_viewed",
+    entityType: "walletWithdrawalRequest",
+    entityId: requestId,
+    details: {
+      cardLast4: cardNumber.slice(-4),
+      referenceId: String(reqSnap.data()?.referenceId || ""),
+    },
+  });
+  return {
+    ok: true,
+    cardNumber,
+    cardLast4: cardNumber.slice(-4),
+    cardholderName: String(reqSnap.data()?.cardholderName || ""),
+  };
 });
 
 const serviceAreaCollections = {
@@ -3490,6 +4009,24 @@ exports.seedServiceAreas = functions.https.onCall(async (data, context) => {
   await batch.commit();
   return { ok: true, districts: districts.length, subDistricts: subs.length };
 });
+
+// --- Ride lifecycle (server-authoritative) ---
+const { createRidesModule } = require("./rides");
+const ridesRuntime = createRidesModule({
+  admin,
+  functions,
+  assertAdminPermissionAny,
+});
+exports.createRide = ridesRuntime.createRide;
+exports.acceptRide = ridesRuntime.acceptRide;
+exports.rejectRide = ridesRuntime.rejectRide;
+exports.startRide = ridesRuntime.startRide;
+exports.endRideAwaitingCash = ridesRuntime.endRideAwaitingCash;
+exports.confirmCashCollected = ridesRuntime.confirmCashCollected;
+exports.cancelRide = ridesRuntime.cancelRide;
+exports.assignNearestDriver = ridesRuntime.assignNearestDriver;
+exports.submitDriverRating = ridesRuntime.submitDriverRating;
+exports.applyPendingRideEarnings = ridesRuntime.applyPendingRideEarnings;
 
 // --- Driver Rewards & Incentives ---
 const { createRewardsModule } = require("./rewards");

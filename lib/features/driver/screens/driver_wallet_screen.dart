@@ -29,7 +29,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -72,6 +72,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
           unselectedLabelColor: Colors.white70,
           tabs: [
             Tab(text: isAr ? 'الرصيد' : 'Balance'),
+            Tab(text: isAr ? 'السحب' : 'Withdraw'),
             Tab(text: isAr ? 'السجل' : 'History'),
           ],
         ),
@@ -135,6 +136,24 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
                         },
                       ),
                       const SizedBox(height: AppSpacing.md),
+                      if (config.withdrawalsEnabled)
+                        AppPrimaryButton(
+                          label: isAr ? 'طلب سحب' : 'Request withdrawal',
+                          icon: Icons.account_balance,
+                          onPressed: blocked
+                              ? null
+                              : () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => DriverWalletWithdrawScreen(
+                                        driver: driver,
+                                        config: config,
+                                      ),
+                                    ),
+                                  );
+                                },
+                        ),
+                      const SizedBox(height: AppSpacing.md),
                       Text(
                         isAr
                             ? 'هذه محفظة داخلية لعمولة الشركة فقط وليست محفظة سوبر كي.'
@@ -145,6 +164,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
                       ),
                     ],
                   ),
+                  _DriverWithdrawalsList(driverId: driver.uid, isAr: isAr),
                   StreamBuilder<List<WalletLedgerEntry>>(
                     stream: wallet.watchLedger(driver.uid),
                     builder: (context, snap) {
@@ -208,12 +228,16 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
                                               color: AppBrandAssets.brandNavy,
                                             ),
                                       ),
-                                      if (e.note.isNotEmpty ||
+                                      if (e.displayDescription.isNotEmpty ||
+                                          e.referenceId.isNotEmpty ||
                                           e.createdAt != null) ...[
                                         const SizedBox(height: 2),
                                         Text(
                                           [
-                                            if (e.note.isNotEmpty) e.note,
+                                            if (e.displayDescription.isNotEmpty)
+                                              e.displayDescription,
+                                            if (e.referenceId.isNotEmpty)
+                                              '${isAr ? 'مرجع' : 'Ref'}: ${e.referenceId}',
                                             if (e.createdAt != null)
                                               e.createdAt!
                                                   .toLocal()
@@ -267,7 +291,253 @@ String _ledgerTypeLabel(WalletLedgerType type, bool isAr) {
     WalletLedgerType.bonus => isAr ? 'مكافأة' : 'Bonus',
     WalletLedgerType.penalty => isAr ? 'غرامة' : 'Penalty',
     WalletLedgerType.reward => isAr ? 'حافز / مكافأة' : 'Reward',
+    WalletLedgerType.withdrawal => isAr ? 'سحب' : 'Withdrawal',
   };
+}
+
+String _withdrawalStatusLabel(WalletWithdrawalStatus status, bool isAr) {
+  return switch (status) {
+    WalletWithdrawalStatus.pending => isAr ? 'قيد الانتظار' : 'Pending',
+    WalletWithdrawalStatus.approved => isAr ? 'موافق عليه' : 'Approved',
+    WalletWithdrawalStatus.processing => isAr ? 'قيد التحويل' : 'Processing',
+    WalletWithdrawalStatus.completed => isAr ? 'مكتمل' : 'Completed',
+    WalletWithdrawalStatus.rejected => isAr ? 'مرفوض' : 'Rejected',
+    WalletWithdrawalStatus.cancelled => isAr ? 'ملغى' : 'Cancelled',
+  };
+}
+
+class _DriverWithdrawalsList extends StatelessWidget {
+  const _DriverWithdrawalsList({
+    required this.driverId,
+    required this.isAr,
+  });
+
+  final String driverId;
+  final bool isAr;
+
+  @override
+  Widget build(BuildContext context) {
+    final wallet = context.watch<AppState>().walletService;
+    const fare = FareService();
+    return StreamBuilder<List<WalletWithdrawalRequest>>(
+      stream: wallet.watchMyWithdrawalRequests(driverId),
+      builder: (context, snap) {
+        final items = snap.data ?? const <WalletWithdrawalRequest>[];
+        if (items.isEmpty) {
+          return AppEmptyState(
+            title: isAr ? 'لا طلبات سحب' : 'No withdrawals yet',
+            message: isAr
+                ? 'اطلب سحباً إلى بطاقة ماستركارد من تبويب الرصيد'
+                : 'Request a Mastercard withdrawal from the Balance tab',
+            icon: Icons.account_balance_outlined,
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+          itemBuilder: (context, index) {
+            final req = items[index];
+            return AppCard(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          fare.formatIqd(req.amountIqd),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      Text(_withdrawalStatusLabel(req.status, isAr)),
+                    ],
+                  ),
+                  Text('**** ${req.cardLast4} • ${req.cardholderName}'),
+                  if (req.referenceId.isNotEmpty)
+                    Text('${isAr ? 'مرجع' : 'Ref'}: ${req.referenceId}'),
+                  if (req.rejectionReason.isNotEmpty)
+                    Text(
+                      req.rejectionReason,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  if (req.status == WalletWithdrawalStatus.pending) ...[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () async {
+                        try {
+                          await wallet.cancelWithdrawalRequest(req.id);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('$e')),
+                          );
+                        }
+                      },
+                      child: Text(isAr ? 'إلغاء الطلب' : 'Cancel request'),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class DriverWalletWithdrawScreen extends StatefulWidget {
+  const DriverWalletWithdrawScreen({
+    super.key,
+    required this.driver,
+    required this.config,
+  });
+
+  final DriverProfile driver;
+  final WalletConfig config;
+
+  @override
+  State<DriverWalletWithdrawScreen> createState() =>
+      _DriverWalletWithdrawScreenState();
+}
+
+class _DriverWalletWithdrawScreenState extends State<DriverWalletWithdrawScreen> {
+  final _amountCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _cardCtrl = TextEditingController();
+  var _busy = false;
+  static const _fare = FareService();
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _nameCtrl.dispose();
+    _cardCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final amount = int.tryParse(_amountCtrl.text.trim()) ?? 0;
+    final name = _nameCtrl.text.trim();
+    final card = _cardCtrl.text.replaceAll(RegExp(r'\D'), '');
+    if (amount < widget.config.minWithdrawalIqd) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAr
+                ? 'الحد الأدنى ${widget.config.minWithdrawalIqd} د.ع'
+                : 'Minimum is ${widget.config.minWithdrawalIqd} IQD',
+          ),
+        ),
+      );
+      return;
+    }
+    if (name.length < 2 || card.length != 16) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAr
+                ? 'أدخل اسم حامل البطاقة ورقم ماستركارد صالحاً'
+                : 'Enter cardholder name and a valid Mastercard number',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final result =
+          await context.read<AppState>().walletService.submitWithdrawalRequest(
+                amountIqd: amount,
+                cardholderName: name,
+                cardNumber: card,
+              );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAr
+                ? 'تم إرسال طلب السحب ${result.referenceId}'
+                : 'Withdrawal submitted ${result.referenceId}',
+          ),
+        ),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isAr ? 'طلب سحب' : 'Withdraw'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        children: [
+          Text(
+            isAr
+                ? 'الرصيد المتاح: ${_fare.formatIqd(widget.driver.walletBalanceIqd)}'
+                : 'Available: ${_fare.formatIqd(widget.driver.walletBalanceIqd)}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: isAr ? 'المبلغ (د.ع)' : 'Amount (IQD)',
+              helperText: isAr
+                  ? 'الحد الأدنى ${widget.config.minWithdrawalIqd}'
+                  : 'Minimum ${widget.config.minWithdrawalIqd}',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _nameCtrl,
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+              labelText: isAr ? 'اسم حامل البطاقة' : 'Cardholder name',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _cardCtrl,
+            keyboardType: TextInputType.number,
+            maxLength: 19,
+            decoration: InputDecoration(
+              labelText: isAr ? 'رقم ماستركارد' : 'Mastercard number',
+              helperText: isAr
+                  ? 'يُحفظ بشكل آمن ولا يظهر لاحقاً إلا للإدارة'
+                  : 'Stored securely; only admins can reveal full number',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppPrimaryButton(
+            label: isAr ? 'إرسال الطلب' : 'Submit request',
+            icon: Icons.send,
+            onPressed: _busy ? null : _submit,
+          ),
+          if (_busy) ...[
+            const SizedBox(height: AppSpacing.md),
+            const Center(child: CircularProgressIndicator()),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class DriverWalletRechargeScreen extends StatefulWidget {

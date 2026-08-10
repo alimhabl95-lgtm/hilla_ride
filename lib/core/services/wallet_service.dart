@@ -67,6 +67,110 @@ class WalletService {
         );
   }
 
+  Stream<List<WalletWithdrawalRequest>> watchMyWithdrawalRequests(
+    String driverId,
+  ) {
+    return _firestore
+        .collection('walletWithdrawalRequests')
+        .where('driverId', isEqualTo: driverId)
+        .orderBy('createdAt', descending: true)
+        .limit(40)
+        .snapshots()
+        .map(
+          (snap) => snap.docs.map(WalletWithdrawalRequest.fromDoc).toList(),
+        );
+  }
+
+  Stream<List<WalletWithdrawalRequest>> watchWithdrawalRequests({
+    String? status,
+    int limit = 100,
+  }) {
+    Query<Map<String, dynamic>> query =
+        _firestore.collection('walletWithdrawalRequests');
+    if (status != null && status.isNotEmpty) {
+      query = query.where('status', isEqualTo: status);
+    }
+    return query
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs.map(WalletWithdrawalRequest.fromDoc).toList(),
+        );
+  }
+
+  Future<({String requestId, String referenceId})> submitWithdrawalRequest({
+    required int amountIqd,
+    required String cardholderName,
+    required String cardNumber,
+  }) async {
+    final result =
+        await _functions.httpsCallable('submitWalletWithdrawalRequest').call({
+      'amountIqd': amountIqd,
+      'cardholderName': cardholderName.trim(),
+      'cardNumber': cardNumber.replaceAll(RegExp(r'\D'), ''),
+    });
+    final data = Map<String, dynamic>.from(result.data as Map? ?? {});
+    return (
+      requestId: data['requestId'] as String? ?? '',
+      referenceId: data['referenceId'] as String? ?? '',
+    );
+  }
+
+  Future<void> cancelWithdrawalRequest(String requestId) async {
+    await _functions.httpsCallable('cancelWalletWithdrawalRequest').call({
+      'requestId': requestId,
+    });
+  }
+
+  Future<void> reviewWithdrawalRequest({
+    required String requestId,
+    required String action,
+    String adminNote = '',
+    String rejectionReason = '',
+  }) async {
+    await _functions.httpsCallable('reviewWalletWithdrawalRequest').call({
+      'requestId': requestId,
+      'action': action,
+      'adminNote': adminNote.trim(),
+      'rejectionReason': rejectionReason.trim(),
+    });
+  }
+
+  Future<void> processWithdrawalRequest({
+    required String requestId,
+    String adminNote = '',
+  }) async {
+    await _functions.httpsCallable('processWalletWithdrawalRequest').call({
+      'requestId': requestId,
+      'adminNote': adminNote.trim(),
+    });
+  }
+
+  Future<void> completeWithdrawalRequest({
+    required String requestId,
+    String adminNote = '',
+  }) async {
+    await _functions.httpsCallable('completeWalletWithdrawalRequest').call({
+      'requestId': requestId,
+      'adminNote': adminNote.trim(),
+    });
+  }
+
+  Future<({String cardNumber, String cardLast4, String cardholderName})>
+      getWithdrawalCardForAdmin(String requestId) async {
+    final result =
+        await _functions.httpsCallable('getWithdrawalCardForAdmin').call({
+      'requestId': requestId,
+    });
+    final data = Map<String, dynamic>.from(result.data as Map? ?? {});
+    return (
+      cardNumber: data['cardNumber'] as String? ?? '',
+      cardLast4: data['cardLast4'] as String? ?? '',
+      cardholderName: data['cardholderName'] as String? ?? '',
+    );
+  }
+
   Future<String> uploadRechargeScreenshot({
     required String driverId,
     required Uint8List bytes,

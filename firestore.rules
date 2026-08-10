@@ -58,7 +58,11 @@ service cloud.firestore {
 
     }
 
-
+    function isDriver() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().role == 'driver';
+    }
 
     function hasPermission(permission) {
 
@@ -288,11 +292,17 @@ service cloud.firestore {
     }
 
     match /rides/{rideId} {
-
-      allow read: if signedIn();
-
-      allow create, update: if signedIn();
-
+      // Lifecycle writes are Cloud Functions only (createRide/acceptRide/...).
+      allow read: if signedIn() && (
+        isAdminUser()
+        || resource.data.customerId == request.auth.uid
+        || resource.data.driverId == request.auth.uid
+        || (
+          resource.data.status in ['searching', 'matched']
+          && isDriver()
+        )
+      );
+      allow create, update, delete: if false;
     }
 
 
@@ -332,6 +342,19 @@ service cloud.firestore {
           || resource.data.driverId == request.auth.uid
         );
       allow create, update, delete: if false;
+    }
+
+    match /walletWithdrawalRequests/{requestId} {
+      allow read: if signedIn()
+        && (
+          isAdminUser()
+          || resource.data.driverId == request.auth.uid
+        );
+      allow create, update, delete: if false;
+    }
+
+    match /walletWithdrawalSecrets/{requestId} {
+      allow read, write: if false;
     }
 
     match /serviceCountries/{id} {

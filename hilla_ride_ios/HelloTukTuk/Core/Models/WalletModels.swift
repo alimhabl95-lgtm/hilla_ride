@@ -1,9 +1,32 @@
 import FirebaseFirestore
 import Foundation
 
+enum WalletWithdrawalStatus: String, Equatable {
+    case pending
+    case approved
+    case processing
+    case completed
+    case rejected
+    case cancelled
+
+    static func from(_ raw: String?) -> WalletWithdrawalStatus {
+        WalletWithdrawalStatus(rawValue: raw ?? "") ?? .pending
+    }
+
+    var isOpen: Bool {
+        switch self {
+        case .pending, .approved, .processing: return true
+        case .completed, .rejected, .cancelled: return false
+        }
+    }
+}
+
 struct WalletConfig: Equatable {
     var minBalanceIqd: Int
     var lowBalanceWarningIqd: Int
+    var minWithdrawalIqd: Int
+    var maxWithdrawalIqd: Int
+    var withdrawalsEnabled: Bool
     var companySuperQiNumber: String
     var companySuperQiName: String
     var managerWhatsappNumber: String
@@ -14,6 +37,9 @@ struct WalletConfig: Equatable {
     static let `default` = WalletConfig(
         minBalanceIqd: 1,
         lowBalanceWarningIqd: 5000,
+        minWithdrawalIqd: 5000,
+        maxWithdrawalIqd: 0,
+        withdrawalsEnabled: true,
         companySuperQiNumber: "",
         companySuperQiName: "Hello Tuk-Tuk",
         managerWhatsappNumber: "",
@@ -27,6 +53,9 @@ struct WalletConfig: Equatable {
     init(
         minBalanceIqd: Int,
         lowBalanceWarningIqd: Int,
+        minWithdrawalIqd: Int = 5000,
+        maxWithdrawalIqd: Int = 0,
+        withdrawalsEnabled: Bool = true,
         companySuperQiNumber: String,
         companySuperQiName: String,
         managerWhatsappNumber: String,
@@ -36,6 +65,9 @@ struct WalletConfig: Equatable {
     ) {
         self.minBalanceIqd = minBalanceIqd
         self.lowBalanceWarningIqd = lowBalanceWarningIqd
+        self.minWithdrawalIqd = minWithdrawalIqd
+        self.maxWithdrawalIqd = maxWithdrawalIqd
+        self.withdrawalsEnabled = withdrawalsEnabled
         self.companySuperQiNumber = companySuperQiNumber
         self.companySuperQiName = companySuperQiName
         self.managerWhatsappNumber = managerWhatsappNumber
@@ -48,6 +80,9 @@ struct WalletConfig: Equatable {
         let source = data ?? [:]
         minBalanceIqd = max((source["minBalanceIqd"] as? NSNumber)?.intValue ?? 1, 1)
         lowBalanceWarningIqd = (source["lowBalanceWarningIqd"] as? NSNumber)?.intValue ?? 5000
+        minWithdrawalIqd = (source["minWithdrawalIqd"] as? NSNumber)?.intValue ?? 5000
+        maxWithdrawalIqd = (source["maxWithdrawalIqd"] as? NSNumber)?.intValue ?? 0
+        withdrawalsEnabled = source["withdrawalsEnabled"] as? Bool ?? true
         companySuperQiNumber = source["companySuperQiNumber"] as? String ?? ""
         companySuperQiName = source["companySuperQiName"] as? String ?? "Hello Tuk-Tuk"
         managerWhatsappNumber = source["managerWhatsappNumber"] as? String ?? ""
@@ -74,7 +109,15 @@ struct WalletLedgerEntry: Identifiable, Equatable {
     let amountIqd: Int
     let balanceAfterIqd: Int
     let note: String
+    let description: String
+    let referenceId: String
+    let status: String
     let createdAt: Date?
+
+    /// Prefers `description`, falls back to `note`.
+    var displayDescription: String {
+        description.isEmpty ? note : description
+    }
 
     init?(documentID: String, data: [String: Any]) {
         id = documentID
@@ -83,6 +126,51 @@ struct WalletLedgerEntry: Identifiable, Equatable {
         amountIqd = (data["amountIqd"] as? NSNumber)?.intValue ?? 0
         balanceAfterIqd = (data["balanceAfterIqd"] as? NSNumber)?.intValue ?? 0
         note = data["note"] as? String ?? ""
+        description = data["description"] as? String ?? ""
+        status = data["status"] as? String ?? "posted"
+        createdAt = (data["createdAt"] as? Timestamp)?.dateValue()
+
+        let rideId = data["rideId"] as? String ?? ""
+        let rechargeRequestId = data["rechargeRequestId"] as? String ?? ""
+        let withdrawalRequestId = data["withdrawalRequestId"] as? String ?? ""
+        let rewardGrantId = data["rewardGrantId"] as? String ?? ""
+        let explicitRef = data["referenceId"] as? String ?? ""
+        if !explicitRef.isEmpty {
+            referenceId = explicitRef
+        } else if !withdrawalRequestId.isEmpty {
+            referenceId = withdrawalRequestId
+        } else if !rechargeRequestId.isEmpty {
+            referenceId = rechargeRequestId
+        } else if !rideId.isEmpty {
+            referenceId = rideId
+        } else {
+            referenceId = rewardGrantId
+        }
+    }
+}
+
+struct WalletWithdrawalRequest: Identifiable, Equatable {
+    let id: String
+    let driverId: String
+    let amountIqd: Int
+    let status: WalletWithdrawalStatus
+    let cardholderName: String
+    let cardLast4: String
+    let cardBrand: String
+    let referenceId: String
+    let rejectionReason: String
+    let createdAt: Date?
+
+    init?(documentID: String, data: [String: Any]) {
+        id = documentID
+        driverId = data["driverId"] as? String ?? ""
+        amountIqd = (data["amountIqd"] as? NSNumber)?.intValue ?? 0
+        status = WalletWithdrawalStatus.from(data["status"] as? String)
+        cardholderName = data["cardholderName"] as? String ?? ""
+        cardLast4 = data["cardLast4"] as? String ?? ""
+        cardBrand = data["cardBrand"] as? String ?? "mastercard"
+        referenceId = data["referenceId"] as? String ?? ""
+        rejectionReason = data["rejectionReason"] as? String ?? ""
         createdAt = (data["createdAt"] as? Timestamp)?.dateValue()
     }
 }
