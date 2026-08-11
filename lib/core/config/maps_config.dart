@@ -1,44 +1,32 @@
-/// Google Maps + Places + Geocoding API keys for **Hello tiktok**.
+/// Google Maps + Places API keys for **Hello tiktok** (`hello-tiktok-57dc5`).
 ///
-/// Google Cloud project with billing: **taxiapp2024** (console name: Hello tiktok).
-/// Enable APIs: https://console.cloud.google.com/apis/library?project=taxiapp2024
-/// Manage keys: https://console.cloud.google.com/apis/credentials?project=taxiapp2024
+/// Manage keys: https://console.cloud.google.com/apis/credentials?project=hello-tiktok-57dc5
 ///
-/// ## Key 1 — Map display (Android)
+/// ## iOS key (Firebase) — map tiles on iPhone
+/// `AIzaSyDD4…` → native iOS `GMSApiKey` / `MapsConfig.mapRenderKey`
+/// Application restrictions: **iOS apps** → `com.hillaride.hillaRide`
+/// APIs: **Maps SDK for iOS** (+ Places/Directions if needed)
+///
+/// ## Android key (Firebase) — map tiles on Android
 /// [androidMapApiKey] → `android/app/src/main/AndroidManifest.xml`
-/// Restrictions: **Android apps** only
-/// - Package: `com.hillaride.hilla_ride`
-/// - SHA-1 (debug): `f9:1c:7e:b9:d2:d8:f3:36:a5:71:91:7d:88:d6:a1:8e:fa:e0:60:65`
-/// APIs: Maps SDK for Android **and Places API (New)**
+/// Application restrictions: **Android apps** → package `com.hillaride.hilla_ride` + SHA-1
+/// APIs: **Maps SDK for Android**, Places API (New) recommended
 ///
-/// ## Key 2 — Place search + geocoding (HTTP from Flutter)
-/// [placesWebApiKey] → used by [GooglePlacesService]
-/// Restrictions: **Application restrictions = None** (or HTTP referrers below)
-/// APIs: **Places API (New)** (required — legacy Places Text Search is disabled)
-/// Geocoding API optional (reverse geocode falls back to OpenStreetMap)
-///
-/// ## Web hosting (iPhone Safari / Firebase Hosting)
-/// The same key is loaded in `web/index.html` for the map widget.
-/// In Google Cloud → Credentials → this key → add HTTP referrers:
-/// - `https://hello-tiktok-57dc5.web.app/*`
-/// - `https://hello-tiktok-57dc5.firebaseapp.com/*`
-/// - `https://hello-tiktok-57dc5-admin.web.app/*`
-/// - `http://localhost:*/*` (local testing)
-/// Enable **Maps JavaScript API** for project taxiapp2024, then redeploy is not
-/// required — refresh Safari after saving key changes (wait ~5 minutes).
-///
-/// On **web/Safari**, driving distance uses the Maps JavaScript Directions API
-/// (same Google routing as Android). REST route APIs are not used in the browser.
+/// ## Browser key (Firebase) — place search HTTP + web map
+/// [placesWebApiKey] → [GooglePlacesService] / `web/index.html`
+/// Application restrictions: **None** (or HTTP referrers for hosting domains)
+/// APIs required: **Places API (New)**, **Maps JavaScript API**
+/// Optional: Geocoding API, Directions API
 class MapsConfig {
   MapsConfig._();
 
-  /// Key 1 — map widget on Android (`AIzaSyBke…`).
+  /// Firebase Android key — map widget on Android.
   static const String androidMapApiKey =
-      'AIzaSyBke5bjy0cHxAnYJ8x89WlvjECLOTcAbGE';
+      'AIzaSyATkDQ-s_PdP3rbRnrvkLs4XXrIAdzE7Q0';
 
-  /// Key 2 — Places Text/Nearby Search + Geocoding over HTTP (`AIzaSyCygb…`).
+  /// Firebase Browser key — Places Text Search + web Maps JS.
   static const String placesWebApiKeyEmbedded =
-      'AIzaSyCygbeGlDUlA7l0GkJjB8TUHvHNUlHwsBg';
+      'AIzaSyAsgktwgQMXi9i5majam_z3Yion1_0qqLY';
 
   static const String googleMapsApiKey = String.fromEnvironment(
     'GOOGLE_MAPS_API_KEY',

@@ -1231,7 +1231,7 @@ exports.adminMonthlyPrize = functions.https.onCall(async (data, context) => {
 
 const GOOGLE_DIRECTIONS_KEY =
   process.env.GOOGLE_PLACES_WEB_API_KEY ||
-  "AIzaSyCygbeGlDUlA7l0GkJjB8TUHvHNUlHwsBg";
+  "AIzaSyAsgktwgQMXi9i5majam_z3Yion1_0qqLY";
 
 function parseCoord(value, name) {
   const num = Number(value);

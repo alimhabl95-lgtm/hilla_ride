@@ -48,7 +48,7 @@
             android:value="driver_ride_requests_v3"/>
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBke5bjy0cHxAnYJ8x89WlvjECLOTcAbGE"/>
+            android:value="AIzaSyATkDQ-s_PdP3rbRnrvkLs4XXrIAdzE7Q0"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -49,7 +49,7 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hello Tuk-Tuk uses your photo library so drivers can upload ID and profile photos during registration.</string>
 	<key>GMSApiKey</key>
-	<string>AIzaSyBke5bjy0cHxAnYJ8x89WlvjECLOTcAbGE</string>
+	<string>AIzaSyDD4PxDlgfhdKj-_Z7sCkWHZ0hrVRtD2aA</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
