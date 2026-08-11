@@ -1,8 +1,64 @@
+const { isWithinBoundaryUnique } = require("./geo");
+
 /**
  * Server-authoritative ride lifecycle mutations.
  */
 function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
   const db = () => admin.firestore();
+
+  /**
+   * Defense-in-depth: re-validates pickup/destination against the
+   * resolved sub-district's effective boundary (Admin-drawn polygon, or
+   * one synthesized from center + radius) — mirrors the client-side
+   * checks so a compromised/modified client can't bypass area scoping.
+   * Also mirrors the client's nearest-center tie-break for overlapping
+   * temporary circle boundaries, so the backend can't be tricked into
+   * accepting a point that the client would have rejected (e.g. a point
+   * inside Qasim's circle that also happens to fall inside Al-Shumali's
+   * larger overlapping circle). Throws `outside_area` / `area_inactive`
+   * HttpsErrors when invalid. No-ops when `subDistrictId` is empty
+   * (unscoped ride creation).
+   */
+  async function assertWithinServiceArea({
+    subDistrictId,
+    pickup,
+    destination,
+  }) {
+    if (!subDistrictId) return;
+    const subSnap = await db().collection("serviceSubDistricts").doc(subDistrictId).get();
+    if (!subSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "area_inactive");
+    }
+    const sub = subSnap.data() || {};
+    if (String(sub.status || "inactive") !== "active") {
+      throw new functions.https.HttpsError("failed-precondition", "area_inactive");
+    }
+    const center = { lat: Number(sub.latitude) || 0, lng: Number(sub.longitude) || 0 };
+    const radiusKm = Number(sub.searchRadiusKm) || 22;
+    const storedBoundary = Array.isArray(sub.boundary) ? sub.boundary : undefined;
+
+    const othersSnap = await db()
+      .collection("serviceSubDistricts")
+      .where("status", "==", "active")
+      .get();
+    const others = othersSnap.docs
+      .filter((doc) => doc.id !== subDistrictId)
+      .map((doc) => {
+        const data = doc.data() || {};
+        return {
+          center: { lat: Number(data.latitude) || 0, lng: Number(data.longitude) || 0 },
+          radiusKm: Number(data.searchRadiusKm) || 22,
+          boundary: Array.isArray(data.boundary) ? data.boundary : undefined,
+        };
+      });
+
+    for (const point of [pickup, destination]) {
+      if (!point) continue;
+      if (!isWithinBoundaryUnique(point, center, radiusKm, storedBoundary, others)) {
+        throw new functions.https.HttpsError("failed-precondition", "outside_area");
+      }
+    }
+  }
 
   function haversineKm(lat1, lng1, lat2, lng2) {
     const toRad = (d) => (d * Math.PI) / 180;
@@ -155,6 +211,12 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
         "pickup_destination_same",
       );
     }
+
+    await assertWithinServiceArea({
+      subDistrictId,
+      pickup: { lat: pickupLat, lng: pickupLng },
+      destination: { lat: destinationLat, lng: destinationLng },
+    });
 
     const active = await db()
       .collection("rides")

@@ -163,6 +163,7 @@
   "currentRideTitle": "Current ride",
   "pickupDestinationRequired": "Choose pickup and destination first.",
   "pickupDestinationMustDiffer": "Pickup and destination must be different places (at least 100 m apart).",
+  "governorateLabel": "Governorate",
   "districtLabel": "District",
   "subDistrictLabel": "Sub-district",
   "selectSubDistrictHint": "Select sub-district",

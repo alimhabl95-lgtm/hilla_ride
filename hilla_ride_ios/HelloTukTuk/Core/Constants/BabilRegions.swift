@@ -7,6 +7,9 @@ struct BabilSubDistrict: Identifiable, Hashable {
     let nameAr: String
     let center: CLLocationCoordinate2D
     let searchRadiusKm: Double
+    /// Optional Admin-drawn geofence polygon (open ring). When nil, an
+    /// effective boundary is synthesized from `center` + `searchRadiusKm`.
+    var boundary: [CLLocationCoordinate2D]? = nil
 
     func displayName(language: AppLanguage) -> String {
         language == .arabic ? nameAr : nameEn
@@ -18,6 +21,21 @@ struct BabilSubDistrict: Identifiable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+
+    /// Radius (km) used to bias broad "search first" provider queries —
+    /// sized from the effective boundary's bounding radius (real polygon
+    /// or synthesized circle) plus a small buffer, so odd-shaped/elongated
+    /// areas don't get under-biased and lose valid candidates. Always a
+    /// soft bias, never a hard restriction.
+    var searchBiasRadiusKm: Double {
+        let effective = GeoPolygon.effectiveBoundary(
+            center: center,
+            radiusKm: searchRadiusKm,
+            storedBoundary: boundary
+        )
+        let boundingKm = GeoPolygon.boundingRadiusKm(center: center, polygon: effective)
+        return max(boundingKm, searchRadiusKm) + 2.0
     }
 }
 
@@ -43,6 +61,9 @@ struct BabilDistrict: Identifiable, Hashable {
 enum BabilRegions {
     static let preferredCustomerDistrictId = "hashimiya"
     static let defaultSubDistrictRadiusKm = 22.0
+    static let seedProvinceId = "babil"
+    static let provinceNameEn = "Babil Province"
+    static let provinceNameAr = "محافظة بابل"
 
     /// Prefer live catalog; seed only before first Firestore sync.
     @MainActor
@@ -65,6 +86,26 @@ enum BabilRegions {
         let list = customerDistricts
         if list.isEmpty { return seedCustomerDistricts[0] }
         return list.first { $0.id == preferredCustomerDistrictId } ?? list[0]
+    }
+
+    /// Governorates offered to customers in the cascading area selector —
+    /// dynamic, backed by Firestore, never hardcoded beyond the seed
+    /// fallback used before the first sync.
+    @MainActor
+    static var customerProvinces: [ServiceProvinceSummary] {
+        ServiceAreaCatalog.shared.customerProvinces
+    }
+
+    /// Customer-visible districts under `provinceId`.
+    @MainActor
+    static func customerDistricts(forProvince provinceId: String) -> [BabilDistrict] {
+        ServiceAreaCatalog.shared.districtsForProvince(provinceId)
+    }
+
+    /// Governorate id that owns `districtId`.
+    @MainActor
+    static func provinceId(forDistrict districtId: String) -> String {
+        ServiceAreaCatalog.shared.provinceIdForDistrict(districtId)
     }
 
     static let seedDistricts: [BabilDistrict] = [
@@ -124,19 +165,45 @@ enum BabilRegions {
         return customerDistrict.subDistricts.first ?? seedDistricts[0].subDistricts[0]
     }
 
-    /// True when [point] falls inside the selected sub-district's search radius.
+    /// True when `point` falls inside the sub-district's effective boundary:
+    /// its Admin-drawn polygon when present, otherwise a polygon synthesized
+    /// from its center + search radius. Always a true geographic boundary
+    /// check (point-in-polygon), never a plain circle-distance check.
+    ///
+    /// When the sub-district only has a temporary circle (no Admin-drawn
+    /// polygon yet), overlapping neighboring circles are resolved by
+    /// nearest center, so a point inside e.g. Qasim's circle never also
+    /// counts as "inside" Al-Shumali just because both circles are large
+    /// and close together in the same district.
     @MainActor
     static func isWithin(subDistrictId: String, point: CLLocationCoordinate2D) -> Bool {
         guard !subDistrictId.isEmpty else { return false }
         let sub = subDistrict(byId: subDistrictId)
-        return GeoMath.distanceKm(from: sub.center, to: point) <= sub.searchRadiusKm
+        let others: [GeoArea] = districts.flatMap { district in
+            district.subDistricts.compactMap { other -> GeoArea? in
+                guard other.id != subDistrictId else { return nil }
+                return GeoArea(center: other.center, radiusKm: other.searchRadiusKm, boundary: other.boundary)
+            }
+        }
+        return GeoPolygon.isWithinBoundaryUnique(
+            point: point,
+            center: sub.center,
+            radiusKm: sub.searchRadiusKm,
+            storedBoundary: sub.boundary,
+            others: others
+        )
     }
 
     @MainActor
     static func resolveFromPoint(_ point: CLLocationCoordinate2D) -> (districtId: String, subDistrictId: String) {
         for district in districts {
             for sub in district.subDistricts {
-                if GeoMath.distanceKm(from: sub.center, to: point) <= sub.searchRadiusKm {
+                if GeoPolygon.isWithinBoundary(
+                    point: point,
+                    center: sub.center,
+                    radiusKm: sub.searchRadiusKm,
+                    storedBoundary: sub.boundary
+                ) {
                     return (district.id, sub.id)
                 }
             }

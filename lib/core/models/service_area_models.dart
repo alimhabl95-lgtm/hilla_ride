@@ -233,6 +233,7 @@ class ServiceProvince {
     required this.countryId,
     required this.nameEn,
     required this.nameAr,
+    this.customerVisible = true,
     this.status = ServiceAreaStatus.active,
   });
 
@@ -240,6 +241,7 @@ class ServiceProvince {
   final String countryId;
   final String nameEn;
   final String nameAr;
+  final bool customerVisible;
   final ServiceAreaStatus status;
 
   bool get isActive => status == ServiceAreaStatus.active;
@@ -248,6 +250,7 @@ class ServiceProvince {
         'countryId': countryId,
         'nameEn': nameEn,
         'nameAr': nameAr,
+        'customerVisible': customerVisible,
         'status': status.value,
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -261,6 +264,7 @@ class ServiceProvince {
       countryId: data['countryId'] as String? ?? '',
       nameEn: data['nameEn'] as String? ?? doc.id,
       nameAr: data['nameAr'] as String? ?? doc.id,
+      customerVisible: data['customerVisible'] as bool? ?? true,
       status: ServiceAreaStatusX.fromString(data['status'] as String?),
     );
   }
@@ -323,6 +327,7 @@ class ServiceSubDistrict {
     required this.nameAr,
     required this.center,
     this.searchRadiusKm = 22,
+    this.boundary,
     this.status = ServiceAreaStatus.active,
     this.services = const [ServiceTypeIds.ride],
     this.commissionPercent,
@@ -339,6 +344,10 @@ class ServiceSubDistrict {
   final String nameAr;
   final LatLng center;
   final double searchRadiusKm;
+
+  /// Optional Admin-drawn geofence polygon (open ring). When null, an
+  /// effective boundary is synthesized from [center] + [searchRadiusKm].
+  final List<LatLng>? boundary;
   final ServiceAreaStatus status;
   final List<String> services;
   final double? commissionPercent;
@@ -364,6 +373,7 @@ class ServiceSubDistrict {
         'latitude': center.latitude,
         'longitude': center.longitude,
         'searchRadiusKm': searchRadiusKm,
+        if (boundary != null) 'boundary': boundaryToMapList(boundary),
         'status': status.value,
         'services': services,
         'useGlobalCommission': useGlobalCommission,
@@ -389,6 +399,7 @@ class ServiceSubDistrict {
         (data['longitude'] as num?)?.toDouble() ?? 0,
       ),
       searchRadiusKm: (data['searchRadiusKm'] as num?)?.toDouble() ?? 22,
+      boundary: boundaryFromDynamic(data['boundary']),
       status: ServiceAreaStatusX.fromString(data['status'] as String?),
       services: (data['services'] as List<dynamic>?)
               ?.map((e) => e.toString())
@@ -404,6 +415,31 @@ class ServiceSubDistrict {
       ),
     );
   }
+}
+
+/// Parses a Firestore `boundary` field (array of `{lat, lng}` maps) into a
+/// polygon, or null when absent/invalid (< 3 points).
+List<LatLng>? boundaryFromDynamic(dynamic raw) {
+  if (raw is! List) return null;
+  final points = <LatLng>[];
+  for (final entry in raw) {
+    if (entry is Map) {
+      final lat = (entry['lat'] as num?)?.toDouble();
+      final lng = (entry['lng'] as num?)?.toDouble();
+      if (lat != null && lng != null) {
+        points.add(LatLng(lat, lng));
+      }
+    }
+  }
+  return points.length >= 3 ? points : null;
+}
+
+/// Serializes a polygon into the Firestore `boundary` shape.
+List<Map<String, double>>? boundaryToMapList(List<LatLng>? boundary) {
+  if (boundary == null) return null;
+  return [
+    for (final p in boundary) {'lat': p.latitude, 'lng': p.longitude},
+  ];
 }
 
 /// Tree used by apps (compatible with previous BabilRegions shape).
@@ -430,6 +466,7 @@ class ServiceSubDistrictNode {
     required this.nameEn,
     required this.center,
     this.searchRadiusKm = 22,
+    this.boundary,
   });
 
   final String id;
@@ -437,4 +474,8 @@ class ServiceSubDistrictNode {
   final String nameEn;
   final LatLng center;
   final double searchRadiusKm;
+
+  /// Optional Admin-drawn geofence polygon (open ring). When null, an
+  /// effective boundary is synthesized from [center] + [searchRadiusKm].
+  final List<LatLng>? boundary;
 }

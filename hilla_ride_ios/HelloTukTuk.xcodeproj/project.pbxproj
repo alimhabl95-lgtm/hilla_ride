@@ -85,6 +85,7 @@
 		A100000000000000000000A4 /* SavedPlacesManageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A4 /* SavedPlacesManageView.swift */; };
 		A100000000000000000000A5 /* CustomerRewardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A5 /* CustomerRewardsView.swift */; };
 		A100000000000000000000A6 /* DirectionsRouteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A6 /* DirectionsRouteService.swift */; };
+		A100000000000000000000A7 /* GeoPolygon.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000A7 /* GeoPolygon.swift */; };
 		A10000000000000000000057 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000053 /* ChatService.swift */; };
 		A10000000000000000000058 /* SupportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000054 /* SupportService.swift */; };
 		A10000000000000000000059 /* PromoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000055 /* PromoModels.swift */; };
@@ -186,6 +187,7 @@
 		A200000000000000000000A4 /* SavedPlacesManageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesManageView.swift; sourceTree = "<group>"; };
 		A200000000000000000000A5 /* CustomerRewardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerRewardsView.swift; sourceTree = "<group>"; };
 		A200000000000000000000A6 /* DirectionsRouteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionsRouteService.swift; sourceTree = "<group>"; };
+		A200000000000000000000A7 /* GeoPolygon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoPolygon.swift; sourceTree = "<group>"; };
 		A20000000000000000000053 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
 		A20000000000000000000054 /* SupportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportService.swift; sourceTree = "<group>"; };
 		A20000000000000000000055 /* PromoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromoModels.swift; sourceTree = "<group>"; };
@@ -428,6 +430,7 @@
 			children = (
 				A20000000000000000000035 /* GeoMath.swift */,
 				A20000000000000000000090 /* Geohash.swift */,
+				A200000000000000000000A7 /* GeoPolygon.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -633,6 +636,7 @@
 				A10000000000000000000056 /* GooglePlacesService.swift in Sources */,
 				A100000000000000000000A2 /* PlaceSearchService.swift in Sources */,
 				A100000000000000000000A6 /* DirectionsRouteService.swift in Sources */,
+				A100000000000000000000A7 /* GeoPolygon.swift in Sources */,
 				A100000000000000000000A4 /* SavedPlacesManageView.swift in Sources */,
 				A100000000000000000000A5 /* CustomerRewardsView.swift in Sources */,
 				A10000000000000000000057 /* ChatService.swift in Sources */,

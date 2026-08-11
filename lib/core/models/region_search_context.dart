@@ -43,6 +43,17 @@ class RegionSearchContext {
     return BabilRegions.searchRadiusKmFor(districtId, subDistrictId!);
   }
 
+  /// Radius (km) for provider search bias — sized from the effective
+  /// boundary's bounding radius rather than the raw stored radius, so the
+  /// "search broadly, then filter by boundary" pipeline doesn't lose valid
+  /// candidates in odd-shaped/elongated areas.
+  double get searchBiasRadiusKm {
+    if (!hasSubDistrict) {
+      return BabilRegions.defaultSubDistrictRadiusKm;
+    }
+    return BabilRegions.searchBiasRadiusKmFor(districtId, subDistrictId!);
+  }
+
   LatLng get searchCenter {
     if (!hasSubDistrict) {
       return district.subDistricts.first.center;

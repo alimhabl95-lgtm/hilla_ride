@@ -490,6 +490,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Pickup and destination must be different places (at least 100 m apart).';
 
   @override
+  String get governorateLabel => 'Governorate';
+
+  @override
   String get districtLabel => 'District';
 
   @override

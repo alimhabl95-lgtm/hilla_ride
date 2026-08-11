@@ -998,6 +998,12 @@ abstract class AppLocalizations {
   /// **'Pickup and destination must be different places (at least 100 m apart).'**
   String get pickupDestinationMustDiffer;
 
+  /// No description provided for @governorateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Governorate'**
+  String get governorateLabel;
+
   /// No description provided for @districtLabel.
   ///
   /// In en, this message translates to:

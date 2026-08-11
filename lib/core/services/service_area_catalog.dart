@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/models/service_area_models.dart';
+import 'package:hilla_ride/core/utils/geo_polygon.dart';
 import 'package:latlong2/latlong.dart';
 
 /// In-memory geo catalog synced from Firestore.
@@ -83,6 +84,7 @@ class ServiceAreaCatalog extends ChangeNotifier {
                 nameEn: s.nameEn,
                 center: s.center,
                 searchRadiusKm: s.searchRadiusKm,
+                boundary: s.boundary,
               ),
           ],
         ),
@@ -103,6 +105,7 @@ class ServiceAreaCatalog extends ChangeNotifier {
                 nameEn: s.nameEn,
                 center: s.center,
                 searchRadiusKm: s.searchRadiusKm,
+                boundary: s.boundary,
               ),
           ],
         ),
@@ -160,6 +163,7 @@ class ServiceAreaCatalog extends ChangeNotifier {
                 nameEn: s.nameEn,
                 center: s.center,
                 searchRadiusKm: s.searchRadiusKm,
+                boundary: s.boundary,
               ),
           ],
         ),
@@ -206,6 +210,7 @@ class ServiceAreaCatalog extends ChangeNotifier {
                 nameEn: s.nameEn,
                 center: s.center,
                 searchRadiusKm: s.searchRadiusKm,
+                boundary: s.boundary,
               ),
           ],
         ),
@@ -220,6 +225,38 @@ class ServiceAreaCatalog extends ChangeNotifier {
     if (list.isEmpty) return _seedProvinces;
     list.sort((a, b) => a.nameEn.toLowerCase().compareTo(b.nameEn.toLowerCase()));
     return list;
+  }
+
+  /// Governorates offered to customers in the cascading area selector:
+  /// active + customerVisible, with seed fallback so cold-start (before the
+  /// first Firestore snapshot) still shows Babil. Never empty. New
+  /// governorates (e.g. Karbala, Najaf) appear automatically once Admin
+  /// activates them — no app update required.
+  List<ServiceProvince> get customerProvinces {
+    if (!_synced) return _seedProvinces;
+    final all = _provincesById.values.toList();
+    final visible = all.where((p) => p.isActive && p.customerVisible).toList();
+    final list = visible.isEmpty ? all : visible;
+    if (list.isEmpty) return _seedProvinces;
+    list.sort((a, b) => a.nameEn.toLowerCase().compareTo(b.nameEn.toLowerCase()));
+    return list;
+  }
+
+  /// Customer-visible districts (with their customer-visible sub-districts)
+  /// under [provinceId], matching the same active/customerVisible filtering
+  /// as [customerDistrictsAsBabil]. Backed entirely by live Firestore data
+  /// once synced, so Admin-added districts appear without an app update.
+  List<BabilDistrict> customerDistrictsForProvince(String provinceId) {
+    final all = customerDistrictsAsBabil;
+    if (provinceId.isEmpty) return all;
+    if (!_synced) {
+      return provinceId == _seedProvinceId ? all : const [];
+    }
+    final idsInProvince = _rawDistricts
+        .where((d) => d.provinceId == provinceId)
+        .map((d) => d.id)
+        .toSet();
+    return all.where((d) => idsInProvince.contains(d.id)).toList();
   }
 
   List<ServiceDistrict> get _allDistrictsForAdmin {
@@ -299,19 +336,31 @@ class ServiceAreaCatalog extends ChangeNotifier {
     return id;
   }
 
-  /// True if [point] falls inside any active sub-district radius.
+  /// True if [point] falls inside any active sub-district's effective
+  /// boundary (Admin-drawn polygon, or one synthesized from center + radius).
   bool isWithinAnyActiveArea(LatLng point) {
-    const distance = Distance();
     for (final sub in _subById.values) {
-      final km = distance.as(LengthUnit.Kilometer, sub.center, point);
-      if (km <= sub.searchRadiusKm) return true;
+      if (GeoPolygon.isWithinBoundary(
+        point: point,
+        center: sub.center,
+        radiusKm: sub.searchRadiusKm,
+        storedBoundary: sub.boundary,
+      )) {
+        return true;
+      }
     }
     // Before first sync, fall back to seed geometry so cold-start still works.
     if (!_synced) {
       for (final d in BabilRegions.seedDistricts) {
         for (final s in d.subDistricts) {
-          final km = distance.as(LengthUnit.Kilometer, s.center, point);
-          if (km <= s.searchRadiusKm) return true;
+          if (GeoPolygon.isWithinBoundary(
+            point: point,
+            center: s.center,
+            radiusKm: s.searchRadiusKm,
+            storedBoundary: s.boundary,
+          )) {
+            return true;
+          }
         }
       }
     }
@@ -337,10 +386,22 @@ class ServiceAreaCatalog extends ChangeNotifier {
             ? 'area_inactive'
             : 'area_closed';
       }
-      const distance = Distance();
       bool withinSub(LatLng point) {
-        final km = distance.as(LengthUnit.Kilometer, sub.center, point);
-        return km <= sub.searchRadiusKm;
+        return GeoPolygon.isWithinBoundaryUnique(
+          point: point,
+          center: sub.center,
+          radiusKm: sub.searchRadiusKm,
+          storedBoundary: sub.boundary,
+          others: [
+            for (final other in _subById.values)
+              if (other.id != sub.id)
+                GeoArea(
+                  center: other.center,
+                  radiusKm: other.searchRadiusKm,
+                  boundary: other.boundary,
+                ),
+          ],
+        );
       }
 
       if (pickup != null && !withinSub(pickup)) {

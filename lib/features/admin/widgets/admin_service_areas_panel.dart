@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/models/service_area_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/features/admin/screens/admin_area_boundary_editor_screen.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -149,7 +150,8 @@ class _AdminServiceAreasPanelState extends State<AdminServiceAreasPanel> {
                               (p) => _EntityRow(
                                 id: p.id,
                                 title: isAr ? p.nameAr : p.nameEn,
-                                subtitle: _statusLabel(p.status, isAr),
+                                subtitle:
+                                    '${_statusLabel(p.status, isAr)}${p.customerVisible ? (isAr ? ' • زبائن' : ' • customer') : ''}',
                                 selected: _provinceId == p.id,
                                 isAr: isAr,
                                 onTap: () => setState(() {
@@ -246,11 +248,14 @@ class _AdminServiceAreasPanelState extends State<AdminServiceAreasPanel> {
                                 id: s.id,
                                 title: isAr ? s.nameAr : s.nameEn,
                                 subtitle:
-                                    '${_statusLabel(s.status, isAr)} • r=${s.searchRadiusKm}km • ${s.services.join(",")}',
+                                    '${_statusLabel(s.status, isAr)} • r=${s.searchRadiusKm}km • '
+                                    '${(s.boundary?.length ?? 0) >= 3 ? (isAr ? "حدود مرسومة" : "drawn boundary") : (isAr ? "دائرة مؤقتة" : "temp circle")} • '
+                                    '${s.services.join(",")}',
                                 selected: false,
                                 isAr: isAr,
                                 onTap: () => _editSubDistrict(context, s, isAr),
                                 onEdit: () => _editSubDistrict(context, s, isAr),
+                                onEditBoundary: () => _editBoundary(context, s, isAr),
                                 onToggle: () => areas.setAreaStatus(
                                   kind: 'subDistrict',
                                   id: s.id,
@@ -341,29 +346,43 @@ class _AdminServiceAreasPanelState extends State<AdminServiceAreasPanel> {
     final idCtrl = TextEditingController(text: existing?.id ?? '');
     final enCtrl = TextEditingController(text: existing?.nameEn ?? '');
     final arCtrl = TextEditingController(text: existing?.nameAr ?? '');
+    var customerVisible = existing?.customerVisible ?? true;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isAr ? 'محافظة' : 'Province'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: idCtrl,
-                enabled: existing == null,
-                decoration: const InputDecoration(labelText: 'ID'),
-              ),
-              TextField(controller: enCtrl, decoration: const InputDecoration(labelText: 'Name EN')),
-              TextField(controller: arCtrl, decoration: const InputDecoration(labelText: 'Name AR')),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(isAr ? 'محافظة' : 'Province'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: idCtrl,
+                  enabled: existing == null,
+                  decoration: const InputDecoration(labelText: 'ID'),
+                ),
+                TextField(controller: enCtrl, decoration: const InputDecoration(labelText: 'Name EN')),
+                TextField(controller: arCtrl, decoration: const InputDecoration(labelText: 'Name AR')),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(isAr ? 'ظاهر للزبائن' : 'Visible to customers'),
+                  subtitle: Text(
+                    isAr
+                        ? 'أوقف هذا لتحضير محافظة جديدة في الأدمن قبل إظهارها للزبائن'
+                        : 'Turn off to stage a new governorate in Admin before it appears to customers',
+                  ),
+                  value: customerVisible,
+                  onChanged: (v) => setLocal(() => customerVisible = v),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(isAr ? 'إلغاء' : 'Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(isAr ? 'حفظ' : 'Save')),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(isAr ? 'إلغاء' : 'Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(isAr ? 'حفظ' : 'Save')),
-        ],
       ),
     );
     if (ok != true || !context.mounted) return;
@@ -373,6 +392,7 @@ class _AdminServiceAreasPanelState extends State<AdminServiceAreasPanel> {
             countryId: existing?.countryId ?? _countryId!,
             nameEn: enCtrl.text.trim(),
             nameAr: arCtrl.text.trim(),
+            customerVisible: customerVisible,
             status: existing?.status ?? ServiceAreaStatus.active,
           ),
         );
@@ -432,6 +452,21 @@ class _AdminServiceAreasPanelState extends State<AdminServiceAreasPanel> {
             status: existing?.status ?? ServiceAreaStatus.active,
           ),
         );
+  }
+
+  Future<void> _editBoundary(
+    BuildContext context,
+    ServiceSubDistrict subDistrict,
+    bool isAr,
+  ) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AdminAreaBoundaryEditorScreen(
+          subDistrict: subDistrict,
+          isAr: isAr,
+        ),
+      ),
+    );
   }
 
   Future<void> _editSubDistrict(
@@ -607,6 +642,8 @@ class _AdminServiceAreasPanelState extends State<AdminServiceAreasPanel> {
             nameAr: arCtrl.text.trim(),
             center: LatLng(lat, lng),
             searchRadiusKm: double.tryParse(radiusCtrl.text.trim()) ?? 22,
+            // Preserve any Admin-drawn polygon — this dialog never edits it.
+            boundary: existing?.boundary,
             status: existing?.status ?? ServiceAreaStatus.active,
             services: services.isEmpty ? [ServiceTypeIds.ride] : services.toList(),
             useGlobalCommission: useGlobalCommission,
@@ -673,6 +710,7 @@ class _EntityRow {
     required this.onToggle,
     required this.onArchive,
     required this.onDelete,
+    this.onEditBoundary,
     this.isAr = false,
   });
 
@@ -686,6 +724,9 @@ class _EntityRow {
   final Future<void> Function() onToggle;
   final Future<void> Function() onArchive;
   final Future<void> Function() onDelete;
+
+  /// Only set for sub-district rows — opens the polygon boundary editor.
+  final VoidCallback? onEditBoundary;
 }
 
 class _EntityList extends StatelessWidget {
@@ -727,6 +768,7 @@ class _EntityList extends StatelessWidget {
                       trailing: PopupMenuButton<String>(
                         onSelected: (v) async {
                           if (v == 'edit') item.onEdit();
+                          if (v == 'editBoundary') item.onEditBoundary?.call();
                           if (v == 'toggle') await item.onToggle();
                           if (v == 'archive') await item.onArchive();
                           if (v == 'delete') await item.onDelete();
@@ -736,6 +778,13 @@ class _EntityList extends StatelessWidget {
                             value: 'edit',
                             child: Text(item.isAr ? 'تعديل' : 'Edit'),
                           ),
+                          if (item.onEditBoundary != null)
+                            PopupMenuItem(
+                              value: 'editBoundary',
+                              child: Text(
+                                item.isAr ? 'تعديل الحدود' : 'Edit boundary',
+                              ),
+                            ),
                           PopupMenuItem(
                             value: 'toggle',
                             child: Text(

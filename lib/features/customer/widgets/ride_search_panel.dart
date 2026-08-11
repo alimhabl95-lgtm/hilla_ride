@@ -3,6 +3,7 @@ import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/region_search_context.dart';
+import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/customer/screens/place_search_screen.dart';
 import 'package:hilla_ride/features/customer/widgets/saved_places_bar.dart';
@@ -307,6 +308,7 @@ class _BottomSheetSearch extends StatelessWidget {
               districtId: districtId,
               subDistrictId: subDistrictId,
               isArabic: isArabic,
+              onDistrictChanged: onDistrictChanged,
               onSubDistrictChanged: onSubDistrictChanged,
             )
           else
@@ -474,28 +476,118 @@ class _TripSearchField extends StatelessWidget {
   }
 }
 
-class _CustomerRegionFields extends StatelessWidget {
+/// Cascading Governorate → District → Sub-district selector for the
+/// customer booking sheet, backed entirely by [ServiceAreaCatalog] (live
+/// Firestore data with a Babil-only seed fallback before the first sync).
+/// Selecting a governorate/district never assumes a fixed area — it always
+/// re-derives its options from the live catalog, so new areas Admin adds
+/// show up automatically without an app update.
+class _CustomerRegionFields extends StatefulWidget {
   const _CustomerRegionFields({
     required this.districtId,
     required this.subDistrictId,
     required this.isArabic,
+    required this.onDistrictChanged,
     required this.onSubDistrictChanged,
   });
 
   final String districtId;
   final String? subDistrictId;
   final bool isArabic;
+  final ValueChanged<String?> onDistrictChanged;
   final ValueChanged<String?> onSubDistrictChanged;
+
+  @override
+  State<_CustomerRegionFields> createState() => _CustomerRegionFieldsState();
+}
+
+class _CustomerRegionFieldsState extends State<_CustomerRegionFields> {
+  late String _provinceId = _resolveProvinceId(widget.districtId);
+
+  String _resolveProvinceId(String districtId) {
+    final owning =
+        ServiceAreaCatalog.instance.provinceIdForDistrict(districtId);
+    if (owning != null && owning.isNotEmpty) return owning;
+    final provinces = ServiceAreaCatalog.instance.customerProvinces;
+    return provinces.isNotEmpty ? provinces.first.id : 'babil';
+  }
+
+  @override
+  void didUpdateWidget(_CustomerRegionFields oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.districtId == widget.districtId) return;
+    final owning =
+        ServiceAreaCatalog.instance.provinceIdForDistrict(widget.districtId);
+    if (owning != null && owning.isNotEmpty && owning != _provinceId) {
+      setState(() => _provinceId = owning);
+    }
+  }
+
+  void _onProvinceChanged(String? provinceId) {
+    if (provinceId == null || provinceId == _provinceId) return;
+    final districts =
+        ServiceAreaCatalog.instance.customerDistrictsForProvince(provinceId);
+    setState(() => _provinceId = provinceId);
+    // A governorate switch always resets to that governorate's first
+    // district; the sub-district itself is reset by the parent screen so the
+    // customer must confirm the new area before booking.
+    widget.onDistrictChanged(districts.isNotEmpty ? districts.first.id : null);
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final district = BabilRegions.districtById(districtId);
+    final catalog = ServiceAreaCatalog.instance;
+    final provinces = catalog.customerProvinces;
+    final districtsInProvince =
+        catalog.customerDistrictsForProvince(_provinceId);
+    final district = districtsInProvince.firstWhere(
+      (d) => d.id == widget.districtId,
+      orElse: () => districtsInProvince.isNotEmpty
+          ? districtsInProvince.first
+          : BabilRegions.districtById(widget.districtId),
+    );
+    final provinceValue =
+        provinces.any((p) => p.id == _provinceId) ? _provinceId : null;
+    final districtValue =
+        districtsInProvince.any((d) => d.id == district.id) ? district.id : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(
+          l10n.governorateLabel,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.outline,
+          ),
+        ),
+        const SizedBox(height: 4),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          isDense: true,
+          value: provinceValue,
+          decoration: const InputDecoration(
+            isDense: true,
+            contentPadding:
+                EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          items: provinces
+              .map(
+                (p) => DropdownMenuItem(
+                  value: p.id,
+                  child: Text(
+                    widget.isArabic ? p.nameAr : p.nameEn,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          // Iraq only has one active governorate today; disable the picker
+          // rather than show a dropdown with nothing to switch to.
+          onChanged: provinces.length > 1 ? _onProvinceChanged : null,
+        ),
+        const SizedBox(height: 10),
         Text(
           l10n.districtLabel,
           style: theme.textTheme.labelMedium?.copyWith(
@@ -503,17 +595,33 @@ class _CustomerRegionFields extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          isArabic ? district.nameAr : district.nameEn,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          isDense: true,
+          value: districtValue,
+          decoration: const InputDecoration(
+            isDense: true,
+            contentPadding:
+                EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           ),
+          items: districtsInProvince
+              .map(
+                (d) => DropdownMenuItem(
+                  value: d.id,
+                  child: Text(
+                    widget.isArabic ? d.nameAr : d.nameEn,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: widget.onDistrictChanged,
         ),
         const SizedBox(height: 10),
         DropdownButtonFormField<String>(
           isExpanded: true,
           isDense: true,
-          value: subDistrictId,
+          value: widget.subDistrictId,
           decoration: InputDecoration(
             labelText: l10n.subDistrictLabel,
             isDense: true,
@@ -526,13 +634,13 @@ class _CustomerRegionFields extends StatelessWidget {
                 (s) => DropdownMenuItem(
                   value: s.id,
                   child: Text(
-                    isArabic ? s.nameAr : s.nameEn,
+                    widget.isArabic ? s.nameAr : s.nameEn,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               )
               .toList(),
-          onChanged: onSubDistrictChanged,
+          onChanged: widget.onSubDistrictChanged,
         ),
       ],
     );

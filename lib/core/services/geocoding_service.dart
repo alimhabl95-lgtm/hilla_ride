@@ -66,7 +66,7 @@ class GeocodingService {
 
     final languageCode = acceptLanguage.startsWith('ar') ? 'ar' : 'en';
     final center = region.searchCenter;
-    final radiusKm = region.searchRadiusKm;
+    final radiusKm = region.searchBiasRadiusKm;
     final regionLabel = region.label(isArabic: acceptLanguage.startsWith('ar'));
 
     final localResults = await filterPlacesInRegion(
@@ -253,7 +253,7 @@ class GeocodingService {
 
     final languageCode = acceptLanguage.startsWith('ar') ? 'ar' : 'en';
     final center = region.searchCenter;
-    final radiusKm = region.searchRadiusKm;
+    final radiusKm = region.searchBiasRadiusKm;
 
     final local = await _localPlaces.listAll(preferArabic: true);
     final localInRegion = local

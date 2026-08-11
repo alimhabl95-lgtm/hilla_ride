@@ -483,6 +483,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'يجب أن تكون نقطة الانطلاق مختلفة عن الوجهة (100 متر على الأقل).';
 
   @override
+  String get governorateLabel => 'المحافظة';
+
+  @override
   String get districtLabel => 'القضاء';
 
   @override

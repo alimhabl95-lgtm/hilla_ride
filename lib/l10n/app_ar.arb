@@ -163,6 +163,7 @@
   "currentRideTitle": "الرحلة الحالية",
   "pickupDestinationRequired": "اختر نقطة الانطلاق والوجهة أولاً.",
   "pickupDestinationMustDiffer": "يجب أن تكون نقطة الانطلاق مختلفة عن الوجهة (100 متر على الأقل).",
+  "governorateLabel": "المحافظة",
   "districtLabel": "القضاء",
   "subDistrictLabel": "الناحية",
   "selectSubDistrictHint": "اختر الناحية",

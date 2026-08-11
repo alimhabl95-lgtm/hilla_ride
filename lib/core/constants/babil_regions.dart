@@ -1,4 +1,5 @@
 import 'package:hilla_ride/core/services/service_area_catalog.dart';
+import 'package:hilla_ride/core/utils/geo_polygon.dart';
 import 'package:latlong2/latlong.dart';
 
 class BabilSubDistrict {
@@ -8,6 +9,7 @@ class BabilSubDistrict {
     required this.nameEn,
     required this.center,
     this.searchRadiusKm = BabilRegions.defaultSubDistrictRadiusKm,
+    this.boundary,
   });
 
   final String id;
@@ -15,6 +17,10 @@ class BabilSubDistrict {
   final String nameEn;
   final LatLng center;
   final double searchRadiusKm;
+
+  /// Optional Admin-drawn geofence polygon (open ring). When null, an
+  /// effective boundary is synthesized from [center] + [searchRadiusKm].
+  final List<LatLng>? boundary;
 }
 
 class BabilDistrict {
@@ -204,14 +210,55 @@ class BabilRegions {
     return subDistrictById(districtId, subDistrictId).searchRadiusKm;
   }
 
+  /// Radius (km) used to bias broad "search first" provider queries —
+  /// sized from the selected sub-district's effective boundary bounding
+  /// radius (real polygon or synthesized circle) plus a small buffer, so
+  /// odd-shaped/elongated areas don't get under-biased and lose valid
+  /// candidates. Always a soft bias, never a hard restriction.
+  static double searchBiasRadiusKmFor(String districtId, String subDistrictId) {
+    final sub = subDistrictById(districtId, subDistrictId);
+    final boundary = GeoPolygon.effectiveBoundary(
+      center: sub.center,
+      radiusKm: sub.searchRadiusKm,
+      storedBoundary: sub.boundary,
+    );
+    final boundingKm = GeoPolygon.boundingRadiusKm(sub.center, boundary);
+    return (boundingKm > sub.searchRadiusKm ? boundingKm : sub.searchRadiusKm) +
+        2.0;
+  }
+
+  /// True when [point] falls inside the sub-district's effective boundary:
+  /// its Admin-drawn polygon when present, otherwise a polygon synthesized
+  /// from its center + search radius. Always a true geographic boundary
+  /// check (point-in-polygon), never a plain circle-distance check.
+  ///
+  /// When the sub-district only has a temporary circle (no Admin-drawn
+  /// polygon yet), overlapping neighboring circles are resolved by nearest
+  /// center, so a point inside e.g. Qasim's circle never also counts as
+  /// "inside" Al-Shumali just because both circles are large and close
+  /// together in the same district.
   static bool isWithinSubDistrict(
     String districtId,
     String subDistrictId,
     LatLng point,
   ) {
     final sub = subDistrictById(districtId, subDistrictId);
-    final km = _distance.as(LengthUnit.Kilometer, sub.center, point);
-    return km <= sub.searchRadiusKm;
+    return GeoPolygon.isWithinBoundaryUnique(
+      point: point,
+      center: sub.center,
+      radiusKm: sub.searchRadiusKm,
+      storedBoundary: sub.boundary,
+      others: [
+        for (final district in districts)
+          for (final other in district.subDistricts)
+            if (!(district.id == districtId && other.id == subDistrictId))
+              GeoArea(
+                center: other.center,
+                radiusKm: other.searchRadiusKm,
+                boundary: other.boundary,
+              ),
+      ],
+    );
   }
 
   static bool isWithinDistrict(String districtId, LatLng point) {

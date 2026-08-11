@@ -494,6 +494,29 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     await _cameraFollow.moveTo(controller, target);
   }
 
+  /// Governorate → District → Subdistrict is fully cascading and backed by
+  /// live [ServiceAreaCatalog] data: changing the district resets the
+  /// sub-district selection (and any pickup/destination that would fall
+  /// outside the new area) so the customer must confirm the new sub-district
+  /// before booking, exactly like a fresh area selection.
+  void _onDistrictChanged(String? id) {
+    if (id == null || id.isEmpty || id == _districtId) return;
+    setState(() {
+      _districtId = id;
+      _subDistrictId = null;
+    });
+    context.read<AppState>().pricingService.prefetchConfig(districtId: id);
+    _clearDestinationIfOutsideRegion();
+    _clearPickupIfOutsideRegion();
+    unawaited(_refreshTripMarkers());
+    final district = BabilRegions.districtById(id);
+    if (district.subDistricts.isNotEmpty) {
+      final center = district.subDistricts.first.center;
+      unawaited(_moveMap(LatLng(center.latitude, center.longitude)));
+    }
+    _restartNearbyWatch(force: true);
+  }
+
   void _onSubDistrictChanged(String? id) {
     setState(() => _subDistrictId = id);
     if (id == null || id.isEmpty) return;
@@ -710,7 +733,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
                   pickup: _pickup,
                   destination: _destination,
                   onToggleRegion: () {},
-                  onDistrictChanged: (_) {},
+                  onDistrictChanged: _onDistrictChanged,
                   onSubDistrictChanged: _onSubDistrictChanged,
                   onPickupSelected: _setPickupFromSearch,
                   onDestinationSelected: _applyDestination,

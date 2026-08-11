@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:hilla_ride/core/models/service_area_models.dart';
 import 'package:hilla_ride/core/services/service_area_catalog.dart';
+import 'package:latlong2/latlong.dart';
 
 class ServiceAreaService {
   ServiceAreaService({
@@ -139,6 +140,7 @@ class ServiceAreaService {
         'countryId': province.countryId,
         'nameEn': province.nameEn,
         'nameAr': province.nameAr,
+        'customerVisible': province.customerVisible,
         'status': province.status.value,
       },
     });
@@ -172,12 +174,31 @@ class ServiceAreaService {
         'latitude': sub.center.latitude,
         'longitude': sub.center.longitude,
         'searchRadiusKm': sub.searchRadiusKm,
+        if (sub.boundary != null) 'boundary': boundaryToMapList(sub.boundary),
         'status': sub.status.value,
         'services': sub.services,
         'useGlobalCommission': sub.useGlobalCommission,
         'commissionPercent': sub.commissionPercent,
         'pricing': sub.pricing.toMap(),
         'operatingHours': sub.operatingHours.toMap(),
+      },
+    });
+  }
+
+  /// Persists only the `boundary` field for a sub-district — used by the
+  /// Admin polygon editor so editing the boundary never touches pricing,
+  /// radius, or other fields. Pass `null` to explicitly clear a previously
+  /// drawn polygon and fall back to the synthesized center+radius circle.
+  Future<void> saveSubDistrictBoundary({
+    required String id,
+    List<LatLng>? boundary,
+  }) async {
+    await _functions.httpsCallable('saveServiceArea').call({
+      'kind': 'subDistrict',
+      'id': id,
+      'mergeOnly': true,
+      'data': {
+        'boundary': boundary != null ? boundaryToMapList(boundary) : null,
       },
     });
   }

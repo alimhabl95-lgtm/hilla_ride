@@ -3755,6 +3755,18 @@ exports.saveServiceArea = functions.https.onCall(async (data, context) => {
   if (!collection || !id) {
     throw new functions.https.HttpsError("invalid-argument", "kind and id required.");
   }
+  if (kind === "subDistrict" && payload.boundary !== undefined && payload.boundary !== null) {
+    const boundary = payload.boundary;
+    const isValidPoint = (p) =>
+      p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng));
+    if (!Array.isArray(boundary) || boundary.length < 3 || !boundary.every(isValidPoint)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "boundary must be an array of at least 3 {lat, lng} points.",
+      );
+    }
+    payload.boundary = boundary.map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) }));
+  }
   const ref = admin.firestore().collection(collection).doc(id);
   if (mergeOnly) {
     await ref.set(
@@ -3940,6 +3952,7 @@ exports.seedServiceAreas = functions.https.onCall(async (data, context) => {
       countryId: "iq",
       nameEn: "Babil Province",
       nameAr: "محافظة بابل",
+      customerVisible: true,
       status: "active",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: context.auth.uid,

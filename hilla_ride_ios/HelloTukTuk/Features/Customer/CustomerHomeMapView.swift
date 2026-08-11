@@ -6,6 +6,8 @@ struct CustomerHomeMapView: View {
     let user: AppUser
 
     @StateObject private var locationService = LocationService()
+    @State private var selectedProvinceId = ""
+    @State private var selectedDistrictId = ""
     @State private var selectedSubDistrictId = ""
     @State private var pickup: MapPlace?
     @State private var destination: MapPlace?
@@ -34,8 +36,28 @@ struct CustomerHomeMapView: View {
         !selectedSubDistrictId.isEmpty
     }
 
+    /// Districts under the currently selected governorate — dynamic, backed
+    /// by the live catalog, so Admin-added districts appear automatically.
+    private var districtsInSelectedProvince: [BabilDistrict] {
+        BabilRegions.customerDistricts(forProvince: selectedProvinceId)
+    }
+
+    private var subDistrictsInSelectedDistrict: [BabilSubDistrict] {
+        BabilRegions.districts.first { $0.id == selectedDistrictId }?.subDistricts ?? []
+    }
+
+    /// The chosen sub-district when one is selected; otherwise the first
+    /// sub-district of the selected district, used only for camera framing
+    /// (never for search/booking — those are gated by `hasSubDistrict`).
     private var subDistrict: BabilSubDistrict {
-        BabilRegions.subDistrict(byId: selectedSubDistrictId)
+        if hasSubDistrict {
+            return BabilRegions.subDistrict(byId: selectedSubDistrictId)
+        }
+        if let first = subDistrictsInSelectedDistrict.first {
+            return first
+        }
+        return BabilRegions.customerDistrict.subDistricts.first
+            ?? BabilRegions.seedDistricts[0].subDistricts[0]
     }
 
     private var regionLabel: String {
@@ -123,7 +145,7 @@ struct CustomerHomeMapView: View {
                         user: user,
                         pickup: pickup,
                         destination: destination,
-                        districtId: BabilRegions.customerDistrictId,
+                        districtId: selectedDistrictId,
                         subDistrictId: selectedSubDistrictId
                     )
                 }
@@ -150,7 +172,7 @@ struct CustomerHomeMapView: View {
                 PlaceSearchView(
                     title: L10n.string(.pickupLabel, language: appState.language),
                     center: subDistrict.center,
-                    radiusKm: subDistrict.searchRadiusKm,
+                    radiusKm: subDistrict.searchBiasRadiusKm,
                     subDistrictId: selectedSubDistrictId,
                     regionLabel: regionLabel,
                     onSelect: { place in
@@ -162,7 +184,7 @@ struct CustomerHomeMapView: View {
                 PlaceSearchView(
                     title: L10n.string(.destinationLabel, language: appState.language),
                     center: subDistrict.center,
-                    radiusKm: subDistrict.searchRadiusKm,
+                    radiusKm: subDistrict.searchBiasRadiusKm,
                     subDistrictId: selectedSubDistrictId,
                     regionLabel: regionLabel,
                     onSelect: { place in
@@ -191,8 +213,28 @@ struct CustomerHomeMapView: View {
             .task {
                 locationService.requestAuthorizationIfNeeded()
                 startNearbyWatch()
+                if selectedProvinceId.isEmpty {
+                    selectedProvinceId = BabilRegions.customerProvinces.first?.id
+                        ?? BabilRegions.seedProvinceId
+                }
+                if selectedDistrictId.isEmpty {
+                    selectedDistrictId = BabilRegions.customerDistrictId
+                }
             }
             .onChange(of: pickup) { _ in startNearbyWatch() }
+            .onChange(of: selectedProvinceId) { _ in
+                // Governorate switch always resets to that governorate's
+                // first district; the sub-district reset below then forces
+                // the customer to confirm the new area before booking.
+                selectedDistrictId = districtsInSelectedProvince.first?.id ?? ""
+            }
+            .onChange(of: selectedDistrictId) { _ in
+                selectedSubDistrictId = ""
+                errorMessage = nil
+                clearLocationsOutsideSelectedArea()
+                startNearbyWatch()
+                requestRecenter(to: subDistrict.center, targetOnly: true)
+            }
             .onChange(of: selectedSubDistrictId) { _ in
                 clearLocationsOutsideSelectedArea()
                 startNearbyWatch()
@@ -322,16 +364,9 @@ struct CustomerHomeMapView: View {
                         .font(.title3.weight(.bold))
                         .foregroundStyle(BrandColors.navy)
                     Spacer()
-                    Picker(L10n.string(.subDistrict, language: appState.language), selection: $selectedSubDistrictId) {
-                        Text(L10n.string(.selectSubDistrictHint, language: appState.language)).tag("")
-                        ForEach(BabilRegions.customerDistrict.subDistricts) { sub in
-                            Text(sub.displayName(language: appState.language)).tag(sub.id)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(BrandColors.tealDark)
-                    .onChange(of: selectedSubDistrictId) { _ in errorMessage = nil }
                 }
+
+                areaSelector
 
                 SavedPlacesBar { place in
                     if requireSubDistrict() {
@@ -393,6 +428,43 @@ struct CustomerHomeMapView: View {
         }
         .padding(.horizontal, AppSpacing.md)
         .padding(.bottom, AppSpacing.md)
+    }
+
+    /// Cascading Governorate → District → Sub-district selector. Iraq is
+    /// fixed and never shown; all three levels are dynamic, backed by
+    /// `ServiceAreaCatalog` (live Firestore data with a Babil seed fallback
+    /// before the first sync), so Admin-added areas appear automatically.
+    private var areaSelector: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack(spacing: 6) {
+                let provinces = BabilRegions.customerProvinces
+                Picker(L10n.string(.governorateLabel, language: appState.language), selection: $selectedProvinceId) {
+                    ForEach(provinces) { province in
+                        Text(province.displayName(language: appState.language)).tag(province.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(BrandColors.tealDark)
+                .disabled(provinces.count <= 1)
+
+                Picker(L10n.string(.districtLabel, language: appState.language), selection: $selectedDistrictId) {
+                    ForEach(districtsInSelectedProvince) { district in
+                        Text(district.displayName(language: appState.language)).tag(district.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(BrandColors.tealDark)
+            }
+
+            Picker(L10n.string(.subDistrict, language: appState.language), selection: $selectedSubDistrictId) {
+                Text(L10n.string(.selectSubDistrictHint, language: appState.language)).tag("")
+                ForEach(subDistrictsInSelectedDistrict) { sub in
+                    Text(sub.displayName(language: appState.language)).tag(sub.id)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(BrandColors.tealDark)
+        }
     }
 
     private var locationConnector: some View {
