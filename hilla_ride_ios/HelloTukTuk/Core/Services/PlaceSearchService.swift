@@ -149,7 +149,7 @@ final class PlaceSearchService {
             switch google.lastError {
             case .apiDenied where rawCount == 0:
                 lastStatusMessage = "apiDenied"
-            case .network, .httpStatus where rawCount == 0:
+            case .network(_) where rawCount == 0, .httpStatus(_) where rawCount == 0:
                 lastStatusMessage = "network"
             default:
                 lastStatusMessage = "no_results_in_area"

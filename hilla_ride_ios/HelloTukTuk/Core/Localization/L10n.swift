@@ -111,6 +111,7 @@ enum L10nKey {
     case searchLimitedToCity
     case searchPlacesInCity
     case pickOnMapShort
+    case estimatedFare
     case distance
     case confirmBooking
     case findingDriver

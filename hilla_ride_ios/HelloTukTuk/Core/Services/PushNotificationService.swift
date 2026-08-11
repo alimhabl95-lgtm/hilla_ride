@@ -23,7 +23,7 @@ final class PushNotificationService: NSObject, ObservableObject {
         do {
             let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
             if granted {
-                await UIApplication.shared.registerForRemoteNotifications()
+                UIApplication.shared.registerForRemoteNotifications()
             }
         } catch {
             // Non-fatal.
