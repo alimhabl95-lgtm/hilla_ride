@@ -679,14 +679,19 @@ struct CustomerHomeMapView: View {
         }
     }
 
-    private func isWithinSelectedArea(_ coordinate: CLLocationCoordinate2D) -> Bool {
-        guard hasSubDistrict else { return false }
-        return BabilRegions.isWithin(subDistrictId: selectedSubDistrictId, point: coordinate)
+    private func isWithinSelectedDistrict(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        guard !selectedDistrictId.isEmpty else { return false }
+        return BabilRegions.isNearDistrictForSearch(
+            districtId: selectedDistrictId,
+            point: coordinate,
+            extraBufferKm: 35
+        )
     }
 
     @discardableResult
     private func guardSelectedArea(for coordinate: CLLocationCoordinate2D) -> Bool {
-        guard isWithinSelectedArea(coordinate) else {
+        // Soft district check — Admin sub-district polygons are often wrong/tight.
+        guard isWithinSelectedDistrict(coordinate) || adoptPlaceArea(for: coordinate) else {
             errorMessage = L10n.string(.searchOutsideRegion, language: appState.language)
             return false
         }
@@ -694,10 +699,10 @@ struct CustomerHomeMapView: View {
     }
 
     private func clearLocationsOutsideSelectedArea() {
-        if let pickup, !isWithinSelectedArea(pickup.coordinate) {
+        if let pickup, !isWithinSelectedDistrict(pickup.coordinate) {
             self.pickup = nil
         }
-        if let destination, !isWithinSelectedArea(destination.coordinate) {
+        if let destination, !isWithinSelectedDistrict(destination.coordinate) {
             self.destination = nil
         }
     }
@@ -710,14 +715,19 @@ struct CustomerHomeMapView: View {
         return false
     }
 
+    /// Aligns governorate / district / area to a coordinate. Accepts any point
+    /// inside the service catalog (or near it), instead of blocking the user.
     @discardableResult
     private func adoptPlaceArea(for coordinate: CLLocationCoordinate2D) -> Bool {
-        if BabilRegions.isNearDistrictForSearch(
-            districtId: selectedDistrictId,
-            point: coordinate,
-            extraBufferKm: 28
-        ) {
-            let resolved = BabilRegions.resolveFromPoint(coordinate)
+        let resolved = BabilRegions.resolveFromPoint(coordinate)
+
+        // Prefer keeping the user's selected district when the point is near it.
+        if !selectedDistrictId.isEmpty,
+           BabilRegions.isNearDistrictForSearch(
+               districtId: selectedDistrictId,
+               point: coordinate,
+               extraBufferKm: 35
+           ) {
             if resolved.districtId == selectedDistrictId {
                 selectedSubDistrictId = resolved.subDistrictId
             } else if let nearestInDistrict = subDistrictsInSelectedDistrict.min(by: {
@@ -726,8 +736,31 @@ struct CustomerHomeMapView: View {
             }) {
                 selectedSubDistrictId = nearestInDistrict.id
             }
+            selectedProvinceId = BabilRegions.provinceId(forDistrict: selectedDistrictId)
             return true
         }
+
+        // Otherwise jump to the area that actually contains this point.
+        if BabilRegions.isNearDistrictForSearch(
+            districtId: resolved.districtId,
+            point: coordinate,
+            extraBufferKm: 35
+        ) || ServiceAreaCatalog.shared.isWithinAnyActiveArea(coordinate) {
+            selectedDistrictId = resolved.districtId
+            selectedSubDistrictId = resolved.subDistrictId
+            selectedProvinceId = BabilRegions.provinceId(forDistrict: resolved.districtId)
+            return true
+        }
+
+        // Final safety net for Babil service footprint (search uses the same box).
+        if (31.7...33.2).contains(coordinate.latitude),
+           (43.8...45.4).contains(coordinate.longitude) {
+            selectedDistrictId = resolved.districtId
+            selectedSubDistrictId = resolved.subDistrictId
+            selectedProvinceId = BabilRegions.provinceId(forDistrict: resolved.districtId)
+            return true
+        }
+
         errorMessage = L10n.string(.searchOutsideRegion, language: appState.language)
         return false
     }
@@ -751,8 +784,8 @@ struct CustomerHomeMapView: View {
     }
 
     private func useMyLocation() {
-        guard requireSubDistrict() else { return }
         errorMessage = nil
+        locationService.requestAuthorizationIfNeeded()
         locationService.refreshCurrentLocation()
         if let coordinate = locationService.currentCoordinate {
             setPickup(
@@ -768,7 +801,6 @@ struct CustomerHomeMapView: View {
     }
 
     private func setDestination(at coordinate: CLLocationCoordinate2D) {
-        guard requireSubDistrict() else { return }
         setDestinationPlace(
             MapPlace(
                 label: L10n.string(.mapPinDestination, language: appState.language),
@@ -779,7 +811,6 @@ struct CustomerHomeMapView: View {
     }
 
     private func attemptBookRide() {
-        guard requireSubDistrict() else { return }
         errorMessage = nil
         guard let pickup else {
             errorMessage = L10n.string(.selectPickup, language: appState.language)
@@ -793,8 +824,14 @@ struct CustomerHomeMapView: View {
             errorMessage = L10n.string(.pickupDestinationSame, language: appState.language)
             return
         }
-        guard guardSelectedArea(for: pickup.coordinate),
-              guardSelectedArea(for: destination.coordinate) else {
+        // Re-adopt areas from the chosen points so booking is not blocked by
+        // a mismatched ناحية selection.
+        guard adoptPlaceArea(for: pickup.coordinate),
+              adoptPlaceArea(for: destination.coordinate) else {
+            return
+        }
+        if selectedSubDistrictId.isEmpty {
+            errorMessage = L10n.string(.selectSubDistrictFirst, language: appState.language)
             return
         }
         showBookRide = true

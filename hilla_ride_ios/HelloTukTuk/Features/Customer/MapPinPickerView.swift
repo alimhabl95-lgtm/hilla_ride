@@ -86,10 +86,17 @@ struct MapPinPickerView: View {
     }
 
     private func confirmSelection() {
-        if !subDistrictId.isEmpty,
-           !BabilRegions.isWithin(subDistrictId: subDistrictId, point: mapCenter) {
-            outsideRegionMessage = L10n.string(.searchOutsideRegion, language: appState.language)
-            return
+        // Soft check only — parent screen will adopt the correct district/area.
+        if !subDistrictId.isEmpty {
+            let sub = BabilRegions.subDistrict(byId: subDistrictId)
+            let nearSub = GeoMath.distanceKm(from: sub.center, to: mapCenter)
+                <= max(sub.searchRadiusKm, 20) + 35
+            let inBabil = (31.7...33.2).contains(mapCenter.latitude)
+                && (43.8...45.4).contains(mapCenter.longitude)
+            if !nearSub && !inBabil {
+                outsideRegionMessage = L10n.string(.searchOutsideRegion, language: appState.language)
+                return
+            }
         }
         let place = MapPlace(
             label: label.isEmpty ? L10n.string(.mapPinDestination, language: appState.language) : label,
