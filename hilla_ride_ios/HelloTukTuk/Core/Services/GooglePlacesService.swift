@@ -76,15 +76,47 @@ final class GooglePlacesService {
             return []
         }
 
+        // Prefer a clean query first (closest to Google Maps behavior), then a
+        // lightly region-scoped retry if needed.
         let label = regionLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let enriched = label.isEmpty
-            ? "\(trimmedQuery) Babil Iraq"
-            : "\(trimmedQuery) \(label) Babil Iraq"
+        let shortLabel = Self.shortRegionLabel(label)
+        let queries = [
+            "\(trimmedQuery) Babil Iraq",
+            shortLabel.isEmpty ? nil : "\(trimmedQuery) \(shortLabel) Iraq",
+            trimmedQuery
+        ].compactMap { $0 }
 
+        var seen = Set<String>()
+        var merged: [PlacesSearchResult] = []
+        for textQuery in queries {
+            let batch = await executeTextSearch(
+                textQuery: textQuery,
+                center: center,
+                radiusKm: radiusKm,
+                languageCode: languageCode
+            )
+            for place in batch {
+                let key = String(format: "%.4f,%.4f", place.latitude, place.longitude)
+                if seen.insert(key).inserted {
+                    merged.append(place)
+                }
+            }
+            if merged.count >= 8 { break }
+        }
+        return Array(merged.prefix(25))
+    }
+
+    private func executeTextSearch(
+        textQuery: String,
+        center: CLLocationCoordinate2D,
+        radiusKm: Double,
+        languageCode: String
+    ) async -> [PlacesSearchResult] {
         let lang = normalizedLanguageCode(languageCode)
-        let biasRadiusMeters = max(1_500.0, radiusKm * 1_000.0)
+        // Places API (New) locationBias circle max is 50_000 m.
+        let biasRadiusMeters = max(2_000.0, min(radiusKm * 1_000.0, 50_000.0))
         let body: [String: Any] = [
-            "textQuery": enriched,
+            "textQuery": textQuery,
             "languageCode": lang,
             "regionCode": "iq",
             "maxResultCount": 20,
@@ -134,13 +166,29 @@ final class GooglePlacesService {
                 return []
             }
             let places = parsePlaces(data)
-            log.info("Places search q=\(enriched, privacy: .public) count=\(places.count)")
+            log.info("Places search q=\(textQuery, privacy: .public) count=\(places.count)")
             return places
         } catch {
             lastError = .network(error.localizedDescription)
             log.error("Places search network error: \(error.localizedDescription, privacy: .public)")
             return []
         }
+    }
+
+    /// Strip long admin labels like "ناحية مركز الهاشمية" / "Al-Hashimiya District"
+    /// down to a short place token Google Text Search understands.
+    private static func shortRegionLabel(_ raw: String) -> String {
+        var value = raw
+            .replacingOccurrences(of: "قضاء", with: "")
+            .replacingOccurrences(of: "ناحية", with: "")
+            .replacingOccurrences(of: "مركز", with: "")
+            .replacingOccurrences(of: "District", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "Center", with: "", options: .caseInsensitive)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        while value.contains("  ") {
+            value = value.replacingOccurrences(of: "  ", with: " ")
+        }
+        return value
     }
 
     private func normalizedLanguageCode(_ raw: String) -> String {
@@ -156,7 +204,6 @@ final class GooglePlacesService {
             return []
         }
         guard let places = json["places"] as? [[String: Any]] else {
-            // Empty `{}` is a valid "no results" response.
             return []
         }
 
@@ -182,7 +229,6 @@ final class GooglePlacesService {
         }
     }
 
-    /// JSONSerialization may yield NSNumber or Double depending on platform bridging.
     static func doubleValue(_ any: Any?) -> Double? {
         if let number = any as? NSNumber {
             return number.doubleValue

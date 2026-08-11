@@ -38,7 +38,10 @@ final class PlaceSearchService {
             return []
         }
 
-        let providerBiasKm = max(max(1.0, radiusKm), biasRadiusKm)
+        let districtBiasKm = await MainActor.run {
+            BabilRegions.searchBiasRadiusKm(forDistrict: districtId)
+        }
+        let providerBiasKm = max(max(1.0, radiusKm), biasRadiusKm, districtBiasKm)
         let biasBbox = GeoPolygon.boundingBox(
             center: center,
             radiusKm: providerBiasKm,
@@ -65,40 +68,40 @@ final class PlaceSearchService {
         )
 
         let local = await localTask
-        var googleResults = await googleTask
+        let googleResults = await googleTask
 
-        var merged = await mergeInDistrict(
+        // Soft district filter — show Google hits near the selected district
+        // instead of dropping them on tight Admin polygons.
+        var merged = await mergeNearDistrict(
             districtId: districtId,
             center: center,
-            groups: [local, googleResults]
+            groups: [local, googleResults],
+            extraBufferKm: 12
         )
 
-        if merged.count >= 3 {
+        if !merged.isEmpty {
             lastStatusMessage = nil
             log.info(
-                "Place search fast path q=\(trimmed, privacy: .public) district=\(districtId, privacy: .public) count=\(merged.count)"
+                "Place search google path q=\(trimmed, privacy: .public) district=\(districtId, privacy: .public) count=\(merged.count) googleRaw=\(googleResults.count)"
             )
             return Array(merged.prefix(25))
         }
 
-        if merged.isEmpty, googleResults.isEmpty {
-            googleResults = await google.searchPlaces(
-                query: trimmed,
-                center: center,
-                radiusKm: providerBiasKm + 4.0,
-                languageCode: languageCode,
-                regionLabel: nil
-            )
-            merged = await mergeInDistrict(
+        // Wider soft pass if Google returned candidates that a tight radius dropped.
+        if !googleResults.isEmpty {
+            merged = await mergeNearDistrict(
                 districtId: districtId,
                 center: center,
-                groups: [local, googleResults]
+                groups: [googleResults],
+                extraBufferKm: 28
             )
-        }
-
-        if merged.count >= 3 {
-            lastStatusMessage = nil
-            return Array(merged.prefix(25))
+            if !merged.isEmpty {
+                lastStatusMessage = nil
+                log.info(
+                    "Place search wide path q=\(trimmed, privacy: .public) district=\(districtId, privacy: .public) count=\(merged.count)"
+                )
+                return Array(merged.prefix(25))
+            }
         }
 
         let supplemental = await supplementalSearchResults(
@@ -111,18 +114,20 @@ final class PlaceSearchService {
             subDistrictName: subDistrictName
         )
 
-        merged = await mergeInDistrict(
+        merged = await mergeNearDistrict(
             districtId: districtId,
             center: center,
-            groups: [local, googleResults, supplemental.photon, supplemental.overpass, supplemental.nominatim]
+            groups: [local, googleResults, supplemental.photon, supplemental.overpass, supplemental.nominatim],
+            extraBufferKm: 16
         )
 
         if merged.isEmpty {
             let categoryResults = await overpassCategorySearch(query: trimmed, bbox: biasBbox)
-            merged = await mergeInDistrict(
+            merged = await mergeNearDistrict(
                 districtId: districtId,
                 center: center,
-                groups: [categoryResults]
+                groups: [categoryResults],
+                extraBufferKm: 16
             )
         }
 
@@ -219,10 +224,11 @@ final class PlaceSearchService {
 
     // MARK: - Region merge
 
-    private func mergeInDistrict(
+    private func mergeNearDistrict(
         districtId: String,
         center: CLLocationCoordinate2D,
-        groups: [[PlacesSearchResult]]
+        groups: [[PlacesSearchResult]],
+        extraBufferKm: Double
     ) async -> [PlacesSearchResult] {
         await MainActor.run {
             var seen = Set<String>()
@@ -230,7 +236,11 @@ final class PlaceSearchService {
 
             for group in groups {
                 for place in group {
-                    guard BabilRegions.isWithinDistrict(districtId: districtId, point: place.coordinate) else {
+                    guard BabilRegions.isNearDistrictForSearch(
+                        districtId: districtId,
+                        point: place.coordinate,
+                        extraBufferKm: extraBufferKm
+                    ) else {
                         continue
                     }
                     let key = String(format: "%.4f,%.4f", place.latitude, place.longitude)
@@ -243,6 +253,19 @@ final class PlaceSearchService {
             scored.sort { $0.1 < $1.1 }
             return scored.map(\.0)
         }
+    }
+
+    private func mergeInDistrict(
+        districtId: String,
+        center: CLLocationCoordinate2D,
+        groups: [[PlacesSearchResult]]
+    ) async -> [PlacesSearchResult] {
+        await mergeNearDistrict(
+            districtId: districtId,
+            center: center,
+            groups: groups,
+            extraBufferKm: 8
+        )
     }
 
     private func mergeInSubDistrict(
@@ -314,7 +337,13 @@ final class PlaceSearchService {
         let preferArabic = languageCode.lowercased().hasPrefix("ar")
         let matches = await LocalPlacesCatalog.shared.search(query: query, preferArabic: preferArabic)
         return await MainActor.run {
-            matches.filter { BabilRegions.isWithinDistrict(districtId: districtId, point: $0.coordinate) }
+            matches.filter {
+                BabilRegions.isNearDistrictForSearch(
+                    districtId: districtId,
+                    point: $0.coordinate,
+                    extraBufferKm: 12
+                )
+            }
         }
     }
 
@@ -777,6 +806,20 @@ final class LocalPlacesCatalog {
             keywords: ["qasim", "قاسم"],
             lat: 32.3014,
             lon: 44.6892
+        ),
+        LocalPlaceRecord(
+            nameEn: "Al-Shumali Police Directorate",
+            nameAr: "مديرية شرطة الشوملي",
+            keywords: ["shumali", "police", "شرطة", "شوملي", "مديرية"],
+            lat: 32.3252,
+            lon: 44.9151
+        ),
+        LocalPlaceRecord(
+            nameEn: "Al-Shumali",
+            nameAr: "الشوملي",
+            keywords: ["shumali", "شوملي", "الشوملي"],
+            lat: 32.328,
+            lon: 44.918
         ),
         LocalPlaceRecord(
             nameEn: "Hilla City Center",

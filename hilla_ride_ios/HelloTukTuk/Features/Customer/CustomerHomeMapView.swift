@@ -86,9 +86,8 @@ struct CustomerHomeMapView: View {
     }
 
     private var districtSearchBiasKm: Double {
-        let subs = subDistrictsInSelectedDistrict
-        guard !subs.isEmpty else { return searchBiasRadiusKm }
-        return subs.map(\.searchBiasRadiusKm).max() ?? searchBiasRadiusKm
+        guard !selectedDistrictId.isEmpty else { return searchBiasRadiusKm }
+        return BabilRegions.searchBiasRadiusKm(forDistrict: selectedDistrictId)
     }
 
     private var searchRadiusKm: Double {
@@ -713,13 +712,24 @@ struct CustomerHomeMapView: View {
 
     @discardableResult
     private func adoptPlaceArea(for coordinate: CLLocationCoordinate2D) -> Bool {
-        let resolved = BabilRegions.resolveFromPoint(coordinate)
-        guard resolved.districtId == selectedDistrictId else {
-            errorMessage = L10n.string(.searchOutsideRegion, language: appState.language)
-            return false
+        if BabilRegions.isNearDistrictForSearch(
+            districtId: selectedDistrictId,
+            point: coordinate,
+            extraBufferKm: 28
+        ) {
+            let resolved = BabilRegions.resolveFromPoint(coordinate)
+            if resolved.districtId == selectedDistrictId {
+                selectedSubDistrictId = resolved.subDistrictId
+            } else if let nearestInDistrict = subDistrictsInSelectedDistrict.min(by: {
+                GeoMath.distanceKm(from: $0.center, to: coordinate)
+                    < GeoMath.distanceKm(from: $1.center, to: coordinate)
+            }) {
+                selectedSubDistrictId = nearestInDistrict.id
+            }
+            return true
         }
-        selectedSubDistrictId = resolved.subDistrictId
-        return true
+        errorMessage = L10n.string(.searchOutsideRegion, language: appState.language)
+        return false
     }
 
     private func setPickup(_ place: MapPlace, recenter: Bool) {

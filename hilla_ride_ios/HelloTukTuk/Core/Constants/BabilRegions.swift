@@ -195,14 +195,62 @@ enum BabilRegions {
     }
 
     /// True when `point` falls inside any sub-district of `districtId`.
+    /// Uses plain boundary checks (not nearest-neighbor unique) so search
+    /// results near overlapping sub-district edges are not dropped.
     @MainActor
     static func isWithinDistrict(districtId: String, point: CLLocationCoordinate2D) -> Bool {
         guard let district = districts.first(where: { $0.id == districtId }) else {
             return false
         }
         return district.subDistricts.contains { sub in
-            isWithin(subDistrictId: sub.id, point: point)
+            GeoPolygon.isWithinBoundary(
+                point: point,
+                center: sub.center,
+                radiusKm: max(sub.searchRadiusKm, 8),
+                storedBoundary: sub.boundary
+            )
         }
+    }
+
+    /// Soft district match for place search — keeps Google/OSM hits that are
+    /// near any sub-district center even when Admin polygons/radii are tight.
+    @MainActor
+    static func isNearDistrictForSearch(
+        districtId: String,
+        point: CLLocationCoordinate2D,
+        extraBufferKm: Double = 12
+    ) -> Bool {
+        if isWithinDistrict(districtId: districtId, point: point) {
+            return true
+        }
+        guard let district = districts.first(where: { $0.id == districtId }),
+              !district.subDistricts.isEmpty else {
+            return false
+        }
+        return district.subDistricts.contains { sub in
+            let allowed = max(sub.searchRadiusKm, sub.searchBiasRadiusKm, 20) + extraBufferKm
+            return GeoMath.distanceKm(from: sub.center, to: point) <= allowed
+        }
+    }
+
+    /// Bias radius (km) large enough to cover the whole district for providers.
+    @MainActor
+    static func searchBiasRadiusKm(forDistrict districtId: String) -> Double {
+        guard let district = districts.first(where: { $0.id == districtId }),
+              !district.subDistricts.isEmpty else {
+            return defaultSubDistrictRadiusKm + 10
+        }
+        let centers = district.subDistricts.map(\.center)
+        let avgLat = centers.map(\.latitude).reduce(0, +) / Double(centers.count)
+        let avgLon = centers.map(\.longitude).reduce(0, +) / Double(centers.count)
+        let centroid = CLLocationCoordinate2D(latitude: avgLat, longitude: avgLon)
+        var maxKm = defaultSubDistrictRadiusKm
+        for sub in district.subDistricts {
+            let reach = GeoMath.distanceKm(from: centroid, to: sub.center)
+                + max(sub.searchRadiusKm, sub.searchBiasRadiusKm)
+            maxKm = max(maxKm, reach)
+        }
+        return min(maxKm + 8, 55)
     }
 
     @MainActor
