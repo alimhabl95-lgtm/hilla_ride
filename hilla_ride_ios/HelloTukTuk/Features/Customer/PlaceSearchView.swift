@@ -10,6 +10,10 @@ struct PlaceSearchView: View {
     let radiusKm: Double
     var subDistrictId: String = ""
     var regionLabel: String = ""
+    var districtName: String = ""
+    var subDistrictName: String = ""
+    var cityScopeLabel: String = ""
+    var boundary: [CLLocationCoordinate2D]? = nil
     let onSelect: (MapPlace) -> Void
 
     @State private var query = ""
@@ -23,13 +27,34 @@ struct PlaceSearchView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TextField(L10n.string(.searchPlacesHint, language: appState.language), text: $query)
-                .textFieldStyle(AppTextFieldStyle())
-                .focused($searchFocused)
-                .padding()
-                .onChange(of: query) { newValue in
-                    scheduleSearch(query: newValue)
+            if !cityScopeLabel.isEmpty {
+                HStack(spacing: AppSpacing.sm) {
+                    Image(systemName: "location.circle.fill")
+                        .foregroundStyle(BrandColors.tealDark)
+                    Text(L10n.searchLimitedToCity(cityScopeLabel, language: appState.language))
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(BrandColors.navy)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, AppSpacing.lg)
+                .padding(.vertical, AppSpacing.sm)
+                .background(BrandColors.surface)
+            }
+
+            TextField(
+                cityScopeLabel.isEmpty
+                    ? L10n.string(.searchPlacesHint, language: appState.language)
+                    : L10n.searchPlacesInCity(cityScopeLabel, language: appState.language),
+                text: $query
+            )
+            .textFieldStyle(AppTextFieldStyle())
+            .focused($searchFocused)
+            .padding(.horizontal, AppSpacing.lg)
+            .padding(.vertical, AppSpacing.md)
+            .onChange(of: query) { newValue in
+                scheduleSearch(query: newValue)
+            }
 
             if isSearching {
                 ProgressView()
@@ -112,7 +137,10 @@ struct PlaceSearchView: View {
                 radiusKm: radiusKm,
                 languageCode: appState.language.rawValue,
                 regionLabel: regionLabel,
-                subDistrictId: subDistrictId
+                subDistrictId: subDistrictId,
+                districtName: districtName,
+                subDistrictName: subDistrictName,
+                boundary: boundary
             )
             guard !Task.isCancelled else { return }
 
@@ -146,9 +174,14 @@ struct PlaceSearchView: View {
                 ? "فشل الاتصال بخدمة البحث. تحقق من الإنترنت وحاول مجدداً."
                 : "Could not reach place search. Check your connection and retry."
         default:
+            if cityScopeLabel.isEmpty {
+                return isAr
+                    ? "لا توجد نتائج في المنطقة المحددة"
+                    : "No results in the selected area."
+            }
             return isAr
-                ? "لا توجد نتائج في المنطقة المحددة"
-                : "No results in the selected area."
+                ? "لا توجد نتائج داخل \(cityScopeLabel)"
+                : "No results inside \(cityScopeLabel)."
         }
     }
 

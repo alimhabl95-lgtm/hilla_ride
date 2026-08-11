@@ -65,6 +65,29 @@ struct CustomerHomeMapView: View {
         hasSubDistrict ? subDistrict.displayName(language: appState.language) : ""
     }
 
+    private var selectedDistrict: BabilDistrict? {
+        districtsInSelectedProvince.first { $0.id == selectedDistrictId }
+    }
+
+    private var cityScopeLabel: String {
+        if hasSubDistrict {
+            return subDistrict.displayName(language: appState.language)
+        }
+        return selectedDistrict?.displayName(language: appState.language) ?? ""
+    }
+
+    private var districtDisplayName: String {
+        selectedDistrict?.displayName(language: appState.language) ?? ""
+    }
+
+    private var subDistrictDisplayName: String {
+        hasSubDistrict ? subDistrict.displayName(language: appState.language) : ""
+    }
+
+    private var searchRadiusKm: Double {
+        subDistrict.searchRadiusKm
+    }
+
     @discardableResult
     private func requireSubDistrict() -> Bool {
         if hasSubDistrict { return true }
@@ -122,7 +145,7 @@ struct CustomerHomeMapView: View {
                         }
                         .accessibilityLabel(L10n.string(.myLocation, language: appState.language))
                         .padding(.trailing, AppSpacing.lg)
-                        .padding(.bottom, 340)
+                        .padding(.bottom, 380)
                     }
                 }
 
@@ -194,9 +217,13 @@ struct CustomerHomeMapView: View {
                     PlaceSearchView(
                         title: L10n.string(.pickupLabel, language: appState.language),
                         center: subDistrict.center,
-                        radiusKm: subDistrict.searchBiasRadiusKm,
+                        radiusKm: searchRadiusKm,
                         subDistrictId: selectedSubDistrictId,
                         regionLabel: regionLabel,
+                        districtName: districtDisplayName,
+                        subDistrictName: subDistrictDisplayName,
+                        cityScopeLabel: cityScopeLabel,
+                        boundary: subDistrict.boundary,
                         onSelect: { place in
                             setPickup(place, recenter: true)
                         }
@@ -209,9 +236,13 @@ struct CustomerHomeMapView: View {
                     PlaceSearchView(
                         title: L10n.string(.destinationLabel, language: appState.language),
                         center: subDistrict.center,
-                        radiusKm: subDistrict.searchBiasRadiusKm,
+                        radiusKm: searchRadiusKm,
                         subDistrictId: selectedSubDistrictId,
                         regionLabel: regionLabel,
+                        districtName: districtDisplayName,
+                        subDistrictName: subDistrictDisplayName,
+                        cityScopeLabel: cityScopeLabel,
+                        boundary: subDistrict.boundary,
                         onSelect: { place in
                             setDestinationPlace(place, recenter: true)
                         }
@@ -377,14 +408,7 @@ struct CustomerHomeMapView: View {
                     )
                 }
 
-                HStack {
-                    Text(L10n.string(.customerHomeTitle, language: appState.language))
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(BrandColors.navy)
-                    Spacer()
-                }
-
-                areaSelector
+                serviceAreaCard
 
                 SavedPlacesBar { place in
                     if requireSubDistrict() {
@@ -392,45 +416,23 @@ struct CustomerHomeMapView: View {
                     }
                 }
 
-                VStack(spacing: AppSpacing.sm) {
-                    locationCard(
-                        icon: "circle.fill",
-                        iconColor: BrandColors.success,
-                        title: L10n.string(.pickupLabel, language: appState.language),
-                        value: pickup?.label ?? L10n.string(.selectPickup, language: appState.language),
-                        onSearch: { if requireSubDistrict() { showPickupSearch = true } },
-                        onPickMap: { if requireSubDistrict() { showPickupPinPicker = true } }
-                    )
-
-                    locationConnector
-
-                    locationCard(
-                        icon: "mappin.circle.fill",
-                        iconColor: BrandColors.danger,
-                        title: L10n.string(.destinationLabel, language: appState.language),
-                        value: destination?.label ?? L10n.string(.selectDestination, language: appState.language),
-                        onSearch: { if requireSubDistrict() { showDestinationSearch = true } },
-                        onPickMap: { if requireSubDistrict() { showDestinationPinPicker = true } }
-                    )
-                }
+                tripPlannerCard
 
                 if let errorMessage {
                     AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
                 }
 
-                HStack(spacing: AppSpacing.md) {
-                    Button(L10n.string(.useMyLocation, language: appState.language)) {
-                        useMyLocation()
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-
-                    Button(L10n.string(.bookRide, language: appState.language)) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            attemptBookRide()
-                        }
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
+                Button(L10n.string(.useMyLocation, language: appState.language)) {
+                    useMyLocation()
                 }
+                .buttonStyle(SecondaryButtonStyle())
+
+                Button(L10n.string(.bookRide, language: appState.language)) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        attemptBookRide()
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
             }
             .padding(.horizontal, AppSpacing.lg)
             .padding(.bottom, AppSpacing.lg)
@@ -448,51 +450,172 @@ struct CustomerHomeMapView: View {
         .padding(.bottom, AppSpacing.md)
     }
 
+    /// Service area selection — governorate, district, and sub-district.
+    private var serviceAreaCard: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Label {
+                Text(L10n.string(.serviceAreaTitle, language: appState.language))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrandColors.navy)
+            } icon: {
+                Image(systemName: "mappin.and.ellipse")
+                    .foregroundStyle(BrandColors.tealDark)
+            }
+
+            areaSelector
+
+            if hasSubDistrict {
+                Text(L10n.searchLimitedToCity(cityScopeLabel, language: appState.language))
+                    .font(.caption)
+                    .foregroundStyle(BrandColors.tealDark)
+                    .multilineTextAlignment(.leading)
+            } else {
+                Text(L10n.string(.selectSubDistrictFirst, language: appState.language))
+                    .font(.caption)
+                    .foregroundStyle(BrandColors.muted)
+            }
+        }
+        .padding(AppSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(BrandColors.surface, in: RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous)
+                .stroke(BrandColors.border, lineWidth: 1)
+        }
+    }
+
+    /// Pickup and destination rows in one card — Uber-style trip planner.
+    private var tripPlannerCard: some View {
+        VStack(spacing: 0) {
+            tripRow(
+                icon: "circle.fill",
+                iconColor: BrandColors.success,
+                title: L10n.string(.pickupLabel, language: appState.language),
+                value: pickup?.label ?? L10n.string(.selectPickup, language: appState.language),
+                isSet: pickup != nil,
+                onSearch: { if requireSubDistrict() { showPickupSearch = true } },
+                onPickMap: { if requireSubDistrict() { showPickupPinPicker = true } }
+            )
+
+            Divider()
+                .padding(.leading, 52)
+
+            tripRow(
+                icon: "mappin.circle.fill",
+                iconColor: BrandColors.danger,
+                title: L10n.string(.destinationLabel, language: appState.language),
+                value: destination?.label ?? L10n.string(.selectDestination, language: appState.language),
+                isSet: destination != nil,
+                onSearch: { if requireSubDistrict() { showDestinationSearch = true } },
+                onPickMap: { if requireSubDistrict() { showDestinationPinPicker = true } }
+            )
+        }
+        .background(.white, in: RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous)
+                .stroke(BrandColors.border, lineWidth: 1)
+        }
+    }
+
+    private func tripRow(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        value: String,
+        isSet: Bool,
+        onSearch: @escaping () -> Void,
+        onPickMap: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: AppSpacing.md) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(iconColor, in: Circle())
+
+            Button(action: onSearch) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(BrandColors.muted)
+                    Text(value)
+                        .font(.subheadline.weight(isSet ? .semibold : .regular))
+                        .foregroundStyle(isSet ? BrandColors.navy : BrandColors.muted)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onPickMap) {
+                Image(systemName: "scope")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrandColors.tealDark)
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.string(.pickOnMapShort, language: appState.language))
+        }
+        .padding(.horizontal, AppSpacing.md)
+        .padding(.vertical, AppSpacing.sm + 2)
+    }
+
     /// Cascading Governorate → District → Sub-district selector. Iraq is
     /// fixed and never shown; all three levels are dynamic, backed by
     /// `ServiceAreaCatalog` (live Firestore data with a Babil seed fallback
     /// before the first sync), so Admin-added areas appear automatically.
     private var areaSelector: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            HStack(spacing: 6) {
-                let provinces = BabilRegions.customerProvinces
-                Picker(L10n.string(.governorateLabel, language: appState.language), selection: $selectedProvinceId) {
-                    ForEach(provinces) { province in
-                        Text(province.displayName(language: appState.language)).tag(province.id)
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            let provinces = BabilRegions.customerProvinces
+            HStack(spacing: AppSpacing.sm) {
+                areaPicker(
+                    label: L10n.string(.governorateLabel, language: appState.language),
+                    selection: $selectedProvinceId,
+                    options: provinces.map { ($0.id, $0.displayName(language: appState.language)) },
+                    disabled: provinces.count <= 1
+                )
+                areaPicker(
+                    label: L10n.string(.districtLabel, language: appState.language),
+                    selection: $selectedDistrictId,
+                    options: districtsInSelectedProvince.map {
+                        ($0.id, $0.displayName(language: appState.language))
                     }
-                }
-                .pickerStyle(.menu)
-                .tint(BrandColors.tealDark)
-                .disabled(provinces.count <= 1)
-
-                Picker(L10n.string(.districtLabel, language: appState.language), selection: $selectedDistrictId) {
-                    ForEach(districtsInSelectedProvince) { district in
-                        Text(district.displayName(language: appState.language)).tag(district.id)
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(BrandColors.tealDark)
+                )
             }
 
-            Picker(L10n.string(.subDistrict, language: appState.language), selection: $selectedSubDistrictId) {
-                Text(L10n.string(.selectSubDistrictHint, language: appState.language)).tag("")
-                ForEach(subDistrictsInSelectedDistrict) { sub in
-                    Text(sub.displayName(language: appState.language)).tag(sub.id)
+            areaPicker(
+                label: L10n.string(.subDistrict, language: appState.language),
+                selection: $selectedSubDistrictId,
+                options: [("", L10n.string(.selectSubDistrictHint, language: appState.language))]
+                    + subDistrictsInSelectedDistrict.map {
+                        ($0.id, $0.displayName(language: appState.language))
+                    }
+            )
+        }
+    }
+
+    private func areaPicker(
+        label: String,
+        selection: Binding<String>,
+        options: [(String, String)],
+        disabled: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(BrandColors.muted)
+            Picker(label, selection: selection) {
+                ForEach(options, id: \.0) { id, name in
+                    Text(name).tag(id)
                 }
             }
             .pickerStyle(.menu)
             .tint(BrandColors.tealDark)
+            .disabled(disabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    private var locationConnector: some View {
-        HStack(spacing: AppSpacing.sm) {
-            Rectangle()
-                .fill(BrandColors.border)
-                .frame(width: 2, height: 16)
-                .padding(.leading, 21)
-            Spacer()
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func mapToolbarButton(systemImage: String, action: @escaping () -> Void) -> some View {
@@ -505,59 +628,6 @@ struct CustomerHomeMapView: View {
                 .shadow(color: BrandColors.navy.opacity(0.12), radius: 4, y: 2)
         }
         .buttonStyle(.plain)
-    }
-
-    private func locationCard(
-        icon: String,
-        iconColor: Color,
-        title: String,
-        value: String,
-        onSearch: @escaping () -> Void,
-        onPickMap: @escaping () -> Void
-    ) -> some View {
-        VStack(spacing: AppSpacing.xs) {
-            Button(action: onSearch) {
-                HStack(spacing: AppSpacing.md) {
-                    Image(systemName: icon)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(iconColor, in: Circle())
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(BrandColors.muted)
-                        Text(value)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(2)
-                            .foregroundStyle(BrandColors.navy)
-                            .multilineTextAlignment(.leading)
-                    }
-
-                    Spacer(minLength: AppSpacing.sm)
-
-                    Image(systemName: "magnifyingglass")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(BrandColors.tealDark)
-                        .frame(width: 44, height: 44)
-                }
-                .padding(.horizontal, AppSpacing.md)
-                .padding(.vertical, AppSpacing.sm)
-                .background(BrandColors.surface, in: RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous)
-                        .stroke(BrandColors.border, lineWidth: 1)
-                }
-            }
-            .buttonStyle(.plain)
-
-            Button(L10n.string(.pickOnMap, language: appState.language), action: onPickMap)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(BrandColors.tealDark)
-                .frame(minHeight: 44, alignment: .leading)
-                .buttonStyle(.plain)
-        }
     }
 
     private func syncAreaSelection() {

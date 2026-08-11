@@ -107,7 +107,10 @@ enum L10nKey {
     case searchOutsideRegion
     case governorateLabel
     case districtLabel
-    case estimatedFare
+    case serviceAreaTitle
+    case searchLimitedToCity
+    case searchPlacesInCity
+    case pickOnMapShort
     case distance
     case confirmBooking
     case findingDriver
@@ -281,6 +284,14 @@ enum L10n {
         }
     }
 
+    static func searchLimitedToCity(_ cityName: String, language: AppLanguage) -> String {
+        String(format: string(.searchLimitedToCity, language: language), cityName)
+    }
+
+    static func searchPlacesInCity(_ cityName: String, language: AppLanguage) -> String {
+        String(format: string(.searchPlacesInCity, language: language), cityName)
+    }
+
     private static let table: [L10nKey: [AppLanguage: String]] = [
         .appTitle: [.english: "Hello Tuk-Tuk", .arabic: "Hello Tuk-Tuk"],
         .modeChooserSubtitle: [
@@ -442,6 +453,16 @@ enum L10n {
         ],
         .governorateLabel: [.english: "Governorate", .arabic: "المحافظة"],
         .districtLabel: [.english: "District", .arabic: "القضاء"],
+        .serviceAreaTitle: [.english: "Your city", .arabic: "مدينتك"],
+        .searchLimitedToCity: [
+            .english: "Search results stay inside %@ only.",
+            .arabic: "نتائج البحث داخل %@ فقط."
+        ],
+        .searchPlacesInCity: [
+            .english: "Search in %@",
+            .arabic: "البحث في %@"
+        ],
+        .pickOnMapShort: [.english: "Pin on map", .arabic: "تحديد على الخريطة"],
         .estimatedFare: [.english: "Estimated fare", .arabic: "الأجرة التقديرية"],
         .distance: [.english: "Distance", .arabic: "المسافة"],
         .confirmBooking: [.english: "Confirm booking", .arabic: "تأكيد الحجز"],

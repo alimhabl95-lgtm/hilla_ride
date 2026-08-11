@@ -15,6 +15,13 @@ struct GeoArea {
     }
 }
 
+struct GeoBoundingBox: Equatable {
+    let south: Double
+    let west: Double
+    let north: Double
+    let east: Double
+}
+
 /// Shared polygon geometry helpers so iOS, Android/Flutter, and Cloud
 /// Functions treat the same stored (or synthesized) boundary identically.
 enum GeoPolygon {
@@ -86,6 +93,39 @@ enum GeoPolygon {
             return stored
         }
         return syntheticPolygonFromCircle(center: center, radiusKm: radiusKm)
+    }
+
+    /// Axis-aligned bounding box for the effective service-area boundary.
+    static func boundingBox(
+        center: CLLocationCoordinate2D,
+        radiusKm: Double,
+        storedBoundary: [CLLocationCoordinate2D]?
+    ) -> GeoBoundingBox {
+        let polygon = effectiveBoundary(
+            center: center,
+            radiusKm: radiusKm,
+            storedBoundary: storedBoundary
+        )
+        guard let first = polygon.first else {
+            let delta = max(0.01, radiusKm / 111.0)
+            return GeoBoundingBox(
+                south: center.latitude - delta,
+                west: center.longitude - delta,
+                north: center.latitude + delta,
+                east: center.longitude + delta
+            )
+        }
+        var minLat = first.latitude
+        var maxLat = first.latitude
+        var minLon = first.longitude
+        var maxLon = first.longitude
+        for point in polygon {
+            minLat = min(minLat, point.latitude)
+            maxLat = max(maxLat, point.latitude)
+            minLon = min(minLon, point.longitude)
+            maxLon = max(maxLon, point.longitude)
+        }
+        return GeoBoundingBox(south: minLat, west: minLon, north: maxLat, east: maxLon)
     }
 
     /// True when `point` falls inside the effective boundary of an area

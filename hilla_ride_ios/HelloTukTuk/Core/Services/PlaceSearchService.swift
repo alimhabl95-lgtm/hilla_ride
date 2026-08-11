@@ -21,7 +21,10 @@ final class PlaceSearchService {
         radiusKm: Double,
         languageCode: String,
         regionLabel: String?,
-        subDistrictId: String
+        subDistrictId: String,
+        districtName: String? = nil,
+        subDistrictName: String? = nil,
+        boundary: [CLLocationCoordinate2D]? = nil
     ) async -> [PlacesSearchResult] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let minLength = containsArabic(trimmed) ? 1 : 2
@@ -34,6 +37,13 @@ final class PlaceSearchService {
             return []
         }
 
+        let bbox = GeoPolygon.boundingBox(
+            center: center,
+            radiusKm: radiusKm,
+            storedBoundary: boundary
+        )
+        let tightRadiusKm = max(1.0, radiusKm)
+
         async let localTask = localPlacesMatching(
             query: trimmed,
             subDistrictId: subDistrictId,
@@ -42,26 +52,28 @@ final class PlaceSearchService {
         async let googleTask = google.searchPlaces(
             query: trimmed,
             center: center,
-            radiusKm: radiusKm,
+            radiusKm: tightRadiusKm,
             languageCode: languageCode,
-            regionLabel: regionLabel
+            regionLabel: regionLabel,
+            districtName: districtName,
+            subDistrictName: subDistrictName
         )
         async let photonTask = photonSearch(
             query: trimmed,
             center: center,
-            radiusKm: radiusKm,
+            radiusKm: tightRadiusKm,
             languageCode: languageCode
         )
         async let overpassTask = overpassSearch(
             query: trimmed,
-            center: center,
-            radiusKm: radiusKm
+            bbox: bbox
         )
         async let nominatimTask = nominatimSearch(
             query: trimmed,
-            center: center,
-            radiusKm: radiusKm,
+            bbox: bbox,
             languageCode: languageCode,
+            districtName: districtName,
+            subDistrictName: subDistrictName,
             regionLabel: regionLabel
         )
 
@@ -80,8 +92,7 @@ final class PlaceSearchService {
         if merged.isEmpty {
             let categoryResults = await overpassCategorySearch(
                 query: trimmed,
-                center: center,
-                radiusKm: radiusKm
+                bbox: bbox
             )
             merged = await mergeInSubDistrict(
                 subDistrictId: subDistrictId,
@@ -158,38 +169,44 @@ final class PlaceSearchService {
 
     private func nominatimSearch(
         query: String,
-        center: CLLocationCoordinate2D,
-        radiusKm: Double,
+        bbox: GeoBoundingBox,
         languageCode: String,
+        districtName: String?,
+        subDistrictName: String?,
         regionLabel: String?
     ) async -> [PlacesSearchResult] {
         let usesArabic = languageCode.lowercased().hasPrefix("ar") || containsArabic(query)
+        let district = districtName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let subDistrict = subDistrictName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let label = regionLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let searchQuery: String
-        if label.isEmpty {
-            searchQuery = usesArabic ? "\(query), بابل, العراق" : "\(query), Babil, Iraq"
-        } else {
-            searchQuery = usesArabic
-                ? "\(query), \(label), بابل, العراق"
-                : "\(query), \(label), Babil, Iraq"
-        }
 
-        let delta = max(0.05, radiusKm / 111.0)
-        let left = center.longitude - delta
-        let right = center.longitude + delta
-        let top = center.latitude + delta
-        let bottom = center.latitude - delta
+        var queryParts = [query]
+        if !subDistrict.isEmpty {
+            queryParts.append(subDistrict)
+        } else if !label.isEmpty {
+            queryParts.append(label)
+        }
+        if !district.isEmpty {
+            queryParts.append(district)
+        }
+        let searchQuery = usesArabic
+            ? queryParts.joined(separator: ", ") + ", بابل, العراق"
+            : queryParts.joined(separator: ", ") + ", Babil, Iraq"
+
         let lang = usesArabic ? "ar,en" : "en,ar"
 
         var components = URLComponents(string: "https://nominatim.openstreetmap.org/search")
         components?.queryItems = [
             URLQueryItem(name: "q", value: searchQuery),
             URLQueryItem(name: "format", value: "json"),
-            URLQueryItem(name: "limit", value: "25"),
+            URLQueryItem(name: "limit", value: "20"),
             URLQueryItem(name: "countrycodes", value: "iq"),
             URLQueryItem(name: "addressdetails", value: "1"),
-            URLQueryItem(name: "viewbox", value: "\(left),\(top),\(right),\(bottom)"),
-            URLQueryItem(name: "bounded", value: "0")
+            URLQueryItem(
+                name: "viewbox",
+                value: "\(bbox.west),\(bbox.north),\(bbox.east),\(bbox.south)"
+            ),
+            URLQueryItem(name: "bounded", value: "1")
         ]
         guard let url = components?.url else { return [] }
 
@@ -233,7 +250,7 @@ final class PlaceSearchService {
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "lat", value: String(center.latitude)),
             URLQueryItem(name: "lon", value: String(center.longitude)),
-            URLQueryItem(name: "limit", value: "30"),
+            URLQueryItem(name: "limit", value: "20"),
             URLQueryItem(name: "lang", value: languageCode.lowercased().hasPrefix("ar") ? "ar" : "en")
         ]
         guard let url = components?.url else { return [] }
@@ -276,15 +293,13 @@ final class PlaceSearchService {
 
     private func overpassSearch(
         query: String,
-        center: CLLocationCoordinate2D,
-        radiusKm: Double
+        bbox: GeoBoundingBox
     ) async -> [PlacesSearchResult] {
         let escaped = query.replacingOccurrences(of: "\"", with: "\\\"")
-        let delta = radiusKm / 111.0
-        let south = center.latitude - delta
-        let north = center.latitude + delta
-        let west = center.longitude - delta
-        let east = center.longitude + delta
+        let south = bbox.south
+        let north = bbox.north
+        let west = bbox.west
+        let east = bbox.east
         let wordPattern = overpassWordPattern(query)
         let categoryLines = overpassCategoryLines(
             south: south, west: west, north: north, east: east, query: query
@@ -316,14 +331,12 @@ final class PlaceSearchService {
 
     private func overpassCategorySearch(
         query: String,
-        center: CLLocationCoordinate2D,
-        radiusKm: Double
+        bbox: GeoBoundingBox
     ) async -> [PlacesSearchResult] {
-        let delta = radiusKm / 111.0
-        let south = center.latitude - delta
-        let north = center.latitude + delta
-        let west = center.longitude - delta
-        let east = center.longitude + delta
+        let south = bbox.south
+        let north = bbox.north
+        let west = bbox.west
+        let east = bbox.east
         let lines = overpassCategoryLines(
             south: south, west: west, north: north, east: east, query: query
         )
