@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hilla_ride/core/models/service_area_models.dart';
 import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:latlong2/latlong.dart';
@@ -40,29 +41,37 @@ class ServiceAreaService {
       );
     }
 
+    void onCatalogError(Object error, StackTrace stackTrace) {
+      debugPrint('ServiceAreaService catalog sync error: $error\n$stackTrace');
+    }
+
     _countriesSub = _firestore.collection('serviceCountries').snapshots().listen(
       (snap) {
         countries = snap.docs.map(ServiceCountry.fromDoc).toList();
         publish();
       },
+      onError: onCatalogError,
     );
     _provincesSub = _firestore.collection('serviceProvinces').snapshots().listen(
       (snap) {
         provinces = snap.docs.map(ServiceProvince.fromDoc).toList();
         publish();
       },
+      onError: onCatalogError,
     );
     _districtsSub = _firestore.collection('serviceDistricts').snapshots().listen(
       (snap) {
         districts = snap.docs.map(ServiceDistrict.fromDoc).toList();
         publish();
       },
+      onError: onCatalogError,
     );
     _subsSub = _firestore.collection('serviceSubDistricts').snapshots().listen(
       (snap) {
         subs = snap.docs.map(ServiceSubDistrict.fromDoc).toList();
         publish();
       },
+      onError: onCatalogError,
     );
   }
 

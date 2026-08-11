@@ -26,31 +26,32 @@ class _SessionGuardState extends State<SessionGuard> {
   }
 
   Future<void> _initialize() async {
-    final authService = context.read<AppState>().authService;
-    final sessionService = context.read<AppState>().sessionService;
-    final user = authService.currentUser;
-    if (user == null) {
+    try {
+      final authService = context.read<AppState>().authService;
+      final sessionService = context.read<AppState>().sessionService;
+      final user = authService.currentUser;
+      if (user == null) {
+        return;
+      }
+
+      final valid = await sessionService.validateLocalSession(user.uid);
+      if (!valid) {
+        await _forceSignOut(showMessage: true);
+        return;
+      }
+
+      _subscription = sessionService.watchRemoteSession(user.uid).listen(
+        (_) async {
+          if (!mounted || _signedOut) return;
+          final valid = await sessionService.isSessionValid(user.uid);
+          if (!valid) {
+            await _forceSignOut(showMessage: true);
+          }
+        },
+      );
+    } finally {
       if (mounted) setState(() => _checking = false);
-      return;
     }
-
-    final valid = await sessionService.validateLocalSession(user.uid);
-    if (!valid) {
-      await _forceSignOut(showMessage: true);
-      return;
-    }
-
-    _subscription = sessionService.watchRemoteSession(user.uid).listen(
-      (_) async {
-        if (!mounted || _signedOut) return;
-        final valid = await sessionService.isSessionValid(user.uid);
-        if (!valid) {
-          await _forceSignOut(showMessage: true);
-        }
-      },
-    );
-
-    if (mounted) setState(() => _checking = false);
   }
 
   Future<void> _forceSignOut({required bool showMessage}) async {

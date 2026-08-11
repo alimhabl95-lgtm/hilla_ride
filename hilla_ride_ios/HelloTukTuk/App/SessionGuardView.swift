@@ -27,8 +27,9 @@ struct SessionGuardView<Content: View>: View {
 
     private func validateAndWatchSession() async {
         sessionTask?.cancel()
+        defer { isChecking = false }
+
         guard let uid = appState.currentUser?.uid else {
-            isChecking = false
             return
         }
 
@@ -36,11 +37,9 @@ struct SessionGuardView<Content: View>: View {
         let valid = (try? await sessionService.validateLocalSession(uid: uid)) ?? false
         if !valid {
             try? await appState.signOut()
-            isChecking = false
             return
         }
 
-        isChecking = false
         sessionTask = Task {
             for await _ in sessionService.watchRemoteSession(uid: uid) {
                 guard !Task.isCancelled else { break }

@@ -53,8 +53,25 @@ final class AppState: ObservableObject {
     func finishBootstrap() async {
         ServiceAreaCatalog.shared.start()
         await refreshCurrentUser(firebaseUser: Auth.auth().currentUser)
-        await PushNotificationService.shared.requestAuthorizationIfNeeded()
         isBootstrapping = false
+        schedulePushSetup()
+    }
+
+    /// Push permission + FCM token must not block the first screen — Messaging.token()
+    /// can wait indefinitely for APNs during cold start.
+    private func schedulePushSetup() {
+        Task {
+            await PushNotificationService.shared.requestAuthorizationIfNeeded()
+            if let user = currentUser {
+                await PushNotificationService.shared.saveToken(for: user.uid, role: user.role)
+            }
+        }
+    }
+
+    private func schedulePushTokenSave(for user: AppUser) {
+        Task {
+            await PushNotificationService.shared.saveToken(for: user.uid, role: user.role)
+        }
     }
 
     func selectMode(_ mode: UserRole) {
@@ -65,7 +82,7 @@ final class AppState: ObservableObject {
         currentUser = user
         Task {
             await refreshDriverProfileIfNeeded()
-            await PushNotificationService.shared.saveToken(for: user.uid, role: user.role)
+            schedulePushTokenSave(for: user)
         }
     }
 
@@ -103,7 +120,7 @@ final class AppState: ObservableObject {
             }
             currentUser = user
             await refreshDriverProfileIfNeeded()
-            await PushNotificationService.shared.saveToken(for: user.uid, role: user.role)
+            schedulePushTokenSave(for: user)
         } catch {
             currentUser = nil
             currentDriver = nil

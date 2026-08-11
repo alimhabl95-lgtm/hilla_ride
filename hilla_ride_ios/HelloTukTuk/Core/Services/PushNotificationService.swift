@@ -32,7 +32,20 @@ final class PushNotificationService: NSObject, ObservableObject {
 
     func refreshToken() async {
         do {
-            fcmToken = try await Messaging.messaging().token()
+            fcmToken = try await withThrowingTaskGroup(of: String.self) { group in
+                group.addTask {
+                    try await Messaging.messaging().token()
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 20_000_000_000)
+                    throw CancellationError()
+                }
+                guard let token = try await group.next() else {
+                    throw CancellationError()
+                }
+                group.cancelAll()
+                return token
+            }
         } catch {
             fcmToken = nil
         }
