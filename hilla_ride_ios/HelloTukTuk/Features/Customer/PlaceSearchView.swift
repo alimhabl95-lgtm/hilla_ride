@@ -43,14 +43,27 @@ struct PlaceSearchView: View {
                 .background(BrandColors.surface)
             }
 
-            TextField(
-                cityScopeLabel.isEmpty
-                    ? L10n.string(.searchPlacesHint, language: appState.language)
-                    : L10n.searchPlacesInCity(cityScopeLabel, language: appState.language),
-                text: $query
-            )
-            .textFieldStyle(AppTextFieldStyle())
-            .focused($searchFocused)
+            HStack(spacing: AppSpacing.sm) {
+                TextField(
+                    cityScopeLabel.isEmpty
+                        ? L10n.string(.searchPlacesHint, language: appState.language)
+                        : L10n.searchPlacesInCity(cityScopeLabel, language: appState.language),
+                    text: $query
+                )
+                .textFieldStyle(AppTextFieldStyle())
+                .focused($searchFocused)
+                .submitLabel(.search)
+                .onSubmit { runSearch(immediate: true) }
+
+                Button(L10n.string(.searchAction, language: appState.language)) {
+                    runSearch(immediate: true)
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(BrandColors.tealDark, in: RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
+            }
             .padding(.horizontal, AppSpacing.lg)
             .padding(.vertical, AppSpacing.md)
             .onChange(of: query) { newValue in
@@ -94,6 +107,7 @@ struct PlaceSearchView: View {
                 }
             }
             .listStyle(.plain)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if let savedMessage {
                 Text(savedMessage)
@@ -119,8 +133,7 @@ struct PlaceSearchView: View {
     private func scheduleSearch(query: String) {
         searchTask?.cancel()
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let minLength = trimmed.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) ? 1 : 2
-        guard trimmed.count >= minLength else {
+        guard trimmed.count >= minQueryLength(for: trimmed) else {
             results = []
             statusMessage = nil
             isSearching = false
@@ -128,40 +141,65 @@ struct PlaceSearchView: View {
         }
 
         searchTask = Task {
-            try? await Task.sleep(nanoseconds: 280_000_000)
+            try? await Task.sleep(nanoseconds: 350_000_000)
             guard !Task.isCancelled else { return }
-            await MainActor.run { isSearching = true }
+            await performSearch(trimmed)
+        }
+    }
 
-            let places = await searchService.search(
-                query: trimmed,
-                center: center,
-                radiusKm: radiusKm,
-                biasRadiusKm: biasRadiusKm > 0 ? biasRadiusKm : radiusKm,
-                languageCode: appState.language.rawValue,
-                regionLabel: regionLabel,
-                districtId: districtId,
-                districtName: districtName,
-                subDistrictName: subDistrictName,
-                boundary: boundary
-            )
+    private func runSearch(immediate: Bool) {
+        searchTask?.cancel()
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= minQueryLength(for: trimmed) else {
+            results = []
+            statusMessage = nil
+            isSearching = false
+            return
+        }
+        searchTask = Task {
+            if !immediate {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
             guard !Task.isCancelled else { return }
+            await performSearch(trimmed)
+        }
+    }
 
-            await MainActor.run {
-                results = places
-                isSearching = false
-                if places.isEmpty {
-                    statusMessage = emptyStateMessage(for: searchService.lastStatusMessage)
-                } else {
-                    statusMessage = nil
-                }
+    private func performSearch(_ trimmed: String) async {
+        await MainActor.run { isSearching = true }
+
+        let places = await searchService.search(
+            query: trimmed,
+            center: center,
+            radiusKm: radiusKm,
+            biasRadiusKm: biasRadiusKm > 0 ? biasRadiusKm : max(radiusKm, 35),
+            languageCode: appState.language.rawValue,
+            regionLabel: regionLabel,
+            districtId: districtId,
+            districtName: districtName,
+            subDistrictName: subDistrictName,
+            boundary: boundary
+        )
+        guard !Task.isCancelled else { return }
+
+        await MainActor.run {
+            results = places
+            isSearching = false
+            if places.isEmpty {
+                statusMessage = emptyStateMessage(for: searchService.lastStatusMessage)
+            } else {
+                statusMessage = nil
             }
         }
     }
 
     private var queryMeetsMinLength: Bool {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let minLength = trimmed.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) ? 1 : 2
-        return trimmed.count >= minLength
+        return trimmed.count >= minQueryLength(for: trimmed)
+    }
+
+    private func minQueryLength(for text: String) -> Int {
+        text.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) ? 1 : 2
     }
 
     private func emptyStateMessage(for code: String?) -> String {

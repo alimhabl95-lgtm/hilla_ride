@@ -60,13 +60,12 @@ final class GooglePlacesService {
         regionLabel: String? = nil
     ) async -> [PlacesSearchResult] {
         lastError = nil
+        // Do not permanently latch apiDenied — transient 403s / misconfig
+        // must not kill search for the rest of the session.
+        apiDenied = false
 
         guard MapsConfig.useGooglePlacesHTTP else {
             lastError = .disabled
-            return []
-        }
-        if apiDenied {
-            lastError = .apiDenied
             return []
         }
 

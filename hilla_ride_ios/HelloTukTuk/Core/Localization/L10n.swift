@@ -155,6 +155,7 @@ enum L10nKey {
     case done
     case rideCancelled
     case searchPlacesHint
+    case searchAction
     case finalFare
     case noDriversInDistrict
     case rideChatTitle
@@ -547,6 +548,7 @@ enum L10n {
         .done: [.english: "Done", .arabic: "تم"],
         .rideCancelled: [.english: "Ride cancelled", .arabic: "تم إلغاء المشوار"],
         .searchPlacesHint: [.english: "Search places in Hilla", .arabic: "ابحث عن أماكن في الحلة"],
+        .searchAction: [.english: "Search", .arabic: "بحث"],
         .finalFare: [.english: "Your fare", .arabic: "أجرتك"],
         .noDriversInDistrict: [
             .english: "No drivers are online in this city right now. We will keep searching.",
