@@ -35,36 +35,56 @@ final class ServiceAreaCatalog: ObservableObject {
     func start() {
         guard listeners.isEmpty else { return }
         let db = Firestore.firestore()
-        listeners.append(db.collection("serviceCountries").addSnapshotListener { [weak self] snap, _ in
+        listeners.append(db.collection("serviceCountries").addSnapshotListener { [weak self] snap, error in
             Task { @MainActor in
-                guard let self, let snap else { return }
+                guard let self else { return }
+                if let error {
+                    print("ServiceAreaCatalog serviceCountries error: \(error.localizedDescription)")
+                    return
+                }
+                guard let snap else { return }
                 self.countries = Dictionary(
                     uniqueKeysWithValues: snap.documents.map { ($0.documentID, $0.data()) }
                 )
                 self.rebuild()
             }
         })
-        listeners.append(db.collection("serviceProvinces").addSnapshotListener { [weak self] snap, _ in
+        listeners.append(db.collection("serviceProvinces").addSnapshotListener { [weak self] snap, error in
             Task { @MainActor in
-                guard let self, let snap else { return }
+                guard let self else { return }
+                if let error {
+                    print("ServiceAreaCatalog serviceProvinces error: \(error.localizedDescription)")
+                    return
+                }
+                guard let snap else { return }
                 self.provinces = Dictionary(
                     uniqueKeysWithValues: snap.documents.map { ($0.documentID, $0.data()) }
                 )
                 self.rebuild()
             }
         })
-        listeners.append(db.collection("serviceDistricts").addSnapshotListener { [weak self] snap, _ in
+        listeners.append(db.collection("serviceDistricts").addSnapshotListener { [weak self] snap, error in
             Task { @MainActor in
-                guard let self, let snap else { return }
+                guard let self else { return }
+                if let error {
+                    print("ServiceAreaCatalog serviceDistricts error: \(error.localizedDescription)")
+                    return
+                }
+                guard let snap else { return }
                 self.districts = Dictionary(
                     uniqueKeysWithValues: snap.documents.map { ($0.documentID, $0.data()) }
                 )
                 self.rebuild()
             }
         })
-        listeners.append(db.collection("serviceSubDistricts").addSnapshotListener { [weak self] snap, _ in
+        listeners.append(db.collection("serviceSubDistricts").addSnapshotListener { [weak self] snap, error in
             Task { @MainActor in
-                guard let self, let snap else { return }
+                guard let self else { return }
+                if let error {
+                    print("ServiceAreaCatalog serviceSubDistricts error: \(error.localizedDescription)")
+                    return
+                }
+                guard let snap else { return }
                 self.subs = Dictionary(
                     uniqueKeysWithValues: snap.documents.map { ($0.documentID, $0.data()) }
                 )
@@ -86,7 +106,9 @@ final class ServiceAreaCatalog: ObservableObject {
             }
             return true
         }
-        return visible.isEmpty ? liveDistricts : visible
+        let list = visible.isEmpty ? liveDistricts : visible
+        if list.isEmpty { return BabilRegions.seedCustomerDistricts }
+        return list
     }
 
     /// Governorates offered to customers in the cascading area selector:
@@ -130,7 +152,11 @@ final class ServiceAreaCatalog: ObservableObject {
         if !synced {
             return provinceId == BabilRegions.seedProvinceId ? all : []
         }
-        return all.filter { (districts[$0.id]?["provinceId"] as? String) == provinceId }
+        let inProvince = all.filter { (districts[$0.id]?["provinceId"] as? String) == provinceId }
+        if inProvince.isEmpty, provinceId == BabilRegions.seedProvinceId {
+            return all
+        }
+        return inProvince
     }
 
     /// Governorate id that owns `districtId`, falling back to the seed
@@ -225,6 +251,10 @@ final class ServiceAreaCatalog: ObservableObject {
         (status ?? "inactive") == "active"
     }
 
+    private func supportsRide(_ services: [String]) -> Bool {
+        services.contains { $0.lowercased() == "ride" }
+    }
+
     private func rebuild() {
         synced = true
         var built: [BabilDistrict] = []
@@ -245,7 +275,7 @@ final class ServiceAreaCatalog: ObservableObject {
                 guard (s["districtId"] as? String) == districtId else { return nil }
                 guard accepts(s["status"] as? String) else { return nil }
                 let services = (s["services"] as? [String]) ?? ["ride"]
-                guard services.contains("ride") else { return nil }
+                guard supportsRide(services) else { return nil }
                 let lat = (s["latitude"] as? NSNumber)?.doubleValue ?? 0
                 let lng = (s["longitude"] as? NSNumber)?.doubleValue ?? 0
                 let radius = (s["searchRadiusKm"] as? NSNumber)?.doubleValue

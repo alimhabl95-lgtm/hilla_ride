@@ -3,6 +3,7 @@ import SwiftUI
 
 struct CustomerHomeMapView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject private var areaCatalog = ServiceAreaCatalog.shared
     let user: AppUser
 
     @StateObject private var locationService = LocationService()
@@ -43,7 +44,7 @@ struct CustomerHomeMapView: View {
     }
 
     private var subDistrictsInSelectedDistrict: [BabilSubDistrict] {
-        BabilRegions.districts.first { $0.id == selectedDistrictId }?.subDistricts ?? []
+        districtsInSelectedProvince.first { $0.id == selectedDistrictId }?.subDistricts ?? []
     }
 
     /// The chosen sub-district when one is selected; otherwise the first
@@ -66,6 +67,8 @@ struct CustomerHomeMapView: View {
 
     @discardableResult
     private func requireSubDistrict() -> Bool {
+        if hasSubDistrict { return true }
+        syncAreaSelection()
         if hasSubDistrict { return true }
         errorMessage = L10n.string(.selectSubDistrictFirst, language: appState.language)
         return false
@@ -168,30 +171,6 @@ struct CustomerHomeMapView: View {
             .navigationDestination(isPresented: $showRewards) {
                 CustomerRewardsView(user: user)
             }
-            .navigationDestination(isPresented: $showPickupSearch) {
-                PlaceSearchView(
-                    title: L10n.string(.pickupLabel, language: appState.language),
-                    center: subDistrict.center,
-                    radiusKm: subDistrict.searchBiasRadiusKm,
-                    subDistrictId: selectedSubDistrictId,
-                    regionLabel: regionLabel,
-                    onSelect: { place in
-                        setPickup(place, recenter: true)
-                    }
-                )
-            }
-            .navigationDestination(isPresented: $showDestinationSearch) {
-                PlaceSearchView(
-                    title: L10n.string(.destinationLabel, language: appState.language),
-                    center: subDistrict.center,
-                    radiusKm: subDistrict.searchBiasRadiusKm,
-                    subDistrictId: selectedSubDistrictId,
-                    regionLabel: regionLabel,
-                    onSelect: { place in
-                        setDestinationPlace(place, recenter: true)
-                    }
-                )
-            }
             .navigationDestination(isPresented: $showPickupPinPicker) {
                 MapPinPickerView(
                     title: L10n.string(.pickupLabel, language: appState.language),
@@ -210,6 +189,36 @@ struct CustomerHomeMapView: View {
                     setDestinationPlace(place, recenter: true)
                 }
             }
+            .sheet(isPresented: $showPickupSearch) {
+                NavigationStack {
+                    PlaceSearchView(
+                        title: L10n.string(.pickupLabel, language: appState.language),
+                        center: subDistrict.center,
+                        radiusKm: subDistrict.searchBiasRadiusKm,
+                        subDistrictId: selectedSubDistrictId,
+                        regionLabel: regionLabel,
+                        onSelect: { place in
+                            setPickup(place, recenter: true)
+                        }
+                    )
+                    .environmentObject(appState)
+                }
+            }
+            .sheet(isPresented: $showDestinationSearch) {
+                NavigationStack {
+                    PlaceSearchView(
+                        title: L10n.string(.destinationLabel, language: appState.language),
+                        center: subDistrict.center,
+                        radiusKm: subDistrict.searchBiasRadiusKm,
+                        subDistrictId: selectedSubDistrictId,
+                        regionLabel: regionLabel,
+                        onSelect: { place in
+                            setDestinationPlace(place, recenter: true)
+                        }
+                    )
+                    .environmentObject(appState)
+                }
+            }
             .task {
                 locationService.requestAuthorizationIfNeeded()
                 startNearbyWatch()
@@ -220,6 +229,7 @@ struct CustomerHomeMapView: View {
                 if selectedDistrictId.isEmpty {
                     selectedDistrictId = BabilRegions.customerDistrictId
                 }
+                syncAreaSelection()
             }
             .onChange(of: pickup) { _ in startNearbyWatch() }
             .onChange(of: selectedProvinceId) { _ in
@@ -229,12 +239,20 @@ struct CustomerHomeMapView: View {
                 selectedDistrictId = districtsInSelectedProvince.first?.id ?? ""
             }
             .onChange(of: selectedDistrictId) { _ in
-                selectedSubDistrictId = ""
+                if selectedSubDistrictId.isEmpty,
+                   subDistrictsInSelectedDistrict.count == 1,
+                   let only = subDistrictsInSelectedDistrict.first {
+                    selectedSubDistrictId = only.id
+                } else {
+                    selectedSubDistrictId = ""
+                }
                 errorMessage = nil
                 clearLocationsOutsideSelectedArea()
                 startNearbyWatch()
                 requestRecenter(to: subDistrict.center, targetOnly: true)
             }
+            .onChange(of: areaCatalog.synced) { _ in syncAreaSelection() }
+            .onChange(of: areaCatalog.liveDistricts.map(\.id)) { _ in syncAreaSelection() }
             .onChange(of: selectedSubDistrictId) { _ in
                 clearLocationsOutsideSelectedArea()
                 startNearbyWatch()
@@ -539,6 +557,28 @@ struct CustomerHomeMapView: View {
                 .foregroundStyle(BrandColors.tealDark)
                 .frame(minHeight: 44, alignment: .leading)
                 .buttonStyle(.plain)
+        }
+    }
+
+    private func syncAreaSelection() {
+        let provinces = BabilRegions.customerProvinces
+        if selectedProvinceId.isEmpty || !provinces.contains(where: { $0.id == selectedProvinceId }) {
+            selectedProvinceId = provinces.first?.id ?? BabilRegions.seedProvinceId
+        }
+
+        let districts = districtsInSelectedProvince
+        if districts.isEmpty {
+            selectedDistrictId = BabilRegions.customerDistrictId
+        } else if !districts.contains(where: { $0.id == selectedDistrictId }) {
+            selectedDistrictId = districts.first?.id ?? BabilRegions.customerDistrictId
+        }
+
+        let subs = subDistrictsInSelectedDistrict
+        if subs.count == 1, let only = subs.first {
+            selectedSubDistrictId = only.id
+        } else if !selectedSubDistrictId.isEmpty,
+                  !subs.contains(where: { $0.id == selectedSubDistrictId }) {
+            selectedSubDistrictId = ""
         }
     }
 

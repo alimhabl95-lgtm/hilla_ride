@@ -18,12 +18,14 @@ struct PlaceSearchView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var savedMessage: String?
     @State private var statusMessage: String?
+    @FocusState private var searchFocused: Bool
     private let searchService = PlaceSearchService()
 
     var body: some View {
         VStack(spacing: 0) {
             TextField(L10n.string(.searchPlacesHint, language: appState.language), text: $query)
                 .textFieldStyle(AppTextFieldStyle())
+                .focused($searchFocused)
                 .padding()
                 .onChange(of: query) { newValue in
                     scheduleSearch(query: newValue)
@@ -76,6 +78,16 @@ struct PlaceSearchView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button(L10n.string(.cancel, language: appState.language)) {
+                    dismiss()
+                }
+            }
+        }
+        .onAppear {
+            searchFocused = true
+        }
     }
 
     private func scheduleSearch(query: String) {
