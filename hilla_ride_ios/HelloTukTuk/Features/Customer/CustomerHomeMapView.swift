@@ -88,6 +88,10 @@ struct CustomerHomeMapView: View {
         subDistrict.searchRadiusKm
     }
 
+    private var searchBiasRadiusKm: Double {
+        subDistrict.searchBiasRadiusKm
+    }
+
     @discardableResult
     private func requireSubDistrict() -> Bool {
         if hasSubDistrict { return true }
@@ -218,6 +222,7 @@ struct CustomerHomeMapView: View {
                         title: L10n.string(.pickupLabel, language: appState.language),
                         center: subDistrict.center,
                         radiusKm: searchRadiusKm,
+                        biasRadiusKm: searchBiasRadiusKm,
                         subDistrictId: selectedSubDistrictId,
                         regionLabel: regionLabel,
                         districtName: districtDisplayName,
@@ -237,6 +242,7 @@ struct CustomerHomeMapView: View {
                         title: L10n.string(.destinationLabel, language: appState.language),
                         center: subDistrict.center,
                         radiusKm: searchRadiusKm,
+                        biasRadiusKm: searchBiasRadiusKm,
                         subDistrictId: selectedSubDistrictId,
                         regionLabel: regionLabel,
                         districtName: districtDisplayName,

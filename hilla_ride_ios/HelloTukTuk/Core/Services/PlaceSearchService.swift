@@ -19,6 +19,7 @@ final class PlaceSearchService {
         query: String,
         center: CLLocationCoordinate2D,
         radiusKm: Double,
+        biasRadiusKm: Double,
         languageCode: String,
         regionLabel: String?,
         subDistrictId: String,
@@ -37,12 +38,14 @@ final class PlaceSearchService {
             return []
         }
 
-        let bbox = GeoPolygon.boundingBox(
+        let sub = await MainActor.run { BabilRegions.subDistrict(byId: subDistrictId) }
+        let filterRadiusKm = max(1.0, radiusKm)
+        let providerBiasKm = max(filterRadiusKm, biasRadiusKm)
+        let biasBbox = GeoPolygon.boundingBox(
             center: center,
-            radiusKm: radiusKm,
+            radiusKm: providerBiasKm,
             storedBoundary: boundary
         )
-        let tightRadiusKm = max(1.0, radiusKm)
 
         async let localTask = localPlacesMatching(
             query: trimmed,
@@ -52,48 +55,76 @@ final class PlaceSearchService {
         async let googleTask = google.searchPlaces(
             query: trimmed,
             center: center,
-            radiusKm: tightRadiusKm,
+            radiusKm: providerBiasKm,
             languageCode: languageCode,
-            regionLabel: regionLabel,
-            districtName: districtName,
-            subDistrictName: subDistrictName
-        )
-        async let photonTask = photonSearch(
-            query: trimmed,
-            center: center,
-            radiusKm: tightRadiusKm,
-            languageCode: languageCode
-        )
-        async let overpassTask = overpassSearch(
-            query: trimmed,
-            bbox: bbox
-        )
-        async let nominatimTask = nominatimSearch(
-            query: trimmed,
-            bbox: bbox,
-            languageCode: languageCode,
-            districtName: districtName,
-            subDistrictName: subDistrictName,
             regionLabel: regionLabel
         )
 
         let local = await localTask
-        let googleResults = await googleTask
-        let photon = await photonTask
-        let overpass = await overpassTask
-        let nominatim = await nominatimTask
+        var googleResults = await googleTask
 
         var merged = await mergeInSubDistrict(
             subDistrictId: subDistrictId,
             center: center,
-            groups: [local, googleResults, photon, overpass, nominatim]
+            groups: [local, googleResults]
+        )
+
+        if merged.count >= 3 {
+            lastStatusMessage = nil
+            log.info(
+                "Place search fast path q=\(trimmed, privacy: .public) sub=\(subDistrictId, privacy: .public) count=\(merged.count)"
+            )
+            return Array(merged.prefix(25))
+        }
+
+        if merged.isEmpty, googleResults.isEmpty {
+            googleResults = await google.searchPlaces(
+                query: trimmed,
+                center: center,
+                radiusKm: providerBiasKm + 4.0,
+                languageCode: languageCode,
+                regionLabel: nil
+            )
+            merged = await mergeInSubDistrict(
+                subDistrictId: subDistrictId,
+                center: center,
+                groups: [local, googleResults]
+            )
+        }
+
+        if merged.isEmpty, !googleResults.isEmpty {
+            merged = await mergeWithinServiceArea(
+                center: sub.center,
+                radiusKm: sub.searchRadiusKm,
+                storedBoundary: sub.boundary,
+                searchCenter: center,
+                groups: [googleResults]
+            )
+        }
+
+        if merged.count >= 3 {
+            lastStatusMessage = nil
+            return Array(merged.prefix(25))
+        }
+
+        let supplemental = await supplementalSearchResults(
+            query: trimmed,
+            center: center,
+            biasRadiusKm: providerBiasKm,
+            biasBbox: biasBbox,
+            languageCode: languageCode,
+            regionLabel: regionLabel,
+            subDistrictName: subDistrictName
+        )
+
+        merged = await mergeInSubDistrict(
+            subDistrictId: subDistrictId,
+            center: center,
+            groups: [local, googleResults, supplemental.photon, supplemental.overpass, supplemental.nominatim]
         )
 
         if merged.isEmpty {
-            let categoryResults = await overpassCategorySearch(
-                query: trimmed,
-                bbox: bbox
-            )
+            let categoryResults = await overpassCategorySearch(query: trimmed, bbox: biasBbox)
             merged = await mergeInSubDistrict(
                 subDistrictId: subDistrictId,
                 center: center,
@@ -101,7 +132,18 @@ final class PlaceSearchService {
             )
         }
 
-        let rawCount = local.count + googleResults.count + photon.count + overpass.count + nominatim.count
+        if merged.isEmpty, !googleResults.isEmpty {
+            merged = await mergeWithinServiceArea(
+                center: sub.center,
+                radiusKm: sub.searchRadiusKm,
+                storedBoundary: sub.boundary,
+                searchCenter: center,
+                groups: [googleResults, supplemental.photon, supplemental.nominatim]
+            )
+        }
+
+        let rawCount = local.count + googleResults.count
+            + supplemental.photon.count + supplemental.overpass.count + supplemental.nominatim.count
 
         if merged.isEmpty {
             switch google.lastError {
@@ -113,7 +155,7 @@ final class PlaceSearchService {
                 lastStatusMessage = "no_results_in_area"
             }
             log.warning(
-                "Place search empty q=\(trimmed, privacy: .public) sub=\(subDistrictId, privacy: .public) raw=\(rawCount) google=\(googleResults.count) local=\(local.count) nominatim=\(nominatim.count) overpass=\(overpass.count) err=\(self.google.lastError?.debugDescription ?? "none", privacy: .public)"
+                "Place search empty q=\(trimmed, privacy: .public) sub=\(subDistrictId, privacy: .public) raw=\(rawCount) google=\(googleResults.count) local=\(local.count) nominatim=\(supplemental.nominatim.count) overpass=\(supplemental.overpass.count) err=\(self.google.lastError?.debugDescription ?? "none", privacy: .public)"
             )
         } else {
             lastStatusMessage = nil
@@ -123,6 +165,72 @@ final class PlaceSearchService {
         }
 
         return Array(merged.prefix(25))
+    }
+
+    private struct SupplementalSearchResults {
+        let photon: [PlacesSearchResult]
+        let overpass: [PlacesSearchResult]
+        let nominatim: [PlacesSearchResult]
+    }
+
+    /// OSM/Photon providers are slow — cap total wait so Google-first results aren't blocked.
+    private func supplementalSearchResults(
+        query: String,
+        center: CLLocationCoordinate2D,
+        biasRadiusKm: Double,
+        biasBbox: GeoBoundingBox,
+        languageCode: String,
+        regionLabel: String?,
+        subDistrictName: String?
+    ) async -> SupplementalSearchResults {
+        await withTaskGroup(of: (Int, [PlacesSearchResult]).self) { group in
+            group.addTask {
+                let results = await self.photonSearch(
+                    query: query,
+                    center: center,
+                    radiusKm: biasRadiusKm,
+                    languageCode: languageCode
+                )
+                return (0, results)
+            }
+            group.addTask {
+                let results = await self.overpassSearch(query: query, bbox: biasBbox)
+                return (1, results)
+            }
+            group.addTask {
+                let results = await self.nominatimSearch(
+                    query: query,
+                    bbox: biasBbox,
+                    languageCode: languageCode,
+                    subDistrictName: subDistrictName,
+                    regionLabel: regionLabel
+                )
+                return (2, results)
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 7_000_000_000)
+                return (-1, [])
+            }
+
+            var photon: [PlacesSearchResult] = []
+            var overpass: [PlacesSearchResult] = []
+            var nominatim: [PlacesSearchResult] = []
+            var finished = 0
+
+            for await (kind, results) in group {
+                if kind == -1 { break }
+                switch kind {
+                case 0: photon = results
+                case 1: overpass = results
+                case 2: nominatim = results
+                default: break
+                }
+                finished += 1
+                if finished == 3 { break }
+            }
+            group.cancelAll()
+            return SupplementalSearchResults(photon: photon, overpass: overpass, nominatim: nominatim)
+        }
     }
 
     // MARK: - Region merge
@@ -153,6 +261,41 @@ final class PlaceSearchService {
         }
     }
 
+    /// Relaxed merge for provider results that Google/OSM returned inside the
+    /// service-area circle/polygon but were rejected by overlapping sub-district logic.
+    private func mergeWithinServiceArea(
+        center: CLLocationCoordinate2D,
+        radiusKm: Double,
+        storedBoundary: [CLLocationCoordinate2D]?,
+        searchCenter: CLLocationCoordinate2D,
+        groups: [[PlacesSearchResult]]
+    ) async -> [PlacesSearchResult] {
+        await MainActor.run {
+            var seen = Set<String>()
+            var scored: [(PlacesSearchResult, Double)] = []
+
+            for group in groups {
+                for place in group {
+                    guard GeoPolygon.isWithinBoundary(
+                        point: place.coordinate,
+                        center: center,
+                        radiusKm: radiusKm,
+                        storedBoundary: storedBoundary
+                    ) else {
+                        continue
+                    }
+                    let key = String(format: "%.4f,%.4f", place.latitude, place.longitude)
+                    guard seen.insert(key).inserted else { continue }
+                    let distance = GeoMath.distanceKm(from: searchCenter, to: place.coordinate)
+                    scored.append((place, distance))
+                }
+            }
+
+            scored.sort { $0.1 < $1.1 }
+            return scored.map(\.0)
+        }
+    }
+
     private func localPlacesMatching(
         query: String,
         subDistrictId: String,
@@ -171,27 +314,22 @@ final class PlaceSearchService {
         query: String,
         bbox: GeoBoundingBox,
         languageCode: String,
-        districtName: String?,
         subDistrictName: String?,
         regionLabel: String?
     ) async -> [PlacesSearchResult] {
         let usesArabic = languageCode.lowercased().hasPrefix("ar") || containsArabic(query)
-        let district = districtName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let subDistrict = subDistrictName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let label = regionLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
-        var queryParts = [query]
-        if !subDistrict.isEmpty {
-            queryParts.append(subDistrict)
-        } else if !label.isEmpty {
-            queryParts.append(label)
+        let searchQuery: String
+        if subDistrict.isEmpty && label.isEmpty {
+            searchQuery = usesArabic ? "\(query), بابل, العراق" : "\(query), Babil, Iraq"
+        } else {
+            let area = subDistrict.isEmpty ? label : subDistrict
+            searchQuery = usesArabic
+                ? "\(query), \(area), بابل, العراق"
+                : "\(query), \(area), Babil, Iraq"
         }
-        if !district.isEmpty {
-            queryParts.append(district)
-        }
-        let searchQuery = usesArabic
-            ? queryParts.joined(separator: ", ") + ", بابل, العراق"
-            : queryParts.joined(separator: ", ") + ", Babil, Iraq"
 
         let lang = usesArabic ? "ar,en" : "en,ar"
 
@@ -199,21 +337,21 @@ final class PlaceSearchService {
         components?.queryItems = [
             URLQueryItem(name: "q", value: searchQuery),
             URLQueryItem(name: "format", value: "json"),
-            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "limit", value: "15"),
             URLQueryItem(name: "countrycodes", value: "iq"),
             URLQueryItem(name: "addressdetails", value: "1"),
             URLQueryItem(
                 name: "viewbox",
                 value: "\(bbox.west),\(bbox.north),\(bbox.east),\(bbox.south)"
             ),
-            URLQueryItem(name: "bounded", value: "1")
+            URLQueryItem(name: "bounded", value: "0")
         ]
         guard let url = components?.url else { return [] }
 
         var request = URLRequest(url: url)
         request.setValue("HelloTukTuk/1.0 (com.hillaride.hilla_ride)", forHTTPHeaderField: "User-Agent")
         request.setValue(lang, forHTTPHeaderField: "Accept-Language")
-        request.timeoutInterval = 10
+        request.timeoutInterval = 7
 
         do {
             let (data, response) = try await session.data(for: request)
@@ -256,7 +394,7 @@ final class PlaceSearchService {
         guard let url = components?.url else { return [] }
 
         var request = URLRequest(url: url)
-        request.timeoutInterval = 10
+        request.timeoutInterval = 7
 
         do {
             let (data, response) = try await session.data(for: request)
@@ -306,7 +444,7 @@ final class PlaceSearchService {
         )
 
         var body = """
-        [out:json][timeout:12];
+        [out:json][timeout:7];
         (
           nwr["name"~"\(escaped)",i](\(south),\(west),\(north),\(east));
           nwr["name:ar"~"\(escaped)",i](\(south),\(west),\(north),\(east));
@@ -343,7 +481,7 @@ final class PlaceSearchService {
         guard !lines.isEmpty else { return [] }
 
         let body = """
-        [out:json][timeout:12];
+        [out:json][timeout:7];
         (
         \(lines.joined(separator: "\n"))
         );
@@ -364,7 +502,7 @@ final class PlaceSearchService {
             request.httpMethod = "POST"
             request.httpBody = formBody(name: "data", value: overpass)
             request.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
-            request.timeoutInterval = 12
+            request.timeoutInterval = 7
 
             do {
                 let (data, response) = try await session.data(for: request)

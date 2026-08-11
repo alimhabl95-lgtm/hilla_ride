@@ -8,6 +8,7 @@ struct PlaceSearchView: View {
     let title: String
     let center: CLLocationCoordinate2D
     let radiusKm: Double
+    var biasRadiusKm: Double = 0
     var subDistrictId: String = ""
     var regionLabel: String = ""
     var districtName: String = ""
@@ -135,6 +136,7 @@ struct PlaceSearchView: View {
                 query: trimmed,
                 center: center,
                 radiusKm: radiusKm,
+                biasRadiusKm: biasRadiusKm > 0 ? biasRadiusKm : radiusKm,
                 languageCode: appState.language.rawValue,
                 regionLabel: regionLabel,
                 subDistrictId: subDistrictId,

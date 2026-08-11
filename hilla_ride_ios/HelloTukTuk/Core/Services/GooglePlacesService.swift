@@ -57,9 +57,7 @@ final class GooglePlacesService {
         center: CLLocationCoordinate2D,
         radiusKm: Double,
         languageCode: String,
-        regionLabel: String? = nil,
-        districtName: String? = nil,
-        subDistrictName: String? = nil
+        regionLabel: String? = nil
     ) async -> [PlacesSearchResult] {
         lastError = nil
 
@@ -79,23 +77,12 @@ final class GooglePlacesService {
         }
 
         let label = regionLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let district = districtName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let subDistrict = subDistrictName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        var queryParts = [trimmedQuery]
-        if !subDistrict.isEmpty {
-            queryParts.append(subDistrict)
-        } else if !label.isEmpty {
-            queryParts.append(label)
-        }
-        if !district.isEmpty {
-            queryParts.append(district)
-        }
-        queryParts.append("Babil Iraq")
-        let enriched = queryParts.joined(separator: " ")
+        let enriched = label.isEmpty
+            ? "\(trimmedQuery) Babil Iraq"
+            : "\(trimmedQuery) \(label) Babil Iraq"
 
         let lang = normalizedLanguageCode(languageCode)
-        // Tight bias to the selected city area; sub-district polygon filtering happens after merge.
-        let biasRadiusMeters = max(800.0, min(radiusKm * 1_000.0, 18_000.0))
+        let biasRadiusMeters = max(1_500.0, radiusKm * 1_000.0)
         let body: [String: Any] = [
             "textQuery": enriched,
             "languageCode": lang,
@@ -127,7 +114,7 @@ final class GooglePlacesService {
             "places.displayName,places.formattedAddress,places.location",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
-        request.timeoutInterval = 12
+        request.timeoutInterval = 8
 
         do {
             let (data, response) = try await session.data(for: request)
