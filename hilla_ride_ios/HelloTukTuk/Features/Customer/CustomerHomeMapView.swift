@@ -70,18 +70,25 @@ struct CustomerHomeMapView: View {
     }
 
     private var cityScopeLabel: String {
-        if hasSubDistrict {
-            return subDistrict.displayName(language: appState.language)
-        }
-        return selectedDistrict?.displayName(language: appState.language) ?? ""
-    }
-
-    private var districtDisplayName: String {
         selectedDistrict?.displayName(language: appState.language) ?? ""
     }
 
-    private var subDistrictDisplayName: String {
-        hasSubDistrict ? subDistrict.displayName(language: appState.language) : ""
+    private var districtDisplayName: String {
+        cityScopeLabel
+    }
+
+    private var districtSearchCenter: CLLocationCoordinate2D {
+        let subs = subDistrictsInSelectedDistrict
+        guard !subs.isEmpty else { return subDistrict.center }
+        let lat = subs.map(\.center.latitude).reduce(0, +) / Double(subs.count)
+        let lon = subs.map(\.center.longitude).reduce(0, +) / Double(subs.count)
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+
+    private var districtSearchBiasKm: Double {
+        let subs = subDistrictsInSelectedDistrict
+        guard !subs.isEmpty else { return searchBiasRadiusKm }
+        return subs.map(\.searchBiasRadiusKm).max() ?? searchBiasRadiusKm
     }
 
     private var searchRadiusKm: Double {
@@ -220,15 +227,13 @@ struct CustomerHomeMapView: View {
                 NavigationStack {
                     PlaceSearchView(
                         title: L10n.string(.pickupLabel, language: appState.language),
-                        center: subDistrict.center,
+                        center: districtSearchCenter,
                         radiusKm: searchRadiusKm,
-                        biasRadiusKm: searchBiasRadiusKm,
-                        subDistrictId: selectedSubDistrictId,
-                        regionLabel: regionLabel,
+                        biasRadiusKm: districtSearchBiasKm,
+                        districtId: selectedDistrictId,
+                        regionLabel: districtDisplayName,
                         districtName: districtDisplayName,
-                        subDistrictName: subDistrictDisplayName,
                         cityScopeLabel: cityScopeLabel,
-                        boundary: subDistrict.boundary,
                         onSelect: { place in
                             setPickup(place, recenter: true)
                         }
@@ -240,15 +245,13 @@ struct CustomerHomeMapView: View {
                 NavigationStack {
                     PlaceSearchView(
                         title: L10n.string(.destinationLabel, language: appState.language),
-                        center: subDistrict.center,
+                        center: districtSearchCenter,
                         radiusKm: searchRadiusKm,
-                        biasRadiusKm: searchBiasRadiusKm,
-                        subDistrictId: selectedSubDistrictId,
-                        regionLabel: regionLabel,
+                        biasRadiusKm: districtSearchBiasKm,
+                        districtId: selectedDistrictId,
+                        regionLabel: districtDisplayName,
                         districtName: districtDisplayName,
-                        subDistrictName: subDistrictDisplayName,
                         cityScopeLabel: cityScopeLabel,
-                        boundary: subDistrict.boundary,
                         onSelect: { place in
                             setDestinationPlace(place, recenter: true)
                         }
@@ -470,7 +473,7 @@ struct CustomerHomeMapView: View {
 
             areaSelector
 
-            if hasSubDistrict {
+            if !cityScopeLabel.isEmpty {
                 Text(L10n.searchLimitedToCity(cityScopeLabel, language: appState.language))
                     .font(.caption)
                     .foregroundStyle(BrandColors.tealDark)
@@ -499,7 +502,7 @@ struct CustomerHomeMapView: View {
                 title: L10n.string(.pickupLabel, language: appState.language),
                 value: pickup?.label ?? L10n.string(.selectPickup, language: appState.language),
                 isSet: pickup != nil,
-                onSearch: { if requireSubDistrict() { showPickupSearch = true } },
+                onSearch: { if requireDistrict() { showPickupSearch = true } },
                 onPickMap: { if requireSubDistrict() { showPickupPinPicker = true } }
             )
 
@@ -512,7 +515,7 @@ struct CustomerHomeMapView: View {
                 title: L10n.string(.destinationLabel, language: appState.language),
                 value: destination?.label ?? L10n.string(.selectDestination, language: appState.language),
                 isSet: destination != nil,
-                onSearch: { if requireSubDistrict() { showDestinationSearch = true } },
+                onSearch: { if requireDistrict() { showDestinationSearch = true } },
                 onPickMap: { if requireSubDistrict() { showDestinationPinPicker = true } }
             )
         }
@@ -700,8 +703,27 @@ struct CustomerHomeMapView: View {
         }
     }
 
+    @discardableResult
+    private func requireDistrict() -> Bool {
+        syncAreaSelection()
+        if !selectedDistrictId.isEmpty { return true }
+        errorMessage = L10n.string(.selectSubDistrictFirst, language: appState.language)
+        return false
+    }
+
+    @discardableResult
+    private func adoptPlaceArea(for coordinate: CLLocationCoordinate2D) -> Bool {
+        let resolved = BabilRegions.resolveFromPoint(coordinate)
+        guard resolved.districtId == selectedDistrictId else {
+            errorMessage = L10n.string(.searchOutsideRegion, language: appState.language)
+            return false
+        }
+        selectedSubDistrictId = resolved.subDistrictId
+        return true
+    }
+
     private func setPickup(_ place: MapPlace, recenter: Bool) {
-        guard guardSelectedArea(for: place.coordinate) else { return }
+        guard adoptPlaceArea(for: place.coordinate) else { return }
         errorMessage = nil
         pickup = place
         if recenter {
@@ -710,7 +732,7 @@ struct CustomerHomeMapView: View {
     }
 
     private func setDestinationPlace(_ place: MapPlace, recenter: Bool) {
-        guard guardSelectedArea(for: place.coordinate) else { return }
+        guard adoptPlaceArea(for: place.coordinate) else { return }
         errorMessage = nil
         destination = place
         if recenter {

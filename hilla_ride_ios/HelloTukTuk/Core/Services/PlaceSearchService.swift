@@ -22,7 +22,7 @@ final class PlaceSearchService {
         biasRadiusKm: Double,
         languageCode: String,
         regionLabel: String?,
-        subDistrictId: String,
+        districtId: String,
         districtName: String? = nil,
         subDistrictName: String? = nil,
         boundary: [CLLocationCoordinate2D]? = nil
@@ -33,23 +33,27 @@ final class PlaceSearchService {
             lastStatusMessage = nil
             return []
         }
-        guard !subDistrictId.isEmpty else {
+        guard !districtId.isEmpty else {
             lastStatusMessage = "no_results_in_area"
             return []
         }
 
-        let sub = await MainActor.run { BabilRegions.subDistrict(byId: subDistrictId) }
-        let filterRadiusKm = max(1.0, radiusKm)
-        let providerBiasKm = max(filterRadiusKm, biasRadiusKm)
+        let providerBiasKm = max(max(1.0, radiusKm), biasRadiusKm)
         let biasBbox = GeoPolygon.boundingBox(
             center: center,
             radiusKm: providerBiasKm,
             storedBoundary: boundary
         )
+        let districtLabel: String? = {
+            let fromDistrict = districtName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !fromDistrict.isEmpty { return fromDistrict }
+            let fromRegion = regionLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return fromRegion.isEmpty ? nil : fromRegion
+        }()
 
         async let localTask = localPlacesMatching(
             query: trimmed,
-            subDistrictId: subDistrictId,
+            districtId: districtId,
             languageCode: languageCode
         )
         async let googleTask = google.searchPlaces(
@@ -57,14 +61,14 @@ final class PlaceSearchService {
             center: center,
             radiusKm: providerBiasKm,
             languageCode: languageCode,
-            regionLabel: regionLabel
+            regionLabel: districtLabel
         )
 
         let local = await localTask
         var googleResults = await googleTask
 
-        var merged = await mergeInSubDistrict(
-            subDistrictId: subDistrictId,
+        var merged = await mergeInDistrict(
+            districtId: districtId,
             center: center,
             groups: [local, googleResults]
         )
@@ -72,7 +76,7 @@ final class PlaceSearchService {
         if merged.count >= 3 {
             lastStatusMessage = nil
             log.info(
-                "Place search fast path q=\(trimmed, privacy: .public) sub=\(subDistrictId, privacy: .public) count=\(merged.count)"
+                "Place search fast path q=\(trimmed, privacy: .public) district=\(districtId, privacy: .public) count=\(merged.count)"
             )
             return Array(merged.prefix(25))
         }
@@ -85,20 +89,10 @@ final class PlaceSearchService {
                 languageCode: languageCode,
                 regionLabel: nil
             )
-            merged = await mergeInSubDistrict(
-                subDistrictId: subDistrictId,
+            merged = await mergeInDistrict(
+                districtId: districtId,
                 center: center,
                 groups: [local, googleResults]
-            )
-        }
-
-        if merged.isEmpty, !googleResults.isEmpty {
-            merged = await mergeWithinServiceArea(
-                center: sub.center,
-                radiusKm: sub.searchRadiusKm,
-                storedBoundary: sub.boundary,
-                searchCenter: center,
-                groups: [googleResults]
             )
         }
 
@@ -113,32 +107,22 @@ final class PlaceSearchService {
             biasRadiusKm: providerBiasKm,
             biasBbox: biasBbox,
             languageCode: languageCode,
-            regionLabel: regionLabel,
+            regionLabel: districtLabel,
             subDistrictName: subDistrictName
         )
 
-        merged = await mergeInSubDistrict(
-            subDistrictId: subDistrictId,
+        merged = await mergeInDistrict(
+            districtId: districtId,
             center: center,
             groups: [local, googleResults, supplemental.photon, supplemental.overpass, supplemental.nominatim]
         )
 
         if merged.isEmpty {
             let categoryResults = await overpassCategorySearch(query: trimmed, bbox: biasBbox)
-            merged = await mergeInSubDistrict(
-                subDistrictId: subDistrictId,
+            merged = await mergeInDistrict(
+                districtId: districtId,
                 center: center,
                 groups: [categoryResults]
-            )
-        }
-
-        if merged.isEmpty, !googleResults.isEmpty {
-            merged = await mergeWithinServiceArea(
-                center: sub.center,
-                radiusKm: sub.searchRadiusKm,
-                storedBoundary: sub.boundary,
-                searchCenter: center,
-                groups: [googleResults, supplemental.photon, supplemental.nominatim]
             )
         }
 
@@ -155,12 +139,12 @@ final class PlaceSearchService {
                 lastStatusMessage = "no_results_in_area"
             }
             log.warning(
-                "Place search empty q=\(trimmed, privacy: .public) sub=\(subDistrictId, privacy: .public) raw=\(rawCount) google=\(googleResults.count) local=\(local.count) nominatim=\(supplemental.nominatim.count) overpass=\(supplemental.overpass.count) err=\(self.google.lastError?.debugDescription ?? "none", privacy: .public)"
+                "Place search empty q=\(trimmed, privacy: .public) district=\(districtId, privacy: .public) raw=\(rawCount) google=\(googleResults.count) local=\(local.count) nominatim=\(supplemental.nominatim.count) overpass=\(supplemental.overpass.count) err=\(self.google.lastError?.debugDescription ?? "none", privacy: .public)"
             )
         } else {
             lastStatusMessage = nil
             log.info(
-                "Place search ok q=\(trimmed, privacy: .public) sub=\(subDistrictId, privacy: .public) count=\(merged.count)"
+                "Place search ok q=\(trimmed, privacy: .public) district=\(districtId, privacy: .public) count=\(merged.count)"
             )
         }
 
@@ -235,6 +219,32 @@ final class PlaceSearchService {
 
     // MARK: - Region merge
 
+    private func mergeInDistrict(
+        districtId: String,
+        center: CLLocationCoordinate2D,
+        groups: [[PlacesSearchResult]]
+    ) async -> [PlacesSearchResult] {
+        await MainActor.run {
+            var seen = Set<String>()
+            var scored: [(PlacesSearchResult, Double)] = []
+
+            for group in groups {
+                for place in group {
+                    guard BabilRegions.isWithinDistrict(districtId: districtId, point: place.coordinate) else {
+                        continue
+                    }
+                    let key = String(format: "%.4f,%.4f", place.latitude, place.longitude)
+                    guard seen.insert(key).inserted else { continue }
+                    let distance = GeoMath.distanceKm(from: center, to: place.coordinate)
+                    scored.append((place, distance))
+                }
+            }
+
+            scored.sort { $0.1 < $1.1 }
+            return scored.map(\.0)
+        }
+    }
+
     private func mergeInSubDistrict(
         subDistrictId: String,
         center: CLLocationCoordinate2D,
@@ -298,13 +308,13 @@ final class PlaceSearchService {
 
     private func localPlacesMatching(
         query: String,
-        subDistrictId: String,
+        districtId: String,
         languageCode: String
     ) async -> [PlacesSearchResult] {
         let preferArabic = languageCode.lowercased().hasPrefix("ar")
         let matches = await LocalPlacesCatalog.shared.search(query: query, preferArabic: preferArabic)
         return await MainActor.run {
-            matches.filter { BabilRegions.isWithin(subDistrictId: subDistrictId, point: $0.coordinate) }
+            matches.filter { BabilRegions.isWithinDistrict(districtId: districtId, point: $0.coordinate) }
         }
     }
 

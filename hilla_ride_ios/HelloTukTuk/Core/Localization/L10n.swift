@@ -456,12 +456,12 @@ enum L10n {
         .districtLabel: [.english: "District", .arabic: "القضاء"],
         .serviceAreaTitle: [.english: "Your city", .arabic: "مدينتك"],
         .searchLimitedToCity: [
-            .english: "Search results stay inside %@ only.",
-            .arabic: "نتائج البحث داخل %@ فقط."
+            .english: "Search results stay inside %@ district only.",
+            .arabic: "نتائج البحث داخل قضاء %@ فقط."
         ],
         .searchPlacesInCity: [
-            .english: "Search in %@",
-            .arabic: "البحث في %@"
+            .english: "Search in %@ district",
+            .arabic: "البحث في قضاء %@"
         ],
         .pickOnMapShort: [.english: "Pin on map", .arabic: "تحديد على الخريطة"],
         .estimatedFare: [.english: "Estimated fare", .arabic: "الأجرة التقديرية"],

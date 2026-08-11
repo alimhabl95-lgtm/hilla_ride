@@ -194,6 +194,17 @@ enum BabilRegions {
         )
     }
 
+    /// True when `point` falls inside any sub-district of `districtId`.
+    @MainActor
+    static func isWithinDistrict(districtId: String, point: CLLocationCoordinate2D) -> Bool {
+        guard let district = districts.first(where: { $0.id == districtId }) else {
+            return false
+        }
+        return district.subDistricts.contains { sub in
+            isWithin(subDistrictId: sub.id, point: point)
+        }
+    }
+
     @MainActor
     static func resolveFromPoint(_ point: CLLocationCoordinate2D) -> (districtId: String, subDistrictId: String) {
         for district in districts {
