@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
@@ -54,6 +55,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   double _cameraZoom = 14;
   LatLng? _lastKnownDeviceLocation;
   bool _suppressLocationClear = false;
+  var _isOpeningBookRide = false;
 
   @override
   void initState() {
@@ -576,6 +578,8 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   }
 
   Future<void> _openBookRide() async {
+    if (_isOpeningBookRide) return;
+
     final l10n = AppLocalizations.of(context)!;
     final pickup = _pickup;
     final destination = _destination;
@@ -616,19 +620,9 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
       }
     }
 
+    HapticFeedback.lightImpact();
+    setState(() => _isOpeningBookRide = true);
     try {
-      final activeRide = await context
-          .read<AppState>()
-          .rideService
-          .fetchActiveRideForCustomer(widget.user.uid);
-      if (!mounted) return;
-      if (activeRide != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.activeRideExists)),
-        );
-        return;
-      }
-
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => BookRideScreen(
@@ -640,11 +634,8 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
           ),
         ),
       );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.fareCalculationFailed)),
-      );
+    } finally {
+      if (mounted) setState(() => _isOpeningBookRide = false);
     }
   }
 
@@ -789,6 +780,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
                   onPinDestination: () => _openPinPicker(forPickup: false),
                   onSavedPlaceSelected: _applyDestination,
                   onBookRide: _openBookRide,
+                  bookRideLoading: _isOpeningBookRide,
                     ),
                   ],
                 ),

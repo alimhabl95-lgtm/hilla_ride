@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/promo_models.dart';
@@ -49,6 +50,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }) async {
     final key = _actionKey(rideId, action);
     if (_pendingRideActions.contains(key)) return;
+    HapticFeedback.lightImpact();
     setState(() => _pendingRideActions.add(key));
     try {
       await task();
@@ -782,6 +784,7 @@ class _ActiveRidePanel extends StatelessWidget {
                           child: AppSecondaryButton(
                             label: l10n.rejectRide,
                             destructive: true,
+                            isLoading: isActionPending(ride.id, 'reject'),
                             onPressed: isActionPending(ride.id, 'reject')
                                 ? null
                                 : () => runRideAction(

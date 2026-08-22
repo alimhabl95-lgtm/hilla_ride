@@ -35,6 +35,7 @@ class RideSearchPanel extends StatelessWidget {
     this.bottomSheetStyle = false,
     this.regionSelectorOnly = false,
     this.onBookRide,
+    this.bookRideLoading = false,
   });
 
   final bool regionExpanded;
@@ -60,6 +61,7 @@ class RideSearchPanel extends StatelessWidget {
   final VoidCallback onPinDestination;
   final ValueChanged<PlaceResult> onSavedPlaceSelected;
   final VoidCallback? onBookRide;
+  final bool bookRideLoading;
 
   Future<void> _openSearch(
     BuildContext context, {
@@ -177,6 +179,7 @@ class RideSearchPanel extends StatelessWidget {
                 if (!_ensureSubDistrictSelected(context, l10n)) return;
                 onBookRide!();
               },
+        bookRideLoading: bookRideLoading,
       );
     }
 
@@ -272,6 +275,7 @@ class _BottomSheetSearch extends StatelessWidget {
     required this.onPinDestination,
     required this.onSavedPlaceSelected,
     this.onBookRide,
+    this.bookRideLoading = false,
   });
 
   final AppLocalizations l10n;
@@ -293,6 +297,7 @@ class _BottomSheetSearch extends StatelessWidget {
   final VoidCallback onPinDestination;
   final ValueChanged<PlaceResult> onSavedPlaceSelected;
   final VoidCallback? onBookRide;
+  final bool bookRideLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -416,7 +421,8 @@ class _BottomSheetSearch extends StatelessWidget {
               child: AppPrimaryButton(
                 label: l10n.bookRideButton,
                 icon: Icons.local_taxi,
-                onPressed: onBookRide,
+                isLoading: bookRideLoading,
+                onPressed: bookRideLoading ? null : onBookRide,
               ),
             ),
           ],

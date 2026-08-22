@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
@@ -150,6 +151,7 @@ class _BookRideScreenState extends State<BookRideScreen> {
     final finalFare = promo?.hasDiscount == true ? promo!.finalFareIqd : baseFare;
 
     setState(() => _isBooking = true);
+    HapticFeedback.lightImpact();
 
     try {
 

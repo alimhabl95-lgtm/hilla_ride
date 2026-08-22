@@ -28,6 +28,7 @@ struct DriverHomeView: View {
     @State private var cancelledCount = 0
     @State private var cancelledTask: Task<Void, Never>?
     @State private var onlinePulse = false
+    @State private var pendingRideActions = Set<String>()
 
     private var currentDriver: DriverProfile {
         liveDriver ?? driver
@@ -641,33 +642,110 @@ struct DriverHomeView: View {
         switch ride.status {
         case .matched:
             HStack(spacing: AppSpacing.md) {
-                Button(L10n.string(.rejectRide, language: appState.language)) {
-                    Task { await reject(ride) }
+                rideActionButton(
+                    rideId: ride.id,
+                    action: "reject",
+                    title: L10n.string(.rejectRide, language: appState.language),
+                    style: .secondaryDestructive
+                ) {
+                    try await RideRepository().rejectRide(rideId: ride.id, driverId: driver.uid)
                 }
-                .buttonStyle(SecondaryButtonStyle(destructive: true))
 
-                Button(L10n.string(.acceptRide, language: appState.language)) {
-                    Task { await accept(ride) }
+                rideActionButton(
+                    rideId: ride.id,
+                    action: "accept",
+                    title: L10n.string(.acceptRide, language: appState.language),
+                    style: .primary
+                ) {
+                    try await RideRepository().acceptRide(rideId: ride.id, driverId: driver.uid)
                 }
-                .buttonStyle(PrimaryButtonStyle())
             }
         case .accepted:
-            Button(L10n.string(.startRide, language: appState.language)) {
-                Task { await start(ride) }
+            rideActionButton(
+                rideId: ride.id,
+                action: "start",
+                title: L10n.string(.startRide, language: appState.language),
+                style: .primary
+            ) {
+                try await RideRepository().startRide(rideId: ride.id)
             }
-            .buttonStyle(PrimaryButtonStyle())
         case .inProgress:
-            Button(L10n.string(.endRide, language: appState.language)) {
-                Task { await endRide(ride) }
+            rideActionButton(
+                rideId: ride.id,
+                action: "end",
+                title: L10n.string(.endRide, language: appState.language),
+                style: .primary
+            ) {
+                try await RideRepository().endRideAwaitingCash(rideId: ride.id)
             }
-            .buttonStyle(PrimaryButtonStyle())
         case .awaitingCashPayment:
-            Button(L10n.string(.confirmCashCollected, language: appState.language)) {
-                Task { await confirmCash(ride) }
+            rideActionButton(
+                rideId: ride.id,
+                action: "cash",
+                title: L10n.string(.confirmCashCollected, language: appState.language),
+                style: .primary
+            ) {
+                try await RideRepository().confirmCashCollected(rideId: ride.id)
             }
-            .buttonStyle(PrimaryButtonStyle())
         default:
             EmptyView()
+        }
+    }
+
+    private enum RideActionStyle {
+        case primary
+        case secondaryDestructive
+    }
+
+    @ViewBuilder
+    private func rideActionButton(
+        rideId: String,
+        action: String,
+        title: String,
+        style: RideActionStyle,
+        task: @escaping () async throws -> Void
+    ) -> some View {
+        let pending = isRideActionPending(rideId: rideId, action: action)
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Task { await runRideAction(rideId: rideId, action: action, task: task) }
+        } label: {
+            Group {
+                if pending {
+                    ProgressView()
+                        .tint(style == .primary ? .white : BrandColors.danger)
+                        .frame(maxWidth: .infinity, minHeight: 54)
+                } else {
+                    Text(title)
+                }
+            }
+        }
+        .buttonStyle(style == .primary ? PrimaryButtonStyle() : SecondaryButtonStyle(destructive: true))
+        .disabled(pending)
+    }
+
+    private func rideActionKey(rideId: String, action: String) -> String {
+        "\(rideId):\(action)"
+    }
+
+    private func isRideActionPending(rideId: String, action: String) -> Bool {
+        pendingRideActions.contains(rideActionKey(rideId: rideId, action: action))
+    }
+
+    private func runRideAction(
+        rideId: String,
+        action: String,
+        task: @escaping () async throws -> Void
+    ) async {
+        let key = rideActionKey(rideId: rideId, action: action)
+        guard !pendingRideActions.contains(key) else { return }
+        pendingRideActions.insert(key)
+        defer { pendingRideActions.remove(key) }
+        errorMessage = nil
+        do {
+            try await task()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -750,51 +828,6 @@ struct DriverHomeView: View {
             await appState.refreshDriverProfileIfNeeded()
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
-    }
-
-    private func accept(_ ride: Ride) async {
-        errorMessage = nil
-        do {
-            try await RideRepository().acceptRide(rideId: ride.id, driverId: driver.uid)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func reject(_ ride: Ride) async {
-        errorMessage = nil
-        do {
-            try await RideRepository().rejectRide(rideId: ride.id, driverId: driver.uid)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func start(_ ride: Ride) async {
-        errorMessage = nil
-        do {
-            try await RideRepository().startRide(rideId: ride.id)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func endRide(_ ride: Ride) async {
-        errorMessage = nil
-        do {
-            try await RideRepository().endRideAwaitingCash(rideId: ride.id)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func confirmCash(_ ride: Ride) async {
-        errorMessage = nil
-        do {
-            try await RideRepository().confirmCashCollected(rideId: ride.id)
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

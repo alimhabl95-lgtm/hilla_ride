@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/constants/map_presence_config.dart';
@@ -502,11 +503,8 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
                                     icon: Icons.chat_bubble_outline,
                                     onPressed: currentUser == null
                                         ? null
-                                        : () async {
-                                            final profile = await authService
-                                                .watchCurrentProfile()
-                                                .first;
-                                            if (!context.mounted) return;
+                                        : () {
+                                            HapticFeedback.lightImpact();
                                             Navigator.of(context).push(
                                               MaterialPageRoute(
                                                 builder: (_) => RideChatScreen(
@@ -516,8 +514,17 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
                                                   currentUserRole:
                                                       UserRole.customer,
                                                   currentUserName:
-                                                      profile?.name ??
-                                                          l10n.roleCustomer,
+                                                      authService
+                                                              .currentUser
+                                                              ?.displayName
+                                                              ?.trim()
+                                                              .isNotEmpty ==
+                                                          true
+                                                      ? authService
+                                                          .currentUser!
+                                                          .displayName!
+                                                          .trim()
+                                                      : l10n.roleCustomer,
                                                 ),
                                               ),
                                             );

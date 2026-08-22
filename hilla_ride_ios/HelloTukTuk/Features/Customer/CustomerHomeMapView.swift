@@ -895,6 +895,7 @@ struct CustomerHomeMapView: View {
             errorMessage = L10n.string(.selectSubDistrictFirst, language: appState.language)
             return
         }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         showBookRide = true
     }
 }

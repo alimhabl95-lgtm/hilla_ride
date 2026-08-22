@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct RideAlertOverlay<Content: View>: View {
     @EnvironmentObject private var appState: AppState
@@ -90,26 +91,46 @@ struct RideAlertOverlay<Content: View>: View {
             if alert.type == .driverRideRequest, let rideId = alert.rideId, !rideId.isEmpty {
                 HStack(spacing: 10) {
                     Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         Task { await rejectOffer(rideId: rideId) }
                     } label: {
-                        Text(L10n.string(.rejectRide, language: appState.language))
-                            .font(.subheadline.weight(.bold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(.white.opacity(0.18), in: Capsule())
-                            .foregroundStyle(.white)
+                        Group {
+                            if isActing {
+                                ProgressView()
+                                    .tint(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                            } else {
+                                Text(L10n.string(.rejectRide, language: appState.language))
+                                    .font(.subheadline.weight(.bold))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(.white.opacity(0.18), in: Capsule())
+                                    .foregroundStyle(.white)
+                            }
+                        }
                     }
                     .disabled(isActing)
 
                     Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         Task { await acceptOffer(rideId: rideId) }
                     } label: {
-                        Text(L10n.string(.acceptRide, language: appState.language))
-                            .font(.subheadline.weight(.bold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(.white, in: Capsule())
-                            .foregroundStyle(BrandColors.tealDark)
+                        Group {
+                            if isActing {
+                                ProgressView()
+                                    .tint(BrandColors.tealDark)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                            } else {
+                                Text(L10n.string(.acceptRide, language: appState.language))
+                                    .font(.subheadline.weight(.bold))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(.white, in: Capsule())
+                                    .foregroundStyle(BrandColors.tealDark)
+                            }
+                        }
                     }
                     .disabled(isActing)
                 }
@@ -140,8 +161,8 @@ struct RideAlertOverlay<Content: View>: View {
 
     private func acceptOffer(rideId: String) async {
         guard let driverId = appState.currentUser?.uid else { return }
-        isActing = true
-        defer { isActing = false }
+        await MainActor.run { isActing = true }
+        defer { Task { @MainActor in isActing = false } }
         do {
             try await RideRepository().acceptRide(rideId: rideId, driverId: driverId)
             await MainActor.run {
@@ -157,8 +178,8 @@ struct RideAlertOverlay<Content: View>: View {
 
     private func rejectOffer(rideId: String) async {
         guard let driverId = appState.currentUser?.uid else { return }
-        isActing = true
-        defer { isActing = false }
+        await MainActor.run { isActing = true }
+        defer { Task { @MainActor in isActing = false } }
         do {
             try await RideRepository().rejectRide(rideId: rideId, driverId: driverId)
             await MainActor.run {

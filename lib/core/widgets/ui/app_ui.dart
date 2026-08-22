@@ -50,24 +50,35 @@ class AppSecondaryButton extends StatelessWidget {
     this.onPressed,
     this.icon,
     this.destructive = false,
+    this.isLoading = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
   final bool destructive;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     final color =
         destructive ? AppBrandAssets.brandDanger : AppBrandAssets.brandTealDark;
     return OutlinedButton(
-      onPressed: onPressed,
+      onPressed: isLoading ? null : onPressed,
       style: OutlinedButton.styleFrom(
         foregroundColor: color,
         side: BorderSide(color: color, width: 1.5),
       ),
-      child: Row(
+      child: isLoading
+          ? SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                color: color,
+              ),
+            )
+          : Row(
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [

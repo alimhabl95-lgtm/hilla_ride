@@ -37,6 +37,7 @@ struct BookRideView: View {
                     }
 
                     Button(L10n.string(.confirmBooking, language: appState.language)) {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         Task { await bookRide() }
                     }
                     .buttonStyle(PrimaryButtonStyle())
