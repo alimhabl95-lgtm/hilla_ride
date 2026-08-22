@@ -203,25 +203,32 @@ final class ServiceAreaCatalog: ObservableObject {
         else {
             return "area_inactive"
         }
-        let others: [GeoArea] = liveDistricts.flatMap { d in
-            d.subDistricts.compactMap { other -> GeoArea? in
-                guard other.id != sub.id else { return nil }
-                return GeoArea(center: other.center, radiusKm: other.searchRadiusKm, boundary: other.boundary)
-            }
-        }
-        func withinSub(_ point: CLLocationCoordinate2D) -> Bool {
-            GeoPolygon.isWithinBoundaryUnique(
+
+        // Soft booking check: selected ناحية (+ buffer), or any ناحية in the
+        // same district. Do NOT use unique/nearest — that wrongly rejects trips
+        // when Admin circles overlap (e.g. الشوملي vs مركز الهاشمية).
+        func nearSub(_ point: CLLocationCoordinate2D, area: BabilSubDistrict) -> Bool {
+            if GeoPolygon.isWithinBoundary(
                 point: point,
-                center: sub.center,
-                radiusKm: sub.searchRadiusKm,
-                storedBoundary: sub.boundary,
-                others: others
-            )
+                center: area.center,
+                radiusKm: max(area.searchRadiusKm, 12) + 12,
+                storedBoundary: area.boundary
+            ) {
+                return true
+            }
+            let allowed = max(area.searchRadiusKm, area.searchBiasRadiusKm, 12) + 12
+            return GeoMath.distanceKm(from: area.center, to: point) <= allowed
         }
-        if let pickup, !withinSub(pickup) {
+
+        func pointAllowed(_ point: CLLocationCoordinate2D) -> Bool {
+            if nearSub(point, area: sub) { return true }
+            return district.subDistricts.contains { nearSub(point, area: $0) }
+        }
+
+        if let pickup, !pointAllowed(pickup) {
             return "outside_area"
         }
-        if let destination, !withinSub(destination) {
+        if let destination, !pointAllowed(destination) {
             return "outside_area"
         }
         return nil

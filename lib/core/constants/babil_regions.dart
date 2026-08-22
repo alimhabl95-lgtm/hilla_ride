@@ -227,6 +227,32 @@ class BabilRegions {
         2.0;
   }
 
+  /// Soft sub-district match for booking / search.
+  static bool isNearSubDistrictForSearch(
+    String districtId,
+    String subDistrictId,
+    LatLng point, {
+    double extraBufferKm = 8,
+  }) {
+    if (isWithinSubDistrict(districtId, subDistrictId, point)) {
+      return true;
+    }
+    final sub = subDistrictById(districtId, subDistrictId);
+    if (GeoPolygon.isWithinBoundary(
+      point: point,
+      center: sub.center,
+      radiusKm: (sub.searchRadiusKm > 12 ? sub.searchRadiusKm : 12) + extraBufferKm,
+      storedBoundary: sub.boundary,
+    )) {
+      return true;
+    }
+    final bias = searchBiasRadiusKmFor(districtId, subDistrictId);
+    final base = sub.searchRadiusKm > bias ? sub.searchRadiusKm : bias;
+    final allowed = (base < 12 ? 12.0 : base) + extraBufferKm;
+    final km = _distance.as(LengthUnit.Kilometer, sub.center, point);
+    return km <= allowed;
+  }
+
   /// Soft district match for place search — keeps Google/OSM hits near any
   /// sub-district center even when Admin polygons/radii are tight.
   static bool isNearDistrictForSearch(

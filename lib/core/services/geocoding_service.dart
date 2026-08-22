@@ -123,7 +123,7 @@ class GeocodingService {
       );
     }
 
-    if (merged.isEmpty) {
+    if (merged.isEmpty && !region.hasSubDistrict) {
       merged = _mergeInBabilBox(
         center: center,
         groups: [localResults, googleResults],
@@ -265,6 +265,14 @@ class GeocodingService {
     final local = await _localPlaces.listAll(preferArabic: true);
     final localInRegion = local.where((place) {
       final point = LatLng(place.latitude, place.longitude);
+      if (region.hasSubDistrict) {
+        return BabilRegions.isNearSubDistrictForSearch(
+          region.districtId,
+          region.subDistrictId!,
+          point,
+          extraBufferKm: 6,
+        );
+      }
       return BabilRegions.isNearDistrictForSearch(
         region.districtId,
         point,
@@ -297,6 +305,14 @@ class GeocodingService {
     final local = await _localPlaces.filter(query, preferArabic: true);
     return local.where((place) {
       final point = LatLng(place.latitude, place.longitude);
+      if (region.hasSubDistrict) {
+        return BabilRegions.isNearSubDistrictForSearch(
+          region.districtId,
+          region.subDistrictId!,
+          point,
+          extraBufferKm: 6,
+        );
+      }
       return BabilRegions.isNearDistrictForSearch(
         region.districtId,
         point,
@@ -693,7 +709,7 @@ out center 40;
     }
   }
 
-  /// Soft merge — prefer district-near hits, keep Babil-box hits as fallback.
+  /// Soft merge — prefer sub-district hits when selected, else district-near.
   List<PlaceResult> _mergeNearDistrict({
     required RegionSearchContext region,
     required LatLng center,
@@ -701,7 +717,7 @@ out center 40;
     required List<List<PlaceResult>> groups,
   }) {
     final seen = <String>{};
-    final scored = <({PlaceResult place, double distance, bool inDistrict})>[];
+    final scored = <({PlaceResult place, double distance, bool inScope})>[];
 
     for (final group in groups) {
       for (final place in group) {
@@ -718,25 +734,38 @@ out center 40;
             '${place.latitude.toStringAsFixed(4)},${place.longitude.toStringAsFixed(4)}';
         if (!seen.add(key)) continue;
 
-        final inDistrict = BabilRegions.isNearDistrictForSearch(
-          region.districtId,
-          point,
-          extraBufferKm: 20,
-        );
-        scored.add((place: place, distance: distance, inDistrict: inDistrict));
+        final inScope = region.hasSubDistrict
+            ? BabilRegions.isNearSubDistrictForSearch(
+                region.districtId,
+                region.subDistrictId!,
+                point,
+                extraBufferKm: 6,
+              )
+            : BabilRegions.isNearDistrictForSearch(
+                region.districtId,
+                point,
+                extraBufferKm: 20,
+              );
+        // When a ناحية is selected, drop out-of-scope hits entirely.
+        if (region.hasSubDistrict && !inScope) continue;
+
+        scored.add((place: place, distance: distance, inScope: inScope));
       }
     }
 
     scored.sort((a, b) {
-      if (a.inDistrict != b.inDistrict) {
-        return a.inDistrict ? -1 : 1;
+      if (a.inScope != b.inScope) {
+        return a.inScope ? -1 : 1;
       }
       return a.distance.compareTo(b.distance);
     });
 
-    final inDistrict = scored.where((s) => s.inDistrict).map((s) => s.place);
-    if (inDistrict.isNotEmpty) {
-      return inDistrict.take(_maxResults).toList();
+    final inScope = scored.where((s) => s.inScope).map((s) => s.place);
+    if (inScope.isNotEmpty) {
+      return inScope.take(_maxResults).toList();
+    }
+    if (region.hasSubDistrict) {
+      return const [];
     }
     return scored.map((s) => s.place).take(_maxResults).toList();
   }
@@ -764,40 +793,6 @@ out center 40;
     }
     scored.sort((a, b) => a.distance.compareTo(b.distance));
     return scored.map((s) => s.place).take(_maxResults).toList();
-  }
-
-  List<PlaceResult> _mergeWithBounds({
-    required RegionSearchContext region,
-    required List<List<PlaceResult>> groups,
-    required bool useDistrictBounds,
-  }) {
-    final seen = <String>{};
-    final merged = <PlaceResult>[];
-
-    for (final group in groups) {
-      for (final place in group) {
-        final point = LatLng(place.latitude, place.longitude);
-        final inBounds = BabilRegions.isNearDistrictForSearch(
-          region.districtId,
-          point,
-          extraBufferKm: useDistrictBounds ? 20 : 12,
-        );
-        if (!inBounds) {
-          continue;
-        }
-
-        final key =
-            '${place.latitude.toStringAsFixed(4)},${place.longitude.toStringAsFixed(4)}';
-        if (seen.add(key)) {
-          merged.add(place);
-        }
-        if (merged.length >= _maxResults) {
-          return merged;
-        }
-      }
-    }
-
-    return merged;
   }
 
   Future<String> reverseGeocode(

@@ -87,6 +87,16 @@ class RideSearchPanel extends StatelessWidget {
     }
   }
 
+  bool _ensureSubDistrictSelected(BuildContext context, AppLocalizations l10n) {
+    if (subDistrictId != null && subDistrictId!.trim().isNotEmpty) {
+      return true;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.selectSubDistrictRequired)),
+    );
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -116,6 +126,7 @@ class RideSearchPanel extends StatelessWidget {
         onDistrictChanged: onDistrictChanged,
         onSubDistrictChanged: onSubDistrictChanged,
         onOpenDestinationSearch: () {
+          if (!_ensureSubDistrictSelected(context, l10n)) return;
           _openSearch(
             context,
             title: l10n.whereTo,
@@ -127,6 +138,7 @@ class RideSearchPanel extends StatelessWidget {
         onOpenPickupSearch: pickupLoading
             ? null
             : () {
+                if (!_ensureSubDistrictSelected(context, l10n)) return;
                 _openSearch(
                   context,
                   title: l10n.pickup,
@@ -135,11 +147,28 @@ class RideSearchPanel extends StatelessWidget {
                   onSelected: onPickupSelected,
                 );
               },
-        onPinPickup: onPinPickup,
-        onUseCurrentLocation: onUseCurrentLocation,
-        onPinDestination: onPinDestination,
-        onSavedPlaceSelected: onSavedPlaceSelected,
-        onBookRide: onBookRide,
+        onPinPickup: () {
+          if (!_ensureSubDistrictSelected(context, l10n)) return;
+          onPinPickup();
+        },
+        onUseCurrentLocation: () {
+          if (!_ensureSubDistrictSelected(context, l10n)) return;
+          onUseCurrentLocation();
+        },
+        onPinDestination: () {
+          if (!_ensureSubDistrictSelected(context, l10n)) return;
+          onPinDestination();
+        },
+        onSavedPlaceSelected: (place) {
+          if (!_ensureSubDistrictSelected(context, l10n)) return;
+          onSavedPlaceSelected(place);
+        },
+        onBookRide: onBookRide == null
+            ? null
+            : () {
+                if (!_ensureSubDistrictSelected(context, l10n)) return;
+                onBookRide!();
+              },
       );
     }
 

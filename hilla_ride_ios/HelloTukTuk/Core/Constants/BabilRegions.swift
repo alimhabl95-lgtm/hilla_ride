@@ -212,6 +212,34 @@ enum BabilRegions {
         }
     }
 
+    /// Soft sub-district match for booking / search — Admin polygons are often
+    /// tight or overlapping, so a small buffer around the area is allowed.
+    @MainActor
+    static func isNearSubDistrictForSearch(
+        districtId: String,
+        subDistrictId: String,
+        point: CLLocationCoordinate2D,
+        extraBufferKm: Double = 8
+    ) -> Bool {
+        guard !subDistrictId.isEmpty else { return false }
+        if isWithin(subDistrictId: subDistrictId, point: point) {
+            return true
+        }
+        let sub = subDistrict(byId: subDistrictId)
+        // Plain boundary (no unique/nearest) — booking shouldn't fail because
+        // a neighbor circle claimed the point.
+        if GeoPolygon.isWithinBoundary(
+            point: point,
+            center: sub.center,
+            radiusKm: max(sub.searchRadiusKm, 12) + extraBufferKm,
+            storedBoundary: sub.boundary
+        ) {
+            return true
+        }
+        let allowed = max(sub.searchRadiusKm, sub.searchBiasRadiusKm, 12) + extraBufferKm
+        return GeoMath.distanceKm(from: sub.center, to: point) <= allowed
+    }
+
     /// Soft district match for place search — keeps Google/OSM hits that are
     /// near any sub-district center even when Admin polygons/radii are tight.
     @MainActor

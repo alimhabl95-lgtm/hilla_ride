@@ -51,12 +51,8 @@ class RegionSearchContext {
     if (!hasSubDistrict) {
       return BabilRegions.searchBiasRadiusKmForDistrict(districtId);
     }
-    // Prefer whole-district bias so places in neighboring نواحٍ still appear.
-    final districtBias =
-        BabilRegions.searchBiasRadiusKmForDistrict(districtId);
-    final subBias =
-        BabilRegions.searchBiasRadiusKmFor(districtId, subDistrictId!);
-    return districtBias > subBias ? districtBias : subBias;
+    // Scope bias to the selected ناحية so results stay local.
+    return BabilRegions.searchBiasRadiusKmFor(districtId, subDistrictId!);
   }
 
   LatLng get searchCenter {

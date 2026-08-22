@@ -228,13 +228,24 @@ struct CustomerHomeMapView: View {
                 NavigationStack {
                     PlaceSearchView(
                         title: L10n.string(.pickupLabel, language: appState.language),
-                        center: districtSearchCenter,
-                        radiusKm: searchRadiusKm,
-                        biasRadiusKm: districtSearchBiasKm,
+                        center: hasSubDistrict ? subDistrict.center : districtSearchCenter,
+                        radiusKm: hasSubDistrict ? subDistrict.searchRadiusKm : searchRadiusKm,
+                        biasRadiusKm: hasSubDistrict
+                            ? max(subDistrict.searchBiasRadiusKm, subDistrict.searchRadiusKm)
+                            : districtSearchBiasKm,
                         districtId: selectedDistrictId,
-                        regionLabel: districtDisplayName,
+                        regionLabel: hasSubDistrict
+                            ? subDistrict.displayName(language: appState.language)
+                            : districtDisplayName,
                         districtName: districtDisplayName,
-                        cityScopeLabel: cityScopeLabel,
+                        subDistrictId: selectedSubDistrictId,
+                        subDistrictName: hasSubDistrict
+                            ? subDistrict.displayName(language: appState.language)
+                            : "",
+                        cityScopeLabel: hasSubDistrict
+                            ? subDistrict.displayName(language: appState.language)
+                            : cityScopeLabel,
+                        boundary: hasSubDistrict ? subDistrict.boundary : nil,
                         onSelect: { place in
                             setPickup(place, recenter: true)
                             showPickupSearch = false
@@ -247,13 +258,24 @@ struct CustomerHomeMapView: View {
                 NavigationStack {
                     PlaceSearchView(
                         title: L10n.string(.destinationLabel, language: appState.language),
-                        center: districtSearchCenter,
-                        radiusKm: searchRadiusKm,
-                        biasRadiusKm: districtSearchBiasKm,
+                        center: hasSubDistrict ? subDistrict.center : districtSearchCenter,
+                        radiusKm: hasSubDistrict ? subDistrict.searchRadiusKm : searchRadiusKm,
+                        biasRadiusKm: hasSubDistrict
+                            ? max(subDistrict.searchBiasRadiusKm, subDistrict.searchRadiusKm)
+                            : districtSearchBiasKm,
                         districtId: selectedDistrictId,
-                        regionLabel: districtDisplayName,
+                        regionLabel: hasSubDistrict
+                            ? subDistrict.displayName(language: appState.language)
+                            : districtDisplayName,
                         districtName: districtDisplayName,
-                        cityScopeLabel: cityScopeLabel,
+                        subDistrictId: selectedSubDistrictId,
+                        subDistrictName: hasSubDistrict
+                            ? subDistrict.displayName(language: appState.language)
+                            : "",
+                        cityScopeLabel: hasSubDistrict
+                            ? subDistrict.displayName(language: appState.language)
+                            : cityScopeLabel,
+                        boundary: hasSubDistrict ? subDistrict.boundary : nil,
                         onSelect: { place in
                             setDestinationPlace(place, recenter: true)
                             showDestinationSearch = false

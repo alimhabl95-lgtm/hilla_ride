@@ -24,6 +24,7 @@ final class PlaceSearchService {
         regionLabel: String?,
         districtId: String,
         districtName: String? = nil,
+        subDistrictId: String? = nil,
         subDistrictName: String? = nil,
         boundary: [CLLocationCoordinate2D]? = nil
     ) async -> [PlacesSearchResult] {
@@ -38,16 +39,25 @@ final class PlaceSearchService {
             return []
         }
 
-        let districtBiasKm = await MainActor.run {
-            BabilRegions.searchBiasRadiusKm(forDistrict: districtId)
+        let selectedSubId = (subDistrictId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let providerBiasKm: Double
+        if selectedSubId.isEmpty {
+            let districtBiasKm = await MainActor.run {
+                BabilRegions.searchBiasRadiusKm(forDistrict: districtId)
+            }
+            providerBiasKm = max(max(1.0, radiusKm), biasRadiusKm, districtBiasKm)
+        } else {
+            // Keep search bias inside the selected ناحية, not the whole district.
+            providerBiasKm = max(max(1.0, radiusKm), biasRadiusKm)
         }
-        let providerBiasKm = max(max(1.0, radiusKm), biasRadiusKm, districtBiasKm)
         let biasBbox = GeoPolygon.boundingBox(
             center: center,
             radiusKm: providerBiasKm,
             storedBoundary: boundary
         )
         let districtLabel: String? = {
+            let fromSub = subDistrictName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !fromSub.isEmpty { return fromSub }
             let fromDistrict = districtName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !fromDistrict.isEmpty { return fromDistrict }
             let fromRegion = regionLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -70,26 +80,39 @@ final class PlaceSearchService {
         let local = await localTask
         let googleResults = await googleTask
 
-        // Primary filter: distance from the selected district center.
-        // Admin polygons/IDs often drop every Google hit; center radius does not.
-        let keepRadiusKm = max(providerBiasKm, 40)
-        var merged = await mergeNearCenter(
-            center: center,
-            radiusKm: keepRadiusKm,
-            groups: [local, googleResults],
-            districtId: districtId
-        )
+        let keepRadiusKm = selectedSubId.isEmpty
+            ? max(providerBiasKm, 40)
+            : max(providerBiasKm, radiusKm) + 6
+
+        var merged: [PlacesSearchResult]
+        if !selectedSubId.isEmpty {
+            merged = await mergeNearSubDistrict(
+                districtId: districtId,
+                subDistrictId: selectedSubId,
+                center: center,
+                radiusKm: keepRadiusKm,
+                boundary: boundary,
+                groups: [local, googleResults]
+            )
+        } else {
+            merged = await mergeNearCenter(
+                center: center,
+                radiusKm: keepRadiusKm,
+                groups: [local, googleResults],
+                districtId: districtId
+            )
+        }
 
         if !merged.isEmpty {
             lastStatusMessage = nil
             log.info(
-                "Place search google path q=\(trimmed, privacy: .public) district=\(districtId, privacy: .public) count=\(merged.count) googleRaw=\(googleResults.count)"
+                "Place search google path q=\(trimmed, privacy: .public) district=\(districtId, privacy: .public) sub=\(selectedSubId, privacy: .public) count=\(merged.count) googleRaw=\(googleResults.count)"
             )
             return Array(merged.prefix(25))
         }
 
-        // Last resort: keep any Google hit inside Babil service bbox.
-        if !googleResults.isEmpty {
+        // Last resort only when no sub-district is selected.
+        if selectedSubId.isEmpty, !googleResults.isEmpty {
             merged = mergeInBabilServiceArea(center: center, groups: [googleResults])
             if !merged.isEmpty {
                 lastStatusMessage = nil
@@ -110,24 +133,53 @@ final class PlaceSearchService {
             subDistrictName: subDistrictName
         )
 
-        merged = await mergeNearCenter(
-            center: center,
-            radiusKm: keepRadiusKm,
-            groups: [local, googleResults, supplemental.photon, supplemental.overpass, supplemental.nominatim],
-            districtId: districtId
-        )
-
-        if merged.isEmpty {
-            let categoryResults = await overpassCategorySearch(query: trimmed, bbox: biasBbox)
+        let allGroups = [
+            local,
+            googleResults,
+            supplemental.photon,
+            supplemental.overpass,
+            supplemental.nominatim
+        ]
+        if !selectedSubId.isEmpty {
+            merged = await mergeNearSubDistrict(
+                districtId: districtId,
+                subDistrictId: selectedSubId,
+                center: center,
+                radiusKm: keepRadiusKm,
+                boundary: boundary,
+                groups: allGroups
+            )
+        } else {
             merged = await mergeNearCenter(
                 center: center,
                 radiusKm: keepRadiusKm,
-                groups: [categoryResults],
+                groups: allGroups,
                 districtId: districtId
             )
         }
 
-        if merged.isEmpty, !googleResults.isEmpty {
+        if merged.isEmpty {
+            let categoryResults = await overpassCategorySearch(query: trimmed, bbox: biasBbox)
+            if !selectedSubId.isEmpty {
+                merged = await mergeNearSubDistrict(
+                    districtId: districtId,
+                    subDistrictId: selectedSubId,
+                    center: center,
+                    radiusKm: keepRadiusKm,
+                    boundary: boundary,
+                    groups: [categoryResults]
+                )
+            } else {
+                merged = await mergeNearCenter(
+                    center: center,
+                    radiusKm: keepRadiusKm,
+                    groups: [categoryResults],
+                    districtId: districtId
+                )
+            }
+        }
+
+        if merged.isEmpty, selectedSubId.isEmpty, !googleResults.isEmpty {
             merged = mergeInBabilServiceArea(center: center, groups: [googleResults, supplemental.photon, supplemental.nominatim])
         }
 
@@ -223,6 +275,61 @@ final class PlaceSearchService {
     }
 
     // MARK: - Region merge
+
+    /// Keep places inside / near the selected ناحية only.
+    private func mergeNearSubDistrict(
+        districtId: String,
+        subDistrictId: String,
+        center: CLLocationCoordinate2D,
+        radiusKm: Double,
+        boundary: [CLLocationCoordinate2D]?,
+        groups: [[PlacesSearchResult]]
+    ) async -> [PlacesSearchResult] {
+        await MainActor.run {
+            var seen = Set<String>()
+            var scored: [(PlacesSearchResult, Double)] = []
+
+            for group in groups {
+                for place in group {
+                    let distance = GeoMath.distanceKm(from: center, to: place.coordinate)
+                    let nearSub = BabilRegions.isNearSubDistrictForSearch(
+                        districtId: districtId,
+                        subDistrictId: subDistrictId,
+                        point: place.coordinate,
+                        extraBufferKm: 6
+                    )
+                    let inSoftCircle = distance <= radiusKm + 4
+                    let inBoundary = GeoPolygon.isWithinBoundary(
+                        point: place.coordinate,
+                        center: center,
+                        radiusKm: max(radiusKm, 8) + 6,
+                        storedBoundary: boundary
+                    )
+                    guard nearSub || inSoftCircle || inBoundary else { continue }
+
+                    let key = String(format: "%.4f,%.4f", place.latitude, place.longitude)
+                    guard seen.insert(key).inserted else { continue }
+                    // Prefer true sub matches over soft-circle neighbors.
+                    let rank = nearSub ? distance : distance + 100
+                    scored.append((place, rank))
+                }
+            }
+
+            scored.sort { $0.1 < $1.1 }
+            let preferred = scored.filter {
+                BabilRegions.isNearSubDistrictForSearch(
+                    districtId: districtId,
+                    subDistrictId: subDistrictId,
+                    point: $0.0.coordinate,
+                    extraBufferKm: 6
+                )
+            }.map(\.0)
+            if !preferred.isEmpty {
+                return Array(preferred.prefix(25))
+            }
+            return Array(scored.map(\.0).prefix(25))
+        }
+    }
 
     /// Keep places near the search center. Prefer district-matched hits when available.
     private func mergeNearCenter(

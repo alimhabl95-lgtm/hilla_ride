@@ -12,6 +12,7 @@ struct PlaceSearchView: View {
     var districtId: String = ""
     var regionLabel: String = ""
     var districtName: String = ""
+    var subDistrictId: String = ""
     var subDistrictName: String = ""
     var cityScopeLabel: String = ""
     var boundary: [CLLocationCoordinate2D]? = nil
@@ -195,6 +196,7 @@ struct PlaceSearchView: View {
             regionLabel: regionLabel,
             districtId: districtId,
             districtName: districtName,
+            subDistrictId: subDistrictId,
             subDistrictName: subDistrictName,
             boundary: boundary
         )

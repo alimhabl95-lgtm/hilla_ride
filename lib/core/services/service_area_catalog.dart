@@ -386,28 +386,45 @@ class ServiceAreaCatalog extends ChangeNotifier {
             ? 'area_inactive'
             : 'area_closed';
       }
-      bool withinSub(LatLng point) {
-        return GeoPolygon.isWithinBoundaryUnique(
+
+      // Soft booking check: selected ناحية (+ buffer), or any ناحية in the
+      // same district. Avoid unique/nearest rejects when Admin circles overlap.
+      bool nearSub(LatLng point, ServiceSubDistrict area) {
+        if (GeoPolygon.isWithinBoundary(
           point: point,
-          center: sub.center,
-          radiusKm: sub.searchRadiusKm,
-          storedBoundary: sub.boundary,
-          others: [
-            for (final other in _subById.values)
-              if (other.id != sub.id)
-                GeoArea(
-                  center: other.center,
-                  radiusKm: other.searchRadiusKm,
-                  boundary: other.boundary,
-                ),
-          ],
+          center: area.center,
+          radiusKm: (area.searchRadiusKm > 12 ? area.searchRadiusKm : 12) + 12,
+          storedBoundary: area.boundary,
+        )) {
+          return true;
+        }
+        final allowed =
+            (area.searchRadiusKm < 12 ? 12.0 : area.searchRadiusKm) + 12;
+        return const Distance().as(
+              LengthUnit.Kilometer,
+              area.center,
+              point,
+            ) <=
+            allowed;
+      }
+
+      bool pointAllowed(LatLng point) {
+        if (nearSub(point, sub)) return true;
+        for (final other in _subById.values) {
+          if (other.districtId != districtId) continue;
+          if (nearSub(point, other)) return true;
+        }
+        return BabilRegions.isNearDistrictForSearch(
+          districtId,
+          point,
+          extraBufferKm: 15,
         );
       }
 
-      if (pickup != null && !withinSub(pickup)) {
+      if (pickup != null && !pointAllowed(pickup)) {
         return 'outside_area';
       }
-      if (destination != null && !withinSub(destination)) {
+      if (destination != null && !pointAllowed(destination)) {
         return 'outside_area';
       }
       return null;
