@@ -142,9 +142,9 @@ struct DriverHomeView: View {
             VStack(spacing: AppSpacing.lg) {
                 driverHeader
 
-                walletCard
-
                 availabilityCard
+
+                walletCard
 
                 if walletIsLow || walletIsBlocked {
                     walletBanner
@@ -177,32 +177,53 @@ struct DriverHomeView: View {
                     AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
                 }
             }
-            .padding(AppSpacing.xxl)
+            .padding(AppSpacing.lg)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(BrandColors.surface.ignoresSafeArea())
+        .background(
+            LinearGradient(
+                colors: [BrandColors.surface, Color.white],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
     }
 
     private var driverHeader: some View {
-        VStack(spacing: AppSpacing.sm) {
+        HStack(spacing: AppSpacing.md) {
             Image("AppLogo")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 88, height: 88)
-                .clipShape(RoundedRectangle(cornerRadius: AppRadii.lg, style: .continuous))
-                .shadow(color: BrandColors.navy.opacity(0.08), radius: 10, y: 4)
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous))
 
-            Text(appState.language == .arabic ? "حساب السائق" : "Driver account")
-                .font(.title3.weight(.bold))
-                .foregroundStyle(BrandColors.navy)
-
-            if !currentDriver.name.isEmpty {
-                Text(currentDriver.name)
-                    .font(.subheadline.weight(.medium))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(appState.language == .arabic ? "مرحباً" : "Welcome")
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(BrandColors.muted)
+                Text(currentDriver.name.isEmpty
+                     ? (appState.language == .arabic ? "حساب السائق" : "Driver")
+                     : currentDriver.name)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(BrandColors.navy)
+                    .lineLimit(1)
             }
+
+            Spacer(minLength: 0)
+
+            Button {
+                showWallet = true
+            } label: {
+                Image(systemName: "wallet.pass.fill")
+                    .font(.title3)
+                    .foregroundStyle(BrandColors.tealDark)
+                    .frame(width: 44, height: 44)
+                    .background(BrandColors.teal.opacity(0.12), in: Circle())
+            }
+            .buttonStyle(.plain)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var walletCard: some View {
@@ -233,7 +254,7 @@ struct DriverHomeView: View {
             HStack(spacing: AppSpacing.sm) {
                 Circle()
                     .fill(currentDriver.isOnline ? BrandColors.success : BrandColors.muted)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 12, height: 12)
                     .overlay {
                         if currentDriver.isOnline {
                             Circle()
@@ -246,45 +267,58 @@ struct DriverHomeView: View {
                 Text(L10n.string(.driverAvailabilityTitle, language: appState.language))
                     .font(.headline.weight(.bold))
                     .foregroundStyle(BrandColors.navy)
-            }
 
-            HStack(alignment: .center, spacing: AppSpacing.md) {
-                VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                    Text(
-                        currentDriver.isOnline
-                            ? L10n.string(.goOnline, language: appState.language)
-                            : L10n.string(.goOffline, language: appState.language)
-                    )
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(currentDriver.isOnline ? BrandColors.tealDark : BrandColors.muted)
+                Spacer()
 
-                    Text(availabilityHint)
-                        .font(.footnote)
-                        .foregroundStyle(currentDriver.hasAssignedWorkArea ? BrandColors.muted : BrandColors.danger)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: AppSpacing.sm)
-
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { currentDriver.isOnline },
-                        set: { value in Task { await setOnline(value) } }
-                    )
+                Text(
+                    currentDriver.isOnline
+                        ? (appState.language == .arabic ? "متصل" : "Online")
+                        : (appState.language == .arabic ? "غير متصل" : "Offline")
                 )
-                .labelsHidden()
-                .tint(BrandColors.teal)
-                .disabled(isUpdatingOnline || !currentDriver.hasAssignedWorkArea)
-                .frame(minWidth: 51, minHeight: 48)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(currentDriver.isOnline ? BrandColors.success : BrandColors.muted)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    (currentDriver.isOnline ? BrandColors.success : BrandColors.muted).opacity(0.12),
+                    in: Capsule()
+                )
             }
-            .padding(AppSpacing.md)
-            .background(
-                currentDriver.isOnline
-                    ? BrandColors.teal.opacity(0.08)
-                    : BrandColors.surface,
-                in: RoundedRectangle(cornerRadius: AppRadii.md, style: .continuous)
-            )
+
+            Text(availabilityHint)
+                .font(.subheadline)
+                .foregroundStyle(currentDriver.hasAssignedWorkArea ? BrandColors.muted : BrandColors.danger)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Group {
+                if currentDriver.isOnline {
+                    Button {
+                        Task { await setOnline(false) }
+                    } label: {
+                        HStack {
+                            Image(systemName: "pause.circle.fill")
+                            Text(appState.language == .arabic ? "إيقاف العمل" : "Go offline")
+                                .fontWeight(.bold)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                } else {
+                    Button {
+                        Task { await setOnline(true) }
+                    } label: {
+                        HStack {
+                            Image(systemName: "play.circle.fill")
+                            Text(appState.language == .arabic ? "ابدأ استقبال الطلبات" : "Go online")
+                                .fontWeight(.bold)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                }
+            }
+            .disabled(isUpdatingOnline || !currentDriver.hasAssignedWorkArea)
+            .opacity((isUpdatingOnline || !currentDriver.hasAssignedWorkArea) ? 0.55 : 1)
         }
         .appCard()
         .onAppear {

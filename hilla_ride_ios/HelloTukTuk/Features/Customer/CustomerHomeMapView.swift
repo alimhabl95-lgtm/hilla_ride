@@ -32,6 +32,8 @@ struct CustomerHomeMapView: View {
     @State private var recenterToken = 1
     @State private var cameraTargetOverride: CLLocationCoordinate2D?
     @State private var preferTargetOnly = false
+    /// Prevents area onChange handlers from wiping a place we just selected.
+    @State private var suppressLocationClear = false
 
     private var hasSubDistrict: Bool {
         !selectedSubDistrictId.isEmpty
@@ -235,6 +237,7 @@ struct CustomerHomeMapView: View {
                         cityScopeLabel: cityScopeLabel,
                         onSelect: { place in
                             setPickup(place, recenter: true)
+                            showPickupSearch = false
                         }
                     )
                     .environmentObject(appState)
@@ -253,6 +256,7 @@ struct CustomerHomeMapView: View {
                         cityScopeLabel: cityScopeLabel,
                         onSelect: { place in
                             setDestinationPlace(place, recenter: true)
+                            showDestinationSearch = false
                         }
                     )
                     .environmentObject(appState)
@@ -272,17 +276,19 @@ struct CustomerHomeMapView: View {
             }
             .onChange(of: pickup) { _ in startNearbyWatch() }
             .onChange(of: selectedProvinceId) { _ in
-                // Governorate switch always resets to that governorate's
-                // first district; the sub-district reset below then forces
-                // the customer to confirm the new area before booking.
+                guard !suppressLocationClear else { return }
                 selectedDistrictId = districtsInSelectedProvince.first?.id ?? ""
             }
             .onChange(of: selectedDistrictId) { _ in
+                guard !suppressLocationClear else {
+                    startNearbyWatch()
+                    return
+                }
                 if selectedSubDistrictId.isEmpty,
                    subDistrictsInSelectedDistrict.count == 1,
                    let only = subDistrictsInSelectedDistrict.first {
                     selectedSubDistrictId = only.id
-                } else {
+                } else if !subDistrictsInSelectedDistrict.contains(where: { $0.id == selectedSubDistrictId }) {
                     selectedSubDistrictId = ""
                 }
                 errorMessage = nil
@@ -293,9 +299,12 @@ struct CustomerHomeMapView: View {
             .onChange(of: areaCatalog.synced) { _ in syncAreaSelection() }
             .onChange(of: areaCatalog.liveDistricts.map(\.id)) { _ in syncAreaSelection() }
             .onChange(of: selectedSubDistrictId) { _ in
+                guard !suppressLocationClear else {
+                    startNearbyWatch()
+                    return
+                }
                 clearLocationsOutsideSelectedArea()
                 startNearbyWatch()
-                // Region change is intentional booking context — one camera move.
                 requestRecenter(to: subDistrict.center, targetOnly: true)
             }
             .onDisappear {
@@ -416,12 +425,14 @@ struct CustomerHomeMapView: View {
                     )
                 }
 
+                Text(L10n.string(.bookRideTitle, language: appState.language))
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(BrandColors.navy)
+
                 serviceAreaCard
 
                 SavedPlacesBar { place in
-                    if requireSubDistrict() {
-                        setDestinationPlace(place, recenter: true)
-                    }
+                    setDestinationPlace(place, recenter: true)
                 }
 
                 tripPlannerCard
@@ -430,10 +441,19 @@ struct CustomerHomeMapView: View {
                     AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
                 }
 
-                Button(L10n.string(.useMyLocation, language: appState.language)) {
-                    useMyLocation()
+                HStack(spacing: AppSpacing.sm) {
+                    Button {
+                        useMyLocation()
+                    } label: {
+                        Label(
+                            L10n.string(.useMyLocation, language: appState.language),
+                            systemImage: "location.fill"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
                 }
-                .buttonStyle(SecondaryButtonStyle())
 
                 Button(L10n.string(.bookRide, language: appState.language)) {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -441,6 +461,7 @@ struct CustomerHomeMapView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
+                .opacity(pickup != nil && destination != nil ? 1 : 0.55)
             }
             .padding(.horizontal, AppSpacing.lg)
             .padding(.bottom, AppSpacing.lg)
@@ -538,35 +559,40 @@ struct CustomerHomeMapView: View {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
+                .frame(width: 28, height: 28)
                 .background(iconColor, in: Circle())
 
             Button(action: onSearch) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.caption.weight(.medium))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(BrandColors.muted)
                     Text(value)
-                        .font(.subheadline.weight(isSet ? .semibold : .regular))
+                        .font(.body.weight(isSet ? .semibold : .regular))
                         .foregroundStyle(isSet ? BrandColors.navy : BrandColors.muted)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
             Button(action: onPickMap) {
-                Image(systemName: "scope")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(BrandColors.tealDark)
-                    .frame(width: 36, height: 36)
+                VStack(spacing: 2) {
+                    Image(systemName: "scope")
+                        .font(.body.weight(.semibold))
+                    Text(L10n.string(.pickOnMapShort, language: appState.language))
+                        .font(.caption2.weight(.medium))
+                }
+                .foregroundStyle(BrandColors.tealDark)
+                .frame(minWidth: 52, minHeight: 48)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.string(.pickOnMapShort, language: appState.language))
         }
         .padding(.horizontal, AppSpacing.md)
-        .padding(.vertical, AppSpacing.sm + 2)
+        .padding(.vertical, AppSpacing.md)
     }
 
     /// Cascading Governorate → District → Sub-district selector. Iraq is
@@ -699,6 +725,7 @@ struct CustomerHomeMapView: View {
     }
 
     private func clearLocationsOutsideSelectedArea() {
+        guard !suppressLocationClear else { return }
         if let pickup, !isWithinSelectedDistrict(pickup.coordinate) {
             self.pickup = nil
         }
@@ -766,20 +793,41 @@ struct CustomerHomeMapView: View {
     }
 
     private func setPickup(_ place: MapPlace, recenter: Bool) {
-        guard adoptPlaceArea(for: place.coordinate) else { return }
+        // Keep suppress true until after SwiftUI processes district/sub-district
+        // onChange — a `defer` reset was clearing the place again immediately.
+        suppressLocationClear = true
+
+        // Always apply the tapped place first so the row never stays blank.
         errorMessage = nil
         pickup = place
+        if !adoptPlaceArea(for: place.coordinate) {
+            // Keep the place; only warn if far outside Babil.
+            errorMessage = L10n.string(.searchOutsideRegion, language: appState.language)
+        }
         if recenter {
             requestRecenter(to: place.coordinate, targetOnly: false)
         }
+        releaseLocationClearSuppress()
     }
 
     private func setDestinationPlace(_ place: MapPlace, recenter: Bool) {
-        guard adoptPlaceArea(for: place.coordinate) else { return }
+        suppressLocationClear = true
+
         errorMessage = nil
         destination = place
+        if !adoptPlaceArea(for: place.coordinate) {
+            errorMessage = L10n.string(.searchOutsideRegion, language: appState.language)
+        }
         if recenter {
             requestRecenter(to: place.coordinate, targetOnly: false)
+        }
+        releaseLocationClearSuppress()
+    }
+
+    private func releaseLocationClearSuppress() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            suppressLocationClear = false
         }
     }
 

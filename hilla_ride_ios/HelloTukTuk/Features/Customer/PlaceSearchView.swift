@@ -23,6 +23,7 @@ struct PlaceSearchView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var savedMessage: String?
     @State private var statusMessage: String?
+    @State private var didSelect = false
     @FocusState private var searchFocused: Bool
     private let searchService = PlaceSearchService()
 
@@ -83,27 +84,35 @@ struct PlaceSearchView: View {
                     .padding()
             }
 
-            List(results) { result in
-                HStack {
-                    Button {
-                        onSelect(result.asMapPlace)
-                        dismiss()
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(result.label)
-                                .font(.body)
-                                .foregroundStyle(BrandColors.navy)
-                                .multilineTextAlignment(.leading)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    Spacer()
-                    Button {
-                        Task { await savePlace(result) }
-                    } label: {
+            List {
+                ForEach(results) { result in
+                    HStack(alignment: .center, spacing: AppSpacing.md) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(BrandColors.tealDark)
+
+                        Text(result.label)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(BrandColors.navy)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+
                         Image(systemName: "bookmark")
+                            .foregroundStyle(BrandColors.tealDark)
+                            .frame(width: 40, height: 40)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                Task { await savePlace(result) }
+                            }
+                            .accessibilityLabel(L10n.string(.savedPlacesTitle, language: appState.language))
                     }
-                    .accessibilityLabel(L10n.string(.savedPlacesTitle, language: appState.language))
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        select(result)
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
             }
             .listStyle(.plain)
@@ -128,6 +137,15 @@ struct PlaceSearchView: View {
         .onAppear {
             searchFocused = true
         }
+    }
+
+    private func select(_ result: PlacesSearchResult) {
+        guard !didSelect else { return }
+        didSelect = true
+        searchFocused = false
+        searchTask?.cancel()
+        onSelect(result.asMapPlace)
+        dismiss()
     }
 
     private func scheduleSearch(query: String) {
