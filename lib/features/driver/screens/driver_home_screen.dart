@@ -767,7 +767,7 @@ class _ActiveRidePanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (isMatched)
+                  if (isMatched) ...[
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.md),
                       child: AppBanner(
@@ -776,6 +776,58 @@ class _ActiveRidePanel extends StatelessWidget {
                         tone: AppBannerTone.warning,
                       ),
                     ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppSecondaryButton(
+                            label: l10n.rejectRide,
+                            destructive: true,
+                            onPressed: isActionPending(ride.id, 'reject')
+                                ? null
+                                : () => runRideAction(
+                                      rideId: ride.id,
+                                      action: 'reject',
+                                      task: () => rideService.rejectRide(
+                                        rideId: ride.id,
+                                        driverId: driver.uid,
+                                      ),
+                                    ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: actionButton(
+                            rideId: ride.id,
+                            action: 'accept',
+                            label: l10n.acceptRide,
+                            icon: Icons.check_rounded,
+                            onPressed: () async {
+                              try {
+                                await rideService.acceptRide(
+                                  rideId: ride.id,
+                                  driverId: driver.uid,
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                final isAr =
+                                    l10n.localeName.startsWith('ar');
+                                final message = error is StateError &&
+                                        error.message == 'wallet_blocked'
+                                    ? (isAr
+                                        ? 'رصيد المحفظة غير كافٍ — اشحن المحفظة أولاً'
+                                        : 'Wallet balance too low — recharge first')
+                                    : '$error';
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(message)),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
                   StreamBuilder<AppUser?>(
                     stream: context
                         .read<AppState>()
@@ -870,58 +922,6 @@ class _ActiveRidePanel extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: AppSpacing.lg),
-                  if (isMatched) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppSecondaryButton(
-                            label: l10n.rejectRide,
-                            destructive: true,
-                            onPressed: isActionPending(ride.id, 'reject')
-                                ? null
-                                : () => runRideAction(
-                                      rideId: ride.id,
-                                      action: 'reject',
-                                      task: () => rideService.rejectRide(
-                                        rideId: ride.id,
-                                        driverId: driver.uid,
-                                      ),
-                                    ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: actionButton(
-                            rideId: ride.id,
-                            action: 'accept',
-                            label: l10n.acceptRide,
-                            icon: Icons.check_rounded,
-                            onPressed: () async {
-                              try {
-                                await rideService.acceptRide(
-                                  rideId: ride.id,
-                                  driverId: driver.uid,
-                                );
-                              } catch (error) {
-                                if (!context.mounted) return;
-                                final isAr =
-                                    l10n.localeName.startsWith('ar');
-                                final message = error is StateError &&
-                                        error.message == 'wallet_blocked'
-                                    ? (isAr
-                                        ? 'رصيد المحفظة غير كافٍ — اشحن المحفظة أولاً'
-                                        : 'Wallet balance too low — recharge first')
-                                    : '$error';
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(message)),
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                   if (ride.status == RideStatus.accepted)
                     actionButton(
                       rideId: ride.id,

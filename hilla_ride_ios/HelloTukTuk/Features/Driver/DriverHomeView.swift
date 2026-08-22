@@ -1,5 +1,6 @@
 import CoreLocation
 import SwiftUI
+import UIKit
 
 struct DriverHomeView: View {
     @EnvironmentObject private var appState: AppState
@@ -493,62 +494,68 @@ struct DriverHomeView: View {
             AppSheetHandle()
                 .padding(.top, AppSpacing.sm)
 
-            VStack(alignment: .leading, spacing: AppSpacing.md) {
-                HStack(spacing: AppSpacing.md) {
-                    ProfileAvatarView(
-                        name: activeCustomer?.name ?? "",
-                        photoURL: activeCustomer?.profilePhotoUrl,
-                        size: 56
-                    )
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        Text(rideStatusTitle(ride.status))
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(BrandColors.navy)
-                        if let name = activeCustomer?.name, !name.isEmpty {
-                            Text(name)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(BrandColors.muted)
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppSpacing.md) {
+                    HStack(spacing: AppSpacing.md) {
+                        ProfileAvatarView(
+                            name: activeCustomer?.name ?? "",
+                            photoURL: activeCustomer?.profilePhotoUrl,
+                            size: 56
+                        )
+                        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                            Text(rideStatusTitle(ride.status))
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(BrandColors.navy)
+                            if let name = activeCustomer?.name, !name.isEmpty {
+                                Text(name)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(BrandColors.muted)
+                            }
                         }
+                        Spacer(minLength: AppSpacing.sm)
+
+                        Text(formatIqd(ride.fareAmountIqd))
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(BrandColors.tealDark)
                     }
-                    Spacer(minLength: AppSpacing.sm)
 
-                    Text(formatIqd(ride.fareAmountIqd))
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(BrandColors.tealDark)
+                    if ride.status == .matched {
+                        offerUrgencyBanner
+                        rideActions(for: ride)
+                    }
+
+                    tripLocationRow(
+                        icon: "circle.fill",
+                        iconColor: BrandColors.success,
+                        title: appState.language == .arabic ? "من" : "Pickup",
+                        label: ride.pickupLabel
+                    )
+                    tripLocationRow(
+                        icon: "flag.fill",
+                        iconColor: BrandColors.danger,
+                        title: appState.language == .arabic ? "إلى" : "Destination",
+                        label: ride.destinationLabel
+                    )
+
+                    if ride.status != .matched {
+                        rideActions(for: ride)
+                    }
+
+                    Button {
+                        showChat = true
+                    } label: {
+                        Label(L10n.string(.messageCustomer, language: appState.language), systemImage: "message.fill")
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+
+                    if let errorMessage {
+                        AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
+                    }
                 }
-
-                tripLocationRow(
-                    icon: "circle.fill",
-                    iconColor: BrandColors.success,
-                    title: appState.language == .arabic ? "من" : "Pickup",
-                    label: ride.pickupLabel
-                )
-                tripLocationRow(
-                    icon: "flag.fill",
-                    iconColor: BrandColors.danger,
-                    title: appState.language == .arabic ? "إلى" : "Destination",
-                    label: ride.destinationLabel
-                )
-
-                if ride.status == .matched {
-                    offerUrgencyBanner
-                }
-
-                Button {
-                    showChat = true
-                } label: {
-                    Label(L10n.string(.messageCustomer, language: appState.language), systemImage: "message.fill")
-                }
-                .buttonStyle(SecondaryButtonStyle())
-
-                rideActions(for: ride)
-
-                if let errorMessage {
-                    AppBanner(message: errorMessage, systemImage: "exclamationmark.triangle.fill", tone: .danger)
-                }
+                .padding(.horizontal, AppSpacing.lg)
+                .padding(.bottom, AppSpacing.lg)
             }
-            .padding(.horizontal, AppSpacing.lg)
-            .padding(.bottom, AppSpacing.lg)
+            .frame(maxHeight: UIScreen.main.bounds.height * 0.55)
         }
         .background {
             RoundedRectangle(cornerRadius: AppRadii.xl, style: .continuous)

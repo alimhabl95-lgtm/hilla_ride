@@ -124,8 +124,11 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     const walletConfig = await getWalletConfig();
     const exclude = new Set(excludeDriverIds.map(String));
 
-    if (!subDistrictId) {
-      // Never fall back to city-wide / nationwide search — only the selected ناحية.
+    // Match within the selected قضاء (district). Prefer drivers in the same
+    // ناحية, but do not require an exact ناحية match — customers often pick
+    // a neighboring area (e.g. قاسم) while the online driver is assigned to
+    // another ناحية in the same district (e.g. الشوملي).
+    if (!districtId && !subDistrictId) {
       await rideRef.set(
         {
           status: "searching",
@@ -140,10 +143,11 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     let query = db()
       .collection("drivers")
       .where("isOnline", "==", true)
-      .where("approvalStatus", "==", "approved")
-      .where("assignedSubDistrictId", "==", subDistrictId);
+      .where("approvalStatus", "==", "approved");
     if (districtId) {
       query = query.where("assignedDistrictId", "==", districtId);
+    } else {
+      query = query.where("assignedSubDistrictId", "==", subDistrictId);
     }
     const driversSnap = await query.limit(40).get();
 
@@ -162,9 +166,24 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
       const lng = Number(d.longitude ?? d.lastLng ?? d.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const km = haversineKm(pickupLat, pickupLng, lat, lng);
-      candidates.push({ id: doc.id, km });
+      const sameSub =
+        !!subDistrictId &&
+        String(d.assignedSubDistrictId || "") === subDistrictId;
+      candidates.push({ id: doc.id, km, sameSub });
     }
-    candidates.sort((a, b) => a.km - b.km);
+    candidates.sort((a, b) => {
+      if (a.sameSub !== b.sameSub) return a.sameSub ? -1 : 1;
+      return a.km - b.km;
+    });
+    if (candidates.length === 0) {
+      functions.logger.info("assignNearestDriver no candidates", {
+        rideId,
+        districtId,
+        subDistrictId,
+        onlineInQuery: driversSnap.size,
+        minBalanceIqd: walletConfig.minBalanceIqd,
+      });
+    }
     if (candidates.length === 0) {
       await rideRef.set(
         {
@@ -399,15 +418,9 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
 
       if (status === "searching") {
         const rideDistrictId = String(ride.districtId || "");
-        const rideSubDistrictId = String(ride.subDistrictId || "");
         const driverDistrictId = String(driver.assignedDistrictId || "");
-        const driverSubDistrictId = String(driver.assignedSubDistrictId || "");
-        if (
-          !rideDistrictId ||
-          !rideSubDistrictId ||
-          driverDistrictId !== rideDistrictId ||
-          driverSubDistrictId !== rideSubDistrictId
-        ) {
+        // Same قضاء is enough — ناحية may differ within the district.
+        if (!rideDistrictId || driverDistrictId !== rideDistrictId) {
           throw new functions.https.HttpsError(
             "failed-precondition",
             "ride_unavailable",

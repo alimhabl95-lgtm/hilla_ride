@@ -13,6 +13,8 @@ struct RideAlertEvent: Identifiable, Equatable {
     let type: RideAlertType
     let title: String
     let body: String
+    /// Present for driver ride offers so the overlay can Accept / Reject.
+    var rideId: String? = nil
 }
 
 @MainActor
@@ -245,7 +247,8 @@ final class RideAlertService: ObservableObject {
         trigger(RideAlertEvent(
             type: .driverRideRequest,
             title: L10n.string(.newRideOffer, language: appLanguage),
-            body: "\(ride.pickupLabel) → \(ride.destinationLabel)"
+            body: "\(ride.pickupLabel) → \(ride.destinationLabel)",
+            rideId: ride.id
         ))
     }
 }

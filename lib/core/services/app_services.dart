@@ -998,14 +998,12 @@ class DriverService {
 
     var drivers = await getAvailableDriversForDistrict(
       trimmedDistrict,
-      subDistrictId: trimmedSub,
       excludeDriverIds: excludeDriverIds,
     );
 
     if (drivers.isEmpty) {
       drivers = await _queryOnlineDriversFallback(
         districtId: trimmedDistrict,
-        subDistrictId: trimmedSub,
         excludeDriverIds: excludeDriverIds,
       );
     }
@@ -1018,6 +1016,9 @@ class DriverService {
 
     final distance = const Distance();
     drivers.sort((a, b) {
+      final aSame = a.assignedSubDistrictId == trimmedSub;
+      final bSame = b.assignedSubDistrictId == trimmedSub;
+      if (aSame != bSame) return aSame ? -1 : 1;
       final aDistance = distance.as(
         LengthUnit.Kilometer,
         pickup,
@@ -1368,27 +1369,24 @@ class RideService {
           controller.add(next);
         }
 
-        void bindSubDistrictListeners({
-          required String districtId,
-          required String subDistrictId,
-        }) {
+        void bindDistrictListeners({required String districtId}) {
           subDistrictSubscription?.cancel();
           subDistrictSubscription = _firestore
               .collection('rides')
               .where('districtId', isEqualTo: districtId)
-              .where('subDistrictId', isEqualTo: subDistrictId)
               .where(
                 'status',
                 whereIn: [RideStatus.searching.value, RideStatus.matched.value],
               )
-              .limit(10)
+              .limit(20)
               .snapshots()
               .listen((snapshot) {
             searchingRide = null;
-            Ride? matchedInSubdistrict;
+            Ride? matchedInDistrict;
             for (final doc in snapshot.docs) {
               final data = doc.data();
-              if (data['driverId'] != null) continue;
+              final assigned = data['driverId'];
+              if (assigned is String && assigned.trim().isNotEmpty) continue;
               final ride = Ride.fromMap(doc.id, data);
               if (ride.status == RideStatus.searching) {
                 searchingRide = ride;
@@ -1397,11 +1395,11 @@ class RideService {
               if (ride.status == RideStatus.matched &&
                   (ride.offeredDriverIds.isEmpty ||
                       ride.offeredDriverIds.contains(driverId))) {
-                matchedInSubdistrict = ride;
+                matchedInDistrict ??= ride;
               }
             }
-            if (searchingRide == null && matchedInSubdistrict != null) {
-              offeredRide = matchedInSubdistrict;
+            if (searchingRide == null && matchedInDistrict != null) {
+              offeredRide = matchedInDistrict;
             }
             publish();
           });
@@ -1434,13 +1432,16 @@ class RideService {
             .limit(5)
             .snapshots()
             .listen((snapshot) {
+          Ride? nextOffer;
           for (final doc in snapshot.docs) {
             final data = doc.data();
-            if (data['driverId'] != null) continue;
-            offeredRide = Ride.fromMap(doc.id, data);
-            publish();
-            return;
+            final assigned = data['driverId'];
+            if (assigned is String && assigned.trim().isNotEmpty) continue;
+            nextOffer = Ride.fromMap(doc.id, data);
+            break;
           }
+          offeredRide = nextOffer;
+          publish();
         });
 
         driverSubscription = _firestore
@@ -1476,17 +1477,18 @@ class RideService {
           final districtId = driverData['assignedDistrictId'] as String? ?? '';
           final subDistrictId =
               driverData['assignedSubDistrictId'] as String? ?? '';
-          if (districtId.isEmpty || subDistrictId.isEmpty) {
+          if (districtId.isEmpty) {
             subDistrictSubscription?.cancel();
             subDistrictSubscription = null;
             searchingRide = null;
             publish();
             return;
           }
-          bindSubDistrictListeners(
-            districtId: districtId,
-            subDistrictId: subDistrictId,
-          );
+          // Keep subDistrictId for future UI; matching is district-wide.
+          if (subDistrictId.isEmpty) {
+            // Still allow district-level listening when ناحية is missing.
+          }
+          bindDistrictListeners(districtId: districtId);
           publish();
         });
 
