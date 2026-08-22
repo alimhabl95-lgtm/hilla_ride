@@ -452,7 +452,10 @@ enum L10n {
         .selectDestination: [.english: "Tap to search or long-press map", .arabic: "اضغط للبحث أو اضغط مطولاً على الخريطة"],
         .useMyLocation: [.english: "Use my location", .arabic: "استخدم موقعي"],
         .subDistrict: [.english: "Area", .arabic: "المنطقة"],
-        .selectSubDistrictFirst: [.english: "Please select your area first", .arabic: "الرجاء اختيار المنطقة أولاً"],
+        .selectSubDistrictFirst: [
+            .english: "Please select district and area first",
+            .arabic: "الرجاء اختيار القضاء والناحية أولاً"
+        ],
         .selectSubDistrictHint: [.english: "Select area", .arabic: "اختر المنطقة"],
         .searchOutsideRegion: [
             .english: "This location is outside the selected area.",
@@ -462,12 +465,12 @@ enum L10n {
         .districtLabel: [.english: "District", .arabic: "القضاء"],
         .serviceAreaTitle: [.english: "Your city", .arabic: "مدينتك"],
         .searchLimitedToCity: [
-            .english: "Search results stay inside %@ district only.",
-            .arabic: "نتائج البحث داخل قضاء %@ فقط."
+            .english: "Search results stay inside %@ only.",
+            .arabic: "نتائج البحث داخل %@ فقط."
         ],
         .searchPlacesInCity: [
-            .english: "Search in %@ district",
-            .arabic: "البحث في قضاء %@"
+            .english: "Search in %@",
+            .arabic: "البحث في %@"
         ],
         .pickOnMapShort: [.english: "Pin on map", .arabic: "تحديد على الخريطة"],
         .estimatedFare: [.english: "Estimated fare", .arabic: "الأجرة التقديرية"],

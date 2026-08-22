@@ -158,8 +158,8 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
       if (walletStatus === "blocked" || balance < walletConfig.minBalanceIqd) {
         continue;
       }
-      const lat = Number(d.lastLat ?? d.lat);
-      const lng = Number(d.lastLng ?? d.lng);
+      const lat = Number(d.latitude ?? d.lastLat ?? d.lat);
+      const lng = Number(d.longitude ?? d.lastLng ?? d.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const km = haversineKm(pickupLat, pickupLng, lat, lng);
       candidates.push({ id: doc.id, km });
@@ -191,6 +191,22 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     return { rideId, status: "matched", offeredDriverIds: offered };
   }
 
+  async function getLoyaltyConfig() {
+    const doc = await db().collection("config").doc("loyalty").get();
+    const data = doc.data() || {};
+    return {
+      enabled: data.enabled === true,
+      ridesRequired: Math.max(1, Math.trunc(Number(data.ridesRequired) || 10)),
+      repeats: data.repeats !== false,
+    };
+  }
+
+  function shouldGrantLoyaltyFreeRide(count, ridesRequired, repeats) {
+    if (!Number.isFinite(count) || count <= 0) return false;
+    if (repeats) return count % ridesRequired === 0;
+    return count === ridesRequired;
+  }
+
   const createRide = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
@@ -204,11 +220,14 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     const destinationLng = Number(data.destinationLng);
     const districtId = String(data.districtId || "").trim();
     const subDistrictId = String(data.subDistrictId || "").trim();
-    const fareAmountIqd = Math.trunc(Number(data.fareAmountIqd) || 0);
+    let fareAmountIqd = Math.trunc(Number(data.fareAmountIqd) || 0);
     const distanceKm = Number(data.distanceKm) || 0;
-    const originalFareIqd = Math.trunc(Number(data.originalFareIqd) || 0);
-    const promoDiscountIqd = Math.trunc(Number(data.promoDiscountIqd) || 0);
-    const promoCode = String(data.promoCode || "").trim();
+    let originalFareIqd = Math.trunc(Number(data.originalFareIqd) || 0);
+    let promoDiscountIqd = Math.trunc(Number(data.promoDiscountIqd) || 0);
+    let promoCode = String(data.promoCode || "").trim();
+    let loyaltyFreeRide =
+      data.loyaltyFreeRide === true ||
+      promoCode.toUpperCase() === "LOYALTY";
 
     if (
       !pickupLabel ||
@@ -216,11 +235,37 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
       !Number.isFinite(pickupLat) ||
       !Number.isFinite(pickupLng) ||
       !Number.isFinite(destinationLat) ||
-      !Number.isFinite(destinationLng) ||
-      fareAmountIqd <= 0
+      !Number.isFinite(destinationLng)
     ) {
       throw new functions.https.HttpsError("invalid-argument", "Invalid ride payload.");
     }
+
+    if (loyaltyFreeRide) {
+      const userSnap = await db().collection("users").doc(customerId).get();
+      const userData = userSnap.data() || {};
+      const remaining = Math.trunc(Number(userData.loyaltyFreeRidesRemaining) || 0);
+      if (remaining <= 0) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "loyalty_free_unavailable",
+        );
+      }
+      const quoted =
+        originalFareIqd > 0
+          ? originalFareIqd
+          : Math.max(fareAmountIqd, promoDiscountIqd, 0);
+      if (quoted <= 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid ride payload.");
+      }
+      originalFareIqd = quoted;
+      promoDiscountIqd = quoted;
+      fareAmountIqd = 0;
+      promoCode = "LOYALTY";
+      loyaltyFreeRide = true;
+    } else if (fareAmountIqd <= 0) {
+      throw new functions.https.HttpsError("invalid-argument", "Invalid ride payload.");
+    }
+
     if (
       Math.abs(pickupLat - destinationLat) < 1e-5 &&
       Math.abs(pickupLng - destinationLng) < 1e-5
@@ -281,6 +326,7 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
         ...(originalFareIqd > 0 ? { originalFareIqd } : {}),
         ...(promoDiscountIqd > 0 ? { promoDiscountIqd } : {}),
         ...(promoCode ? { promoCode } : {}),
+        ...(loyaltyFreeRide ? { loyaltyFreeRide: true } : {}),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
@@ -524,6 +570,7 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     const rideRef = db().collection("rides").doc(rideId);
     const commissionDoc = await db().collection("config").doc("commission").get();
     const defaultCommissionPercent = Number(commissionDoc.data()?.platformPercent) || 15;
+    const loyaltyConfig = await getLoyaltyConfig();
 
     await db().runTransaction(async (tx) => {
       const snap = await tx.get(rideRef);
@@ -547,8 +594,17 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
       const driverId = String(ride.driverId || "");
       let commissionPercent = defaultCommissionPercent;
       const subId = String(ride.subDistrictId || "");
+      let subSnap = null;
       if (subId) {
-        const subSnap = await tx.get(db().collection("serviceSubDistricts").doc(subId));
+        subSnap = await tx.get(db().collection("serviceSubDistricts").doc(subId));
+      }
+      const customerId = String(ride.customerId || "");
+      let customerSnap = null;
+      if (customerId) {
+        customerSnap = await tx.get(db().collection("users").doc(customerId));
+      }
+
+      if (subSnap && subSnap.exists) {
         const sub = subSnap.data() || {};
         if (
           sub.useGlobalCommission === false &&
@@ -576,13 +632,9 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
           totalPlatformCommissionIqd: admin.firestore.FieldValue.increment(
             platformCommissionIqd,
           ),
-          outstandingPlatformCommissionIqd: admin.firestore.FieldValue.increment(
-            platformCommissionIqd,
-          ),
+          // Wallet prepaid settlement: do not grow cash "outstanding" here.
+          // onRideUpdated debits the wallet; only failed debits keep debt.
           totalDriverEarningsIqd: admin.firestore.FieldValue.increment(
-            driverEarningsIqd,
-          ),
-          outstandingDriverEarningsIqd: admin.firestore.FieldValue.increment(
             driverEarningsIqd,
           ),
           completedRidesCount: admin.firestore.FieldValue.increment(1),
@@ -591,13 +643,51 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
         });
       }
 
-      const customerId = String(ride.customerId || "");
-      const promoCode = String(ride.promoCode || "");
-      const promoDiscountIqd = Number(ride.promoDiscountIqd) || 0;
-      if (customerId && promoCode && promoDiscountIqd > 0) {
-        tx.update(db().collection("users").doc(customerId), {
-          promoRidesUsed: admin.firestore.FieldValue.increment(1),
-        });
+      if (customerId && customerSnap) {
+        const customer = customerSnap.data() || {};
+        const promoCode = String(ride.promoCode || "");
+        const promoDiscountIqd = Number(ride.promoDiscountIqd) || 0;
+        const isLoyaltyFree =
+          ride.loyaltyFreeRide === true ||
+          promoCode.toUpperCase() === "LOYALTY";
+        const nextCompleted =
+          Math.trunc(Number(customer.completedRidesCount) || 0) + 1;
+        const customerUpdate = {
+          completedRidesCount: nextCompleted,
+        };
+
+        if (promoCode && promoDiscountIqd > 0 && !isLoyaltyFree) {
+          customerUpdate.promoRidesUsed = admin.firestore.FieldValue.increment(1);
+        }
+
+        if (isLoyaltyFree) {
+          const remaining = Math.max(
+            0,
+            Math.trunc(Number(customer.loyaltyFreeRidesRemaining) || 0) - 1,
+          );
+          customerUpdate.loyaltyFreeRidesRemaining = remaining;
+          customerUpdate.loyaltyFreeRidesRedeemed =
+            admin.firestore.FieldValue.increment(1);
+        } else if (loyaltyConfig.enabled) {
+          if (
+            shouldGrantLoyaltyFreeRide(
+              nextCompleted,
+              loyaltyConfig.ridesRequired,
+              loyaltyConfig.repeats,
+            )
+          ) {
+            customerUpdate.loyaltyFreeRidesRemaining =
+              admin.firestore.FieldValue.increment(1);
+            customerUpdate.loyaltyFreeRidesEarned =
+              admin.firestore.FieldValue.increment(1);
+          }
+        }
+
+        tx.set(
+          db().collection("users").doc(customerId),
+          customerUpdate,
+          { merge: true },
+        );
       }
     });
 
@@ -819,13 +909,7 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
             totalPlatformCommissionIqd: admin.firestore.FieldValue.increment(
               platformCommissionIqd,
             ),
-            outstandingPlatformCommissionIqd: admin.firestore.FieldValue.increment(
-              platformCommissionIqd,
-            ),
             totalDriverEarningsIqd: admin.firestore.FieldValue.increment(
-              driverEarningsIqd,
-            ),
-            outstandingDriverEarningsIqd: admin.firestore.FieldValue.increment(
               driverEarningsIqd,
             ),
             completedRidesCount: admin.firestore.FieldValue.increment(1),

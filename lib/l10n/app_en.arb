@@ -167,7 +167,7 @@
   "districtLabel": "District",
   "subDistrictLabel": "Sub-district",
   "selectSubDistrictHint": "Select sub-district",
-  "selectSubDistrictRequired": "Please select your sub-district first.",
+  "selectSubDistrictRequired": "Please select your district and area (sub-district) first.",
   "fixedCustomerDistrictLabel": "Al-Hashimiya District",
   "whereTo": "Where to?",
   "bookRideButton": "Book ride",
@@ -179,7 +179,7 @@
   "tripInProgress": "Trip in progress",
   "tripCompletedTitle": "Trip completed",
   "doneButton": "Done",
-  "searchRegionHint": "Search is limited to {region}",
+  "searchRegionHint": "Search results stay inside {region}",
   "@searchRegionHint": {
     "placeholders": {
       "region": {"type": "String"}

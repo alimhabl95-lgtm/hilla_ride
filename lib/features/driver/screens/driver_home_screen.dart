@@ -644,21 +644,6 @@ class _IdleDriverPanel extends StatelessWidget {
                 label: l10n.completedRidesCount,
                 value: '${driver.completedRidesCount}',
               ),
-              _EarningsRow(
-                label: l10n.driverNetEarnings,
-                value: fareService.formatIqd(
-                  driver.outstandingDriverEarningsIqd,
-                  locale: l10n.localeName,
-                ),
-                emphasized: true,
-              ),
-              _EarningsRow(
-                label: l10n.owedToPlatformLabel,
-                value: fareService.formatIqd(
-                  driver.owedPlatformCommissionIqd,
-                  locale: l10n.localeName,
-                ),
-              ),
               if (driver.pendingBonusIqd > 0)
                 _EarningsRow(
                   label: l10n.pendingBonusLabel,

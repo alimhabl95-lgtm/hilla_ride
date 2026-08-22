@@ -8,7 +8,6 @@ import 'package:hilla_ride/core/config/firebase_config.dart';
 import 'package:hilla_ride/core/providers/app_mode_provider.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
-import 'package:hilla_ride/firebase_options.dart';
 import 'package:provider/provider.dart';
 
 Future<void> bootstrapApp(AppVariant variant) async {
@@ -23,14 +22,18 @@ Future<void> bootstrapApp(AppVariant variant) async {
       firebaseError =
           'Firebase is not linked yet. Run flutterfire configure in the project folder.';
     } else {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      await FirebaseConfig.ensureInitialized();
       firebaseReady = true;
     }
   } catch (error, stackTrace) {
-    firebaseError = error.toString();
-    debugPrint('Firebase.initializeApp failed: $error\n$stackTrace');
+    // Native Android may already have created [DEFAULT]; treat that as ready.
+    if (error.toString().contains('duplicate-app') &&
+        Firebase.apps.isNotEmpty) {
+      firebaseReady = true;
+    } else {
+      firebaseError = error.toString();
+      debugPrint('Firebase.initializeApp failed: $error\n$stackTrace');
+    }
   }
 
   runApp(

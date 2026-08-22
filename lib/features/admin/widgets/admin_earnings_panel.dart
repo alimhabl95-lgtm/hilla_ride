@@ -22,7 +22,6 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
   var _isSaving = false;
   var _loaded = false;
   var _reconciled = false;
-  final _receivingDriverIds = <String>{};
   AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   String _driverCityLabel(DriverProfile driver, String localeName) {
@@ -95,64 +94,6 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
     }
   }
 
-  Future<void> _markProfitsReceived(
-    DriverProfile driver,
-    FareService fareService,
-    AppLocalizations l10n,
-  ) async {
-    if (driver.owedPlatformCommissionIqd <= 0) return;
-
-    final auth = context.read<AppState>().authService.currentUser;
-    if (auth == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.receivedProfitsTitle),
-        content: Text(
-          l10n.receivedProfitsConfirm(
-            fareService.formatIqd(
-              driver.owedPlatformCommissionIqd,
-              locale: l10n.localeName,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.receivedProfitsAction),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _receivingDriverIds.add(driver.uid));
-    try {
-      await context.read<AppState>().adminService.markProfitsReceived(
-            driverId: driver.uid,
-            receivedByUid: auth.uid,
-          );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.receivedProfitsSuccess)),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$error')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _receivingDriverIds.remove(driver.uid));
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -216,6 +157,16 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
                 ),
                 const SizedBox(height: 8),
                 Text(l10n.commissionSettingsHint),
+                const SizedBox(height: 8),
+                Text(
+                  isAr
+                      ? 'عمولة المنصة تُخصم تلقائياً من محفظة السائق عند إكمال كل رحلة — لا حاجة لزر «تم استلام الأرباح».'
+                      : 'Platform commission is taken automatically from the driver wallet when each ride completes — no “Profits received” button needed.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _percentController,
@@ -253,29 +204,35 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
                 Card(
                   color: Theme.of(context).colorScheme.primaryContainer,
                   child: ListTile(
-                    title: Text(l10n.outstandingProfitTotal),
-                    subtitle: Text(
-                      fareService.formatIqd(
-                        totalOutstanding,
-                        locale: l10n.localeName,
-                      ),
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  child: ListTile(
                     title: Text(l10n.lifetimeProfitTotal),
                     subtitle: Text(
                       fareService.formatIqd(
                         totalLifetime,
                         locale: l10n.localeName,
                       ),
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
                   ),
                 ),
+                if (totalOutstanding > 0) ...[
+                  const SizedBox(height: 8),
+                  Card(
+                    child: ListTile(
+                      title: Text(
+                        isAr
+                            ? 'عمولة معلّقة (فشل خصم المحفظة)'
+                            : 'Pending commission (wallet debit failed)',
+                      ),
+                      subtitle: Text(
+                        fareService.formatIqd(
+                          totalOutstanding,
+                          locale: l10n.localeName,
+                        ),
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Text(
                   l10n.managerProfitByDriver,
@@ -303,6 +260,11 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
                           (sum, driver) =>
                               sum + driver.owedPlatformCommissionIqd,
                         );
+                        final groupLifetime = groupDrivers.fold<int>(
+                          0,
+                          (sum, driver) =>
+                              sum + driver.totalPlatformCommissionIqd,
+                        );
                         final groupTitle = groupKey == '_unassigned'
                             ? l10n.driverWorkDistrictRequired
                             : catalog.localizedDistrictName(
@@ -324,78 +286,39 @@ class _AdminEarningsPanelState extends State<AdminEarningsPanel> {
                                 ),
                                 title: Text(groupTitle),
                                 subtitle: Text(
-                                  '${l10n.outstandingProfitTotal}: ${fareService.formatIqd(groupOutstanding, locale: l10n.localeName)}',
+                                  groupOutstanding > 0
+                                      ? (isAr
+                                          ? 'عمولة معلّقة: ${fareService.formatIqd(groupOutstanding, locale: l10n.localeName)}'
+                                          : 'Pending: ${fareService.formatIqd(groupOutstanding, locale: l10n.localeName)}')
+                                      : '${l10n.lifetimeProfitTotal}: ${fareService.formatIqd(groupLifetime, locale: l10n.localeName)}',
                                 ),
                               ),
                             ),
                             ...groupDrivers.map((driver) {
-                              final isReceiving =
-                                  _receivingDriverIds.contains(driver.uid);
                               return Card(
                                 child: Padding(
                                   padding: const EdgeInsets.all(12),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      ListTile(
-                                        contentPadding: EdgeInsets.zero,
-                                        title: Text(
-                                          driver.name.isEmpty
-                                              ? '—'
-                                              : driver.name,
-                                        ),
-                                        subtitle: Text(
-                                          '${l10n.driverWorkDistrictLabel}: ${_driverCityLabel(driver, l10n.localeName)}\n'
-                                          '${l10n.monthlyRidesCount}: ${driver.monthlyRideCount}\n'
-                                          '${l10n.completedRidesCount}: ${driver.completedRidesCount}\n'
-                                          '${l10n.outstandingProfitLabel}: ${fareService.formatIqd(driver.owedPlatformCommissionIqd, locale: l10n.localeName)}\n'
-                                          '${l10n.lifetimeProfitLabel}: ${fareService.formatIqd(driver.totalPlatformCommissionIqd, locale: l10n.localeName)}\n'
-                                          '${l10n.driverNetEarnings}: ${fareService.formatIqd(driver.outstandingDriverEarningsIqd, locale: l10n.localeName)}',
-                                        ),
-                                        isThreeLine: true,
-                                        trailing:
-                                            const Icon(Icons.chevron_right),
-                                        onTap: () =>
-                                            Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                AdminDriverDetailScreen(
-                                              driver: driver,
-                                            ),
-                                          ),
+                                  child: ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(
+                                      driver.name.isEmpty ? '—' : driver.name,
+                                    ),
+                                    subtitle: Text(
+                                      '${l10n.driverWorkDistrictLabel}: ${_driverCityLabel(driver, l10n.localeName)}\n'
+                                      '${l10n.monthlyRidesCount}: ${driver.monthlyRideCount}\n'
+                                      '${l10n.completedRidesCount}: ${driver.completedRidesCount}\n'
+                                      '${l10n.lifetimeProfitLabel}: ${fareService.formatIqd(driver.totalPlatformCommissionIqd, locale: l10n.localeName)}'
+                                      '${driver.owedPlatformCommissionIqd > 0 ? '\n${l10n.outstandingProfitLabel}: ${fareService.formatIqd(driver.owedPlatformCommissionIqd, locale: l10n.localeName)}' : ''}',
+                                    ),
+                                    isThreeLine: true,
+                                    trailing: const Icon(Icons.chevron_right),
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => AdminDriverDetailScreen(
+                                          driver: driver,
                                         ),
                                       ),
-                                      if (driver.owedPlatformCommissionIqd > 0)
-                                        Align(
-                                          alignment:
-                                              AlignmentDirectional.centerStart,
-                                          child: FilledButton.tonalIcon(
-                                            onPressed: isReceiving
-                                                ? null
-                                                : () => _markProfitsReceived(
-                                                      driver,
-                                                      fareService,
-                                                      l10n,
-                                                    ),
-                                            icon: isReceiving
-                                                ? const SizedBox(
-                                                    width: 18,
-                                                    height: 18,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                                  )
-                                                : const Icon(
-                                                    Icons.check_circle_outline,
-                                                  ),
-                                            label: Text(
-                                              l10n.receivedProfitsAction,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               );

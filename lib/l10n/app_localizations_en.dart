@@ -503,7 +503,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get selectSubDistrictRequired =>
-      'Please select your sub-district first.';
+      'Please select your district and area (sub-district) first.';
 
   @override
   String get fixedCustomerDistrictLabel => 'Al-Hashimiya District';
@@ -541,7 +541,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String searchRegionHint(String region) {
-    return 'Search is limited to $region';
+    return 'Search results stay inside $region';
   }
 
   @override

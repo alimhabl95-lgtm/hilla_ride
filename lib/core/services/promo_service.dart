@@ -9,7 +9,8 @@ class PromoService {
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ?? FirebaseFunctions.instance;
+        _functions = functions ??
+            FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
@@ -181,5 +182,23 @@ class PromoService {
       {'currentRedemptions': FieldValue.increment(1)},
       SetOptions(merge: true),
     );
+  }
+
+  DocumentReference<Map<String, dynamic>> get _loyaltyRef =>
+      _firestore.collection('config').doc('loyalty');
+
+  Stream<LoyaltyConfig> watchLoyaltyConfig() {
+    return _loyaltyRef.snapshots().map(
+          (snapshot) => LoyaltyConfig.fromMap(snapshot.data()),
+        );
+  }
+
+  Future<LoyaltyConfig> getLoyaltyConfig() async {
+    final snapshot = await _loyaltyRef.get();
+    return LoyaltyConfig.fromMap(snapshot.data());
+  }
+
+  Future<void> saveLoyaltyConfig(LoyaltyConfig config) async {
+    await _functions.httpsCallable('saveLoyaltyConfig').call(config.toMap());
   }
 }

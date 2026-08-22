@@ -167,7 +167,7 @@
   "districtLabel": "القضاء",
   "subDistrictLabel": "الناحية",
   "selectSubDistrictHint": "اختر الناحية",
-  "selectSubDistrictRequired": "يرجى اختيار الناحية أولاً.",
+  "selectSubDistrictRequired": "يرجى اختيار القضاء والناحية أولاً.",
   "fixedCustomerDistrictLabel": "قضاء الهاشمية",
   "whereTo": "إلى أين؟",
   "bookRideButton": "احجز رحلة",
@@ -179,7 +179,7 @@
   "tripInProgress": "الرحلة جارية",
   "tripCompletedTitle": "اكتملت الرحلة",
   "doneButton": "تم",
-  "searchRegionHint": "البحث محصور في {region}",
+  "searchRegionHint": "نتائج البحث داخل {region} فقط",
   "@searchRegionHint": {
     "placeholders": {
       "region": {"type": "String"}

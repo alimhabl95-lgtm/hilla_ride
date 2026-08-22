@@ -356,9 +356,9 @@ struct DriverHomeView: View {
             )
 
             AppStatCard(
-                label: L10n.string(.driverNetEarnings, language: appState.language),
-                value: formatIqd(currentDriver.outstandingDriverEarningsIqd),
-                systemImage: "banknote.fill"
+                label: appState.language == .arabic ? "رصيد المحفظة" : "Wallet balance",
+                value: formatIqd(currentDriver.walletBalanceIqd),
+                systemImage: "creditcard.fill"
             )
         }
     }
@@ -454,14 +454,6 @@ struct DriverHomeView: View {
             earningsRow(
                 L10n.string(.completedRidesCount, language: appState.language),
                 value: "\(driver.completedRidesCount)"
-            )
-            earningsRow(
-                L10n.string(.driverNetEarnings, language: appState.language),
-                value: formatIqd(driver.outstandingDriverEarningsIqd)
-            )
-            earningsRow(
-                L10n.string(.owedToPlatformLabel, language: appState.language),
-                value: formatIqd(driver.outstandingPlatformCommissionIqd)
             )
             if driver.pendingBonusIqd > 0 {
                 earningsRow(

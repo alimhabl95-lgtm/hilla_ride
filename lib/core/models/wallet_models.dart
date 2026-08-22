@@ -123,6 +123,8 @@ class WalletConfig {
     this.minWithdrawalIqd = 5000,
     this.maxWithdrawalIqd = 0,
     this.withdrawalsEnabled = true,
+    /// Auto-credited to driver wallet on approve. 0 disables.
+    this.registrationBonusIqd = 0,
     this.companySuperQiNumber = '',
     this.companySuperQiName = 'Hello Tuk-Tuk',
     /// WhatsApp number drivers use to send SuperQi / payment receipts.
@@ -140,6 +142,7 @@ class WalletConfig {
   /// 0 means no maximum.
   final int maxWithdrawalIqd;
   final bool withdrawalsEnabled;
+  final int registrationBonusIqd;
   final String companySuperQiNumber;
   final String companySuperQiName;
   final String managerWhatsappNumber;
@@ -156,6 +159,8 @@ class WalletConfig {
       minWithdrawalIqd: (data['minWithdrawalIqd'] as num?)?.toInt() ?? 5000,
       maxWithdrawalIqd: (data['maxWithdrawalIqd'] as num?)?.toInt() ?? 0,
       withdrawalsEnabled: data['withdrawalsEnabled'] as bool? ?? true,
+      registrationBonusIqd:
+          (data['registrationBonusIqd'] as num?)?.toInt() ?? 0,
       companySuperQiNumber: data['companySuperQiNumber'] as String? ?? '',
       companySuperQiName:
           data['companySuperQiName'] as String? ?? 'Hello Tuk-Tuk',
@@ -177,6 +182,7 @@ class WalletConfig {
         'minWithdrawalIqd': minWithdrawalIqd,
         'maxWithdrawalIqd': maxWithdrawalIqd,
         'withdrawalsEnabled': withdrawalsEnabled,
+        'registrationBonusIqd': registrationBonusIqd,
         'companySuperQiNumber': companySuperQiNumber,
         'companySuperQiName': companySuperQiName,
         'managerWhatsappNumber': managerWhatsappNumber,

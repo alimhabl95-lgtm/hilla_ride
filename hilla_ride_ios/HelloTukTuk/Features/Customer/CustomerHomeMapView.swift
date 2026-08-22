@@ -72,11 +72,14 @@ struct CustomerHomeMapView: View {
     }
 
     private var cityScopeLabel: String {
-        selectedDistrict?.displayName(language: appState.language) ?? ""
+        if hasSubDistrict {
+            return subDistrict.displayName(language: appState.language)
+        }
+        return selectedDistrict?.displayName(language: appState.language) ?? ""
     }
 
     private var districtDisplayName: String {
-        cityScopeLabel
+        selectedDistrict?.displayName(language: appState.language) ?? ""
     }
 
     private var districtSearchCenter: CLLocationCoordinate2D {
@@ -515,7 +518,7 @@ struct CustomerHomeMapView: View {
 
             areaSelector
 
-            if !cityScopeLabel.isEmpty {
+            if hasSubDistrict {
                 Text(L10n.searchLimitedToCity(cityScopeLabel, language: appState.language))
                     .font(.caption)
                     .foregroundStyle(BrandColors.tealDark)
@@ -544,7 +547,7 @@ struct CustomerHomeMapView: View {
                 title: L10n.string(.pickupLabel, language: appState.language),
                 value: pickup?.label ?? L10n.string(.selectPickup, language: appState.language),
                 isSet: pickup != nil,
-                onSearch: { if requireDistrict() { showPickupSearch = true } },
+                onSearch: { if requireSubDistrict() { showPickupSearch = true } },
                 onPickMap: { if requireSubDistrict() { showPickupPinPicker = true } }
             )
 
@@ -557,7 +560,7 @@ struct CustomerHomeMapView: View {
                 title: L10n.string(.destinationLabel, language: appState.language),
                 value: destination?.label ?? L10n.string(.selectDestination, language: appState.language),
                 isSet: destination != nil,
-                onSearch: { if requireDistrict() { showDestinationSearch = true } },
+                onSearch: { if requireSubDistrict() { showDestinationSearch = true } },
                 onPickMap: { if requireSubDistrict() { showDestinationPinPicker = true } }
             )
         }

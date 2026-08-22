@@ -28,8 +28,10 @@ class DefaultFirebaseOptions {
     storageBucket: 'hello-tiktok-57dc5.firebasestorage.app',
   );
 
+  // Must match android/app/google-services.json (Auth/Identity Toolkit key).
+  // Maps tiles use a separate key in AndroidManifest / native map config.
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyATkDQ-s_PdP3rbRnrvkLs4XXrIAdzE7Q0',
+    apiKey: 'AIzaSyAsgktwgQMXi9i5majam_z3Yion1_0qqLY',
     appId: '1:862680507196:android:60e6335cb57b9e76987439',
     messagingSenderId: '862680507196',
     projectId: 'hello-tiktok-57dc5',

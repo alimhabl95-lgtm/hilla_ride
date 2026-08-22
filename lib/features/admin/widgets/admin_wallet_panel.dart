@@ -712,6 +712,7 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
   final _lowCtrl = TextEditingController();
   final _minWithdrawCtrl = TextEditingController();
   final _maxWithdrawCtrl = TextEditingController();
+  final _registrationBonusCtrl = TextEditingController();
   final _enCtrl = TextEditingController();
   final _arCtrl = TextEditingController();
   var _loaded = false;
@@ -728,6 +729,7 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
     _lowCtrl.dispose();
     _minWithdrawCtrl.dispose();
     _maxWithdrawCtrl.dispose();
+    _registrationBonusCtrl.dispose();
     _enCtrl.dispose();
     _arCtrl.dispose();
     super.dispose();
@@ -744,6 +746,7 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
     _minWithdrawCtrl.text = '${config.minWithdrawalIqd}';
     _maxWithdrawCtrl.text =
         config.maxWithdrawalIqd > 0 ? '${config.maxWithdrawalIqd}' : '';
+    _registrationBonusCtrl.text = '${config.registrationBonusIqd}';
     _withdrawalsEnabled = config.withdrawalsEnabled;
     _enCtrl.text = config.rechargeInstructionsEn;
     _arCtrl.text = config.rechargeInstructionsAr;
@@ -758,6 +761,8 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
         minWithdrawalIqd: int.tryParse(_minWithdrawCtrl.text.trim()) ?? 5000,
         maxWithdrawalIqd: int.tryParse(_maxWithdrawCtrl.text.trim()) ?? 0,
         withdrawalsEnabled: _withdrawalsEnabled,
+        registrationBonusIqd:
+            int.tryParse(_registrationBonusCtrl.text.trim()) ?? 0,
         companySuperQiNumber: _numberCtrl.text.trim(),
         companySuperQiName: _nameCtrl.text.trim().isEmpty
             ? 'Hello Tuk-Tuk'
@@ -870,6 +875,19 @@ class _WalletSettingsTabState extends State<_WalletSettingsTab> {
                 labelText: widget.isAr
                     ? 'تحذير الرصيد المنخفض (د.ع)'
                     : 'Low-balance warning (IQD)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _registrationBonusCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: widget.isAr
+                    ? 'مكافأة تسجيل السائق (د.ع)'
+                    : 'Driver registration bonus (IQD)',
+                helperText: widget.isAr
+                    ? 'يُضاف تلقائياً للمحفظة عند الموافقة. 0 = معطّل'
+                    : 'Auto-credited to wallet on approve. 0 = disabled',
               ),
             ),
             const SizedBox(height: 12),

@@ -1025,7 +1025,7 @@ abstract class AppLocalizations {
   /// No description provided for @selectSubDistrictRequired.
   ///
   /// In en, this message translates to:
-  /// **'Please select your sub-district first.'**
+  /// **'Please select your district and area (sub-district) first.'**
   String get selectSubDistrictRequired;
 
   /// No description provided for @fixedCustomerDistrictLabel.
@@ -1097,7 +1097,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchRegionHint.
   ///
   /// In en, this message translates to:
-  /// **'Search is limited to {region}'**
+  /// **'Search results stay inside {region}'**
   String searchRegionHint(String region);
 
   /// No description provided for @placesInRegionCount.
@@ -1481,7 +1481,7 @@ abstract class AppLocalizations {
   /// No description provided for @noDriversInDistrict.
   ///
   /// In en, this message translates to:
-  /// **'No drivers are online in this city right now. Ask the manager to assign drivers to this area.'**
+  /// **'No drivers are online in this area right now. We will keep searching.'**
   String get noDriversInDistrict;
 
   /// No description provided for @openChat.

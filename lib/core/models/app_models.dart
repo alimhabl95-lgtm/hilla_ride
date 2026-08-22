@@ -82,6 +82,8 @@ class AppUser {
     this.referralAppliedAt,
     this.referralReferrerId = '',
     this.completedRidesCount = 0,
+    this.loyaltyFreeRidesRemaining = 0,
+    this.loyaltyFreeRidesEarned = 0,
     this.roleTemplate = '',
   });
 
@@ -107,10 +109,14 @@ class AppUser {
   final DateTime? referralAppliedAt;
   final String referralReferrerId;
   final int completedRidesCount;
+  final int loyaltyFreeRidesRemaining;
+  final int loyaltyFreeRidesEarned;
   final String roleTemplate;
 
   bool get hasActivePromo =>
       promoCode.isNotEmpty && promoRidesUsed < promoRidesLimit;
+
+  bool get hasLoyaltyFreeRide => loyaltyFreeRidesRemaining > 0;
 
   bool get isPendingAssistant =>
       role == UserRole.assistant && approvalStatus == 'pending';
@@ -156,6 +162,10 @@ class AppUser {
           (data['referralAppliedAt'] as dynamic)?.toDate() as DateTime?,
       referralReferrerId: data['referralReferrerId'] as String? ?? '',
       completedRidesCount: (data['completedRidesCount'] as num?)?.toInt() ?? 0,
+      loyaltyFreeRidesRemaining:
+          (data['loyaltyFreeRidesRemaining'] as num?)?.toInt() ?? 0,
+      loyaltyFreeRidesEarned:
+          (data['loyaltyFreeRidesEarned'] as num?)?.toInt() ?? 0,
       roleTemplate: data['roleTemplate'] as String? ?? '',
     );
   }
@@ -183,6 +193,8 @@ class AppUser {
       if (referralAppliedAt != null) 'referralAppliedAt': referralAppliedAt,
       if (referralReferrerId.isNotEmpty) 'referralReferrerId': referralReferrerId,
       'completedRidesCount': completedRidesCount,
+      'loyaltyFreeRidesRemaining': loyaltyFreeRidesRemaining,
+      'loyaltyFreeRidesEarned': loyaltyFreeRidesEarned,
       if (roleTemplate.isNotEmpty) 'roleTemplate': roleTemplate,
     };
   }

@@ -30,10 +30,15 @@ struct AppUser: Identifiable, Equatable {
     let promoRidesUsed: Int
     let promoRidesLimit: Int
     let referralCode: String
+    let completedRidesCount: Int
+    let loyaltyFreeRidesRemaining: Int
 
     var id: String { uid }
     var hasPromoRemaining: Bool {
         !promoCode.isEmpty && promoRidesUsed < promoRidesLimit
+    }
+    var hasLoyaltyFreeRide: Bool {
+        loyaltyFreeRidesRemaining > 0
     }
     var isProfileComplete: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && age > 0
@@ -52,7 +57,9 @@ struct AppUser: Identifiable, Equatable {
         promoCode: String = "",
         promoRidesUsed: Int = 0,
         promoRidesLimit: Int = 0,
-        referralCode: String = ""
+        referralCode: String = "",
+        completedRidesCount: Int = 0,
+        loyaltyFreeRidesRemaining: Int = 0
     ) {
         self.uid = uid
         self.phone = phone
@@ -67,6 +74,8 @@ struct AppUser: Identifiable, Equatable {
         self.promoRidesUsed = promoRidesUsed
         self.promoRidesLimit = promoRidesLimit
         self.referralCode = referralCode
+        self.completedRidesCount = completedRidesCount
+        self.loyaltyFreeRidesRemaining = loyaltyFreeRidesRemaining
     }
 
     init?(documentID: String, data: [String: Any]) {
@@ -84,5 +93,7 @@ struct AppUser: Identifiable, Equatable {
         promoRidesUsed = (data["promoRidesUsed"] as? NSNumber)?.intValue ?? 0
         promoRidesLimit = (data["promoRidesLimit"] as? NSNumber)?.intValue ?? 0
         referralCode = data["referralCode"] as? String ?? ""
+        completedRidesCount = (data["completedRidesCount"] as? NSNumber)?.intValue ?? 0
+        loyaltyFreeRidesRemaining = (data["loyaltyFreeRidesRemaining"] as? NSNumber)?.intValue ?? 0
     }
 }

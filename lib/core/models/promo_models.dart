@@ -177,6 +177,47 @@ class MonthlyLeaderboardEntry {
   final bool isPaid;
 }
 
+class LoyaltyConfig {
+  const LoyaltyConfig({
+    this.enabled = false,
+    this.ridesRequired = 10,
+    this.repeats = true,
+  });
+
+  final bool enabled;
+  final int ridesRequired;
+  final bool repeats;
+
+  factory LoyaltyConfig.fromMap(Map<String, dynamic>? data) {
+    if (data == null) return const LoyaltyConfig();
+    return LoyaltyConfig(
+      enabled: data['enabled'] as bool? ?? false,
+      ridesRequired: (data['ridesRequired'] as num?)?.toInt() ?? 10,
+      repeats: data['repeats'] as bool? ?? true,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'enabled': enabled,
+        'ridesRequired': ridesRequired < 1 ? 1 : ridesRequired,
+        'repeats': repeats,
+      };
+
+  String summary(bool isAr) {
+    if (!enabled) {
+      return isAr ? 'ولاء العملاء: معطّل' : 'Customer loyalty: off';
+    }
+    if (repeats) {
+      return isAr
+          ? 'مشوار مجاني كل $ridesRequired رحلات'
+          : 'Free ride every $ridesRequired trips';
+    }
+    return isAr
+        ? 'مشوار مجاني مرة عند $ridesRequired رحلات'
+        : 'One free ride at $ridesRequired trips';
+  }
+}
+
 class DriverMonthlyStats {
   const DriverMonthlyStats({
     required this.rideCount,

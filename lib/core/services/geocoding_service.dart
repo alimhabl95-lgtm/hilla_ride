@@ -993,10 +993,18 @@ out center 40;
 
   bool get isUsingGooglePlaces => _hasGooglePlacesSource;
 
-  /// Soft area check for booking / pin / GPS — district neighborhood, not
-  /// tight Admin polygons.
+  /// Soft area check for booking / pin / GPS.
+  /// When a ناحية (area) is selected, scope to that area — not the whole district.
   bool isNearSelectedArea(RegionSearchContext region, LatLng point) {
     if (region.districtId.isEmpty) return false;
+    if (region.hasSubDistrict) {
+      return BabilRegions.isNearSubDistrictForSearch(
+        region.districtId,
+        region.subDistrictId!,
+        point,
+        extraBufferKm: 12,
+      );
+    }
     return BabilRegions.isNearDistrictForSearch(
       region.districtId,
       point,

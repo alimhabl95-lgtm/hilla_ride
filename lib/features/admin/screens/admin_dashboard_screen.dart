@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
+import 'package:hilla_ride/core/models/wallet_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/service_area_catalog.dart';
@@ -24,7 +25,9 @@ import 'package:hilla_ride/features/admin/widgets/admin_app_settings_panel.dart'
 import 'package:hilla_ride/features/admin/widgets/admin_wallet_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_rewards_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_business_partners_panel.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_broadcast_actions.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_chrome.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_fake_driver_controls.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_profile_button.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_driver_card.dart';
@@ -33,6 +36,7 @@ import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_live_map_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_overview_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_service_areas_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_side_nav.dart';
 import 'package:hilla_ride/features/admin/screens/admin_ride_detail_screen.dart';
 import 'package:hilla_ride/features/admin/screens/admin_ride_status_screen.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_ride_promo_summary.dart';
@@ -52,6 +56,7 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminTabDefinition {
   const _AdminTabDefinition({
     required this.permission,
+    required this.group,
     required this.icon,
     required this.selectedIcon,
     required this.label,
@@ -59,15 +64,26 @@ class _AdminTabDefinition {
   });
 
   final String permission;
+  final AdminNavGroup group;
   final IconData icon;
   final IconData selectedIcon;
   final String label;
   final Widget builder;
+
+  AdminNavItem toNavItem() => AdminNavItem(
+        group: group,
+        icon: icon,
+        selectedIcon: selectedIcon,
+        label: label,
+        builder: builder,
+      );
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedIndex = 0;
   var _loginAuditLogged = false;
+  var _sidebarCollapsed = false;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -92,34 +108,47 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final allTabs = <_AdminTabDefinition>[
       _AdminTabDefinition(
         permission: AdminPermissions.overview,
+        group: AdminNavGroup.home,
         icon: Icons.dashboard_outlined,
         selectedIcon: Icons.dashboard,
-        label: isAr ? 'نظرة عامة' : 'Overview',
+        label: isAr ? 'الرئيسية' : 'Home',
         builder: const AdminOverviewPanel(),
       ),
       _AdminTabDefinition(
-        permission: AdminPermissions.pendingDrivers,
-        icon: Icons.pending_actions_outlined,
-        selectedIcon: Icons.pending_actions,
-        label: l10n.pendingDriversTab,
-        builder: const _PendingDriversPanel(),
-      ),
-      _AdminTabDefinition(
-        permission: AdminPermissions.activeRides,
-        icon: Icons.local_taxi_outlined,
-        selectedIcon: Icons.local_taxi,
-        label: l10n.activeRidesTab,
-        builder: const _ActiveRidesPanel(),
-      ),
-      _AdminTabDefinition(
         permission: AdminPermissions.liveMap,
+        group: AdminNavGroup.home,
         icon: Icons.map_outlined,
         selectedIcon: Icons.map,
         label: l10n.liveMapTab,
         builder: const AdminLiveMapPanel(),
       ),
       _AdminTabDefinition(
+        permission: AdminPermissions.activeRides,
+        group: AdminNavGroup.rides,
+        icon: Icons.local_taxi_outlined,
+        selectedIcon: Icons.local_taxi,
+        label: l10n.activeRidesTab,
+        builder: const _ActiveRidesPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.rideHistory,
+        group: AdminNavGroup.rides,
+        icon: Icons.history,
+        selectedIcon: Icons.history,
+        label: l10n.rideHistoryTab,
+        builder: const _RideHistoryPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.pendingDrivers,
+        group: AdminNavGroup.users,
+        icon: Icons.pending_actions_outlined,
+        selectedIcon: Icons.pending_actions,
+        label: l10n.pendingDriversTab,
+        builder: const _PendingDriversPanel(),
+      ),
+      _AdminTabDefinition(
         permission: AdminPermissions.allDrivers,
+        group: AdminNavGroup.users,
         icon: Icons.groups_outlined,
         selectedIcon: Icons.groups,
         label: l10n.allDriversTab,
@@ -127,55 +156,47 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       _AdminTabDefinition(
         permission: AdminPermissions.customers,
+        group: AdminNavGroup.users,
         icon: Icons.person_outline,
         selectedIcon: Icons.person,
         label: l10n.customersTab,
         builder: const AdminCustomersPanel(),
       ),
       _AdminTabDefinition(
-        permission: AdminPermissions.rideHistory,
-        icon: Icons.history,
-        selectedIcon: Icons.history,
-        label: l10n.rideHistoryTab,
-        builder: const _RideHistoryPanel(),
+        permission: AdminPermissions.driverReviews,
+        group: AdminNavGroup.users,
+        icon: Icons.star_outline,
+        selectedIcon: Icons.star,
+        label: l10n.driverReviewsTab,
+        builder: const AdminDriverRatingsPanel(),
       ),
       _AdminTabDefinition(
-        permission: AdminPermissions.pricing,
-        icon: Icons.price_change_outlined,
-        selectedIcon: Icons.price_change,
-        label: l10n.pricingTab,
-        builder: const AdminPricingPanel(),
+        permission: AdminPermissions.driverPerformance,
+        group: AdminNavGroup.users,
+        icon: Icons.insights_outlined,
+        selectedIcon: Icons.insights,
+        label: isAr ? 'أداء السائقين' : 'Driver Performance',
+        builder: const AdminDriverPerformancePanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.businessPartners,
+        group: AdminNavGroup.stores,
+        icon: Icons.storefront_outlined,
+        selectedIcon: Icons.storefront,
+        label: isAr ? 'شركاء الأعمال' : 'Business Partners',
+        builder: const AdminBusinessPartnersPanel(),
       ),
       _AdminTabDefinition(
         permission: AdminPermissions.serviceAreas,
+        group: AdminNavGroup.serviceAreas,
         icon: Icons.travel_explore_outlined,
         selectedIcon: Icons.travel_explore,
         label: isAr ? 'مناطق الخدمة' : 'Service areas',
         builder: const AdminServiceAreasPanel(),
       ),
       _AdminTabDefinition(
-        permission: AdminPermissions.promoCodes,
-        icon: Icons.local_offer_outlined,
-        selectedIcon: Icons.local_offer,
-        label: l10n.promoCodesTab,
-        builder: const AdminPromoPanel(),
-      ),
-      _AdminTabDefinition(
-        permission: AdminPermissions.monthlyLeaderboard,
-        icon: Icons.emoji_events_outlined,
-        selectedIcon: Icons.emoji_events,
-        label: l10n.monthlyLeaderboardTab,
-        builder: const AdminLeaderboardPanel(),
-      ),
-      _AdminTabDefinition(
         permission: AdminPermissions.earnings,
-        icon: Icons.card_giftcard_outlined,
-        selectedIcon: Icons.card_giftcard,
-        label: l10n.driverBonusesTab,
-        builder: const AdminBonusesPanel(),
-      ),
-      _AdminTabDefinition(
-        permission: AdminPermissions.earnings,
+        group: AdminNavGroup.finance,
         icon: Icons.payments_outlined,
         selectedIcon: Icons.payments,
         label: l10n.earningsTab,
@@ -183,62 +204,47 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       _AdminTabDefinition(
         permission: AdminPermissions.wallet,
+        group: AdminNavGroup.finance,
         icon: Icons.account_balance_wallet_outlined,
         selectedIcon: Icons.account_balance_wallet,
         label: l10n.localeName.startsWith('ar') ? 'المحفظة' : 'Wallet',
         builder: const AdminWalletPanel(),
       ),
       _AdminTabDefinition(
+        permission: AdminPermissions.earnings,
+        group: AdminNavGroup.finance,
+        icon: Icons.card_giftcard_outlined,
+        selectedIcon: Icons.card_giftcard,
+        label: l10n.driverBonusesTab,
+        builder: const AdminBonusesPanel(),
+      ),
+      _AdminTabDefinition(
         permission: AdminPermissions.rewards,
+        group: AdminNavGroup.rewards,
         icon: Icons.emoji_events_outlined,
         selectedIcon: Icons.emoji_events,
         label: isAr ? 'المكافآت' : 'Rewards',
         builder: const AdminRewardsPanel(),
       ),
       _AdminTabDefinition(
-        permission: AdminPermissions.businessPartners,
-        icon: Icons.storefront_outlined,
-        selectedIcon: Icons.storefront,
-        label: isAr ? 'شركاء الأعمال' : 'Business Partners',
-        builder: const AdminBusinessPartnersPanel(),
+        permission: AdminPermissions.monthlyLeaderboard,
+        group: AdminNavGroup.rewards,
+        icon: Icons.leaderboard_outlined,
+        selectedIcon: Icons.leaderboard,
+        label: l10n.monthlyLeaderboardTab,
+        builder: const AdminLeaderboardPanel(),
       ),
       _AdminTabDefinition(
-        permission: AdminPermissions.driverReviews,
-        icon: Icons.star_outline,
-        selectedIcon: Icons.star,
-        label: l10n.driverReviewsTab,
-        builder: const AdminDriverRatingsPanel(),
-      ),
-      _AdminTabDefinition(
-        permission: AdminPermissions.supportInbox,
-        icon: Icons.support_agent_outlined,
-        selectedIcon: Icons.support_agent,
-        label: l10n.supportInboxTab,
-        builder: const AdminSupportPanel(),
-      ),
-      _AdminTabDefinition(
-        permission: AdminPermissions.complaints,
-        icon: Icons.report_problem_outlined,
-        selectedIcon: Icons.report_problem,
-        label: isAr ? 'الشكاوى' : 'Complaints',
-        builder: const AdminComplaintsPanel(),
-      ),
-      _AdminTabDefinition(
-        permission: AdminPermissions.notifications,
-        icon: Icons.notifications_outlined,
-        selectedIcon: Icons.notifications,
-        label: isAr ? 'الإشعارات' : 'Notifications',
-        builder: const AdminNotificationsCenterPanel(),
-      ),
-      _AdminTabDefinition(
-        permission: AdminPermissions.driverPerformance,
-        icon: Icons.insights_outlined,
-        selectedIcon: Icons.insights,
-        label: isAr ? 'أداء السائقين' : 'Driver Performance',
-        builder: const AdminDriverPerformancePanel(),
+        permission: AdminPermissions.promoCodes,
+        group: AdminNavGroup.rewards,
+        icon: Icons.local_offer_outlined,
+        selectedIcon: Icons.local_offer,
+        label: l10n.promoCodesTab,
+        builder: const AdminPromoPanel(),
       ),
       _AdminTabDefinition(
         permission: AdminPermissions.reports,
+        group: AdminNavGroup.reports,
         icon: Icons.summarize_outlined,
         selectedIcon: Icons.summarize,
         label: isAr ? 'التقارير' : 'Reports',
@@ -246,13 +252,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       _AdminTabDefinition(
         permission: AdminPermissions.auditLog,
+        group: AdminNavGroup.reports,
         icon: Icons.fact_check_outlined,
         selectedIcon: Icons.fact_check,
         label: isAr ? 'سجل التدقيق' : 'Audit Log',
         builder: const AdminAuditLogPanel(),
       ),
       _AdminTabDefinition(
+        permission: AdminPermissions.pricing,
+        group: AdminNavGroup.settings,
+        icon: Icons.price_change_outlined,
+        selectedIcon: Icons.price_change,
+        label: l10n.pricingTab,
+        builder: const AdminPricingPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.notifications,
+        group: AdminNavGroup.settings,
+        icon: Icons.notifications_outlined,
+        selectedIcon: Icons.notifications,
+        label: isAr ? 'الإشعارات' : 'Notifications',
+        builder: const AdminNotificationsCenterPanel(),
+      ),
+      _AdminTabDefinition(
         permission: AdminPermissions.appSettings,
+        group: AdminNavGroup.settings,
         icon: Icons.tune_outlined,
         selectedIcon: Icons.tune,
         label: isAr ? 'إعدادات التطبيق' : 'App Settings',
@@ -260,10 +284,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       _AdminTabDefinition(
         permission: AdminPermissions.manageAssistants,
+        group: AdminNavGroup.settings,
         icon: Icons.admin_panel_settings_outlined,
         selectedIcon: Icons.admin_panel_settings,
         label: l10n.assistantsTab,
         builder: const AdminAssistantsPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.supportInbox,
+        group: AdminNavGroup.support,
+        icon: Icons.support_agent_outlined,
+        selectedIcon: Icons.support_agent,
+        label: l10n.supportInboxTab,
+        builder: const AdminSupportPanel(),
+      ),
+      _AdminTabDefinition(
+        permission: AdminPermissions.complaints,
+        group: AdminNavGroup.support,
+        icon: Icons.report_problem_outlined,
+        selectedIcon: Icons.report_problem,
+        label: isAr ? 'الشكاوى' : 'Complaints',
+        builder: const AdminComplaintsPanel(),
       ),
     ];
 
@@ -275,7 +316,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final isWide = MediaQuery.sizeOf(context).width >= 900;
+    final isAr = l10n.localeName.startsWith('ar');
+    final width = MediaQuery.sizeOf(context).width;
+    final isWide = width >= 900;
+    final isTablet = width >= 700 && width < 900;
     final tabs = _tabs(l10n);
 
     if (tabs.isEmpty) {
@@ -291,141 +335,175 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
 
     final safeIndex = _selectedIndex.clamp(0, tabs.length - 1);
-    final body = tabs[safeIndex].builder;
+    final selected = tabs[safeIndex];
+    final navItems = tabs.map((t) => t.toNavItem()).toList();
+    final dateLabel = DateFormat.yMMMMEEEEd(l10n.localeName).format(DateTime.now());
 
-    final destinations = tabs
-        .map(
-          (tab) => NavigationRailDestination(
-            icon: Icon(tab.icon),
-            selectedIcon: Icon(tab.selectedIcon),
-            label: Text(tab.label),
-          ),
-        )
-        .toList();
+    void selectTab(int index) {
+      setState(() => _selectedIndex = index);
+      if (!isWide) {
+        _scaffoldKey.currentState?.closeDrawer();
+      }
+    }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: isWide
-            ? Row(
-                children: [
-                  Text(l10n.adminPanelTitle),
-                  const SizedBox(width: 16),
-                  const Expanded(child: AdminGlobalSearchField()),
-                ],
-              )
-            : Text(l10n.adminPanelTitle),
-        actions: [
-          if (!isWide) const AdminGlobalSearchField(compact: true),
-          if (widget.adminUser.hasAdminPermission(AdminPermissions.rideHistory)) ...[
-            IconButton(
-              tooltip: l10n.completedRidesCount,
-              icon: const Icon(Icons.check_circle_outline),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AdminRideStatusScreen(
-                      status: RideStatus.completed,
-                      title: l10n.completedRidesCount,
-                    ),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              tooltip: l10n.cancelledRidesCount,
-              icon: const Icon(Icons.cancel_outlined),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AdminRideStatusScreen(
-                      status: RideStatus.cancelled,
-                      title: l10n.cancelledRidesCount,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-          AdminBroadcastActions(adminUser: widget.adminUser),
-          const AdminProfileButton(),
-        ],
-      ),
-      body: SafeArea(
-        child: isWide
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _AdminSideNavigation(
-                    selectedIndex: safeIndex,
-                    destinations: destinations,
-                    onSelected: (index) => setState(() => _selectedIndex = index),
-                  ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: body),
-                ],
-              )
-            : body,
-      ),
-      bottomNavigationBar: isWide
-          ? null
-          : NavigationBar(
-              selectedIndex: safeIndex,
-              onDestinationSelected: (index) =>
-                  setState(() => _selectedIndex = index),
-              destinations: tabs
-                  .map(
-                    (tab) => NavigationDestination(
-                      icon: Icon(tab.icon),
-                      label: tab.label,
-                    ),
-                  )
-                  .toList(),
-            ),
+    final sideNav = AdminSideNav(
+      items: navItems,
+      selectedIndex: safeIndex,
+      collapsed: isWide && _sidebarCollapsed,
+      onToggleCollapse: isWide
+          ? () => setState(() => _sidebarCollapsed = !_sidebarCollapsed)
+          : null,
+      onSelected: selectTab,
+      width: isTablet ? 220 : 260,
     );
-  }
-}
 
-class _AdminSideNavigation extends StatelessWidget {
-  const _AdminSideNavigation({
-    required this.selectedIndex,
-    required this.destinations,
-    required this.onSelected,
-  });
+    final baseTheme = Theme.of(context);
+    final adminTheme = baseTheme.copyWith(
+      scaffoldBackgroundColor: AdminChrome.contentBg,
+      cardTheme: baseTheme.cardTheme.copyWith(
+        color: Colors.white,
+        elevation: 0,
+        margin: const EdgeInsets.all(8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AdminChrome.cardBorder),
+        ),
+      ),
+      colorScheme: baseTheme.colorScheme.copyWith(
+        primary: AppBrandAssets.brandTeal,
+        secondary: AppBrandAssets.brandTealDark,
+      ),
+    );
 
-  final int selectedIndex;
-  final List<NavigationRailDestination> destinations;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SizedBox(
-      width: 220,
-      child: Material(
-        color: theme.colorScheme.surfaceContainerLow,
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          itemCount: destinations.length,
-          itemBuilder: (context, index) {
-            final destination = destinations[index];
-            final selected = selectedIndex == index;
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              child: ListTile(
-                selected: selected,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+    return Theme(
+      data: adminTheme,
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: AdminChrome.contentBg,
+        drawer: isWide
+            ? null
+            : Drawer(
+                backgroundColor: AdminChrome.sidebarBg,
+                width: 280,
+                child: SafeArea(
+                  child: AdminSideNav(
+                    items: navItems,
+                    selectedIndex: safeIndex,
+                    onSelected: selectTab,
+                    width: 280,
+                  ),
                 ),
-                leading: selected
-                    ? destination.selectedIcon
-                    : destination.icon,
-                title: destination.label,
-                onTap: () => onSelected(index),
               ),
-            );
-          },
+        body: SafeArea(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (isWide) sideNav,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Material(
+                      color: Colors.white,
+                      elevation: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          border: Border(
+                            bottom: BorderSide(color: AdminChrome.cardBorder),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            if (!isWide)
+                              IconButton(
+                                tooltip: isAr ? 'القائمة' : 'Menu',
+                                onPressed: () =>
+                                    _scaffoldKey.currentState?.openDrawer(),
+                                icon: const Icon(Icons.menu),
+                              ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    selected.label,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF111827),
+                                        ),
+                                  ),
+                                  Text(
+                                    dateLabel,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: AdminChrome.sidebarMuted,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isWide || isTablet)
+                              const SizedBox(
+                                width: 280,
+                                child: AdminGlobalSearchField(),
+                              )
+                            else
+                              const AdminGlobalSearchField(compact: true),
+                            const SizedBox(width: 8),
+                            if (widget.adminUser.hasAdminPermission(
+                              AdminPermissions.rideHistory,
+                            )) ...[
+                              IconButton(
+                                tooltip: l10n.completedRidesCount,
+                                icon: const Icon(Icons.check_circle_outline),
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AdminRideStatusScreen(
+                                        status: RideStatus.completed,
+                                        title: l10n.completedRidesCount,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                tooltip: l10n.cancelledRidesCount,
+                                icon: const Icon(Icons.cancel_outlined),
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AdminRideStatusScreen(
+                                        status: RideStatus.cancelled,
+                                        title: l10n.cancelledRidesCount,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                            AdminBroadcastActions(adminUser: widget.adminUser),
+                            const AdminProfileButton(),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(child: selected.builder),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -454,115 +532,174 @@ class _PendingDriversPanelState extends State<_PendingDriversPanel> {
     return _filters.matchesDate(driver.createdAt);
   }
 
+  Widget _bonusBanner(BuildContext context, bool isAr, int bonusIqd) {
+    if (bonusIqd <= 0) return const SizedBox.shrink();
+    final fare = FareService();
+    final amount = fare.formatIqd(
+      bonusIqd,
+      locale: isAr ? 'ar' : 'en',
+    );
+    return Material(
+      color: const Color(0xFFECFDF5),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(Icons.account_balance_wallet_outlined,
+                color: Color(0xFF059669)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                isAr
+                    ? 'الموافقة تضيف $amount تلقائياً لمحفظة السائق'
+                    : 'Approving credits $amount to the driver wallet automatically',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF065F46),
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isAr = l10n.localeName.startsWith('ar');
     final adminService = context.read<AppState>().adminService;
+    final walletService = context.read<AppState>().walletService;
 
-    return StreamBuilder<List<DriverProfile>>(
-      stream: adminService.watchAllDrivers(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return StreamBuilder<WalletConfig>(
+      stream: walletService.watchConfig(),
+      builder: (context, walletSnap) {
+        final bonusIqd = walletSnap.data?.registrationBonusIqd ?? 0;
+        return StreamBuilder<List<DriverProfile>>(
+          stream: adminService.watchAllDrivers(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48),
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.pendingDriversLoadError,
-                    textAlign: TextAlign.center,
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48),
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n.pendingDriversLoadError,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${snapshot.error}',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final drivers = (snapshot.data ?? const [])
-            .where((driver) =>
-                driver.approvalStatus == DriverApprovalStatus.pending)
-            .where(_matchesDriverFilter)
-            .toList()
-          ..sort(
-            (a, b) => (b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
-                .compareTo(a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0)),
-          );
-
-        if (drivers.isEmpty) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                child: AdminFilterBar(
-                  value: _filters,
-                  onChanged: (v) => setState(() => _filters = v),
-                  fields: const [
-                    AdminFilterField.province,
-                    AdminFilterField.district,
-                    AdminFilterField.subDistrict,
-                    AdminFilterField.dateRange,
-                  ],
                 ),
-              ),
-              Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
+              );
+            }
+
+            final drivers = (snapshot.data ?? const [])
+                .where((driver) =>
+                    driver.approvalStatus == DriverApprovalStatus.pending)
+                .where(_matchesDriverFilter)
+                .toList()
+              ..sort(
+                (a, b) =>
+                    (b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+                        .compareTo(
+                            a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0)),
+              );
+
+            if (drivers.isEmpty) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(l10n.noPendingDrivers, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        Text(
-                          l10n.checkAllDriversTab,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                        _bonusBanner(context, isAr, bonusIqd),
+                        if (bonusIqd > 0) const SizedBox(height: 12),
+                        AdminFilterBar(
+                          value: _filters,
+                          onChanged: (v) => setState(() => _filters = v),
+                          fields: const [
+                            AdminFilterField.province,
+                            AdminFilterField.district,
+                            AdminFilterField.subDistrict,
+                            AdminFilterField.dateRange,
+                          ],
                         ),
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          );
-        }
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(24),
-          itemCount: drivers.length + 1,
-          separatorBuilder: (_, index) {
-            if (index == 0) return const SizedBox(height: 12);
-            return const SizedBox(height: 12);
-          },
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return AdminFilterBar(
-                value: _filters,
-                onChanged: (v) => setState(() => _filters = v),
-                fields: const [
-                  AdminFilterField.province,
-                  AdminFilterField.district,
-                  AdminFilterField.subDistrict,
-                  AdminFilterField.dateRange,
+                  Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(l10n.noPendingDrivers,
+                                textAlign: TextAlign.center),
+                            const SizedBox(height: 12),
+                            Text(
+                              l10n.checkAllDriversTab,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               );
             }
-            return AdminDriverCard(driver: drivers[index - 1]);
+
+            return ListView.separated(
+              padding: const EdgeInsets.all(24),
+              itemCount: drivers.length + 1,
+              separatorBuilder: (_, index) {
+                if (index == 0) return const SizedBox(height: 12);
+                return const SizedBox(height: 12);
+              },
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _bonusBanner(context, isAr, bonusIqd),
+                      if (bonusIqd > 0) const SizedBox(height: 12),
+                      AdminFilterBar(
+                        value: _filters,
+                        onChanged: (v) => setState(() => _filters = v),
+                        fields: const [
+                          AdminFilterField.province,
+                          AdminFilterField.district,
+                          AdminFilterField.subDistrict,
+                          AdminFilterField.dateRange,
+                        ],
+                      ),
+                    ],
+                  );
+                }
+                return AdminDriverCard(driver: drivers[index - 1]);
+              },
+            );
           },
         );
       },

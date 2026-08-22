@@ -171,7 +171,7 @@ class AdminDriverCard extends StatelessWidget {
                       '${l10n.licenseNumber}: ${liveDriver.licenseNumber.isEmpty ? '—' : liveDriver.licenseNumber}',
                     ),
                     Text(
-                      '${l10n.outstandingProfitLabel}: ${fareService.formatIqd(liveDriver.owedPlatformCommissionIqd, locale: l10n.localeName)}',
+                      '${l10n.lifetimeProfitLabel}: ${fareService.formatIqd(liveDriver.totalPlatformCommissionIqd, locale: l10n.localeName)}',
                     ),
                     Text(
                       '${l10n.cancelledRidesCount}: ${liveDriver.cancelledRidesCount}',
@@ -192,62 +192,6 @@ class AdminDriverCard extends StatelessWidget {
                       spacing: 12,
                       runSpacing: 8,
                       children: [
-                        if (liveDriver.owedPlatformCommissionIqd > 0)
-                          FilledButton.tonalIcon(
-                            onPressed: () async {
-                              final auth = context
-                                  .read<AppState>()
-                                  .authService
-                                  .currentUser;
-                              if (auth == null) return;
-                              final confirmed = await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text(l10n.receivedProfitsTitle),
-                                  content: Text(
-                                    l10n.receivedProfitsConfirm(
-                                      fareService.formatIqd(
-                                        liveDriver.owedPlatformCommissionIqd,
-                                        locale: l10n.localeName,
-                                      ),
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: Text(l10n.cancel),
-                                    ),
-                                    FilledButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: Text(l10n.receivedProfitsAction),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              if (confirmed != true || !context.mounted) return;
-                              try {
-                                await adminService.markProfitsReceived(
-                                  driverId: liveDriver.uid,
-                                  receivedByUid: auth.uid,
-                                );
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(l10n.receivedProfitsSuccess),
-                                  ),
-                                );
-                              } catch (error) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('$error')),
-                                );
-                              }
-                            },
-                            icon: const Icon(Icons.check_circle_outline),
-                            label: Text(l10n.receivedProfitsAction),
-                          ),
                         if (canApprove) ...[
                           FilledButton.icon(
                             onPressed: () => approveDriver(

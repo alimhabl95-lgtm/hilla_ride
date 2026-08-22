@@ -88,11 +88,19 @@ class RideSearchPanel extends StatelessWidget {
   }
 
   bool _ensureSubDistrictSelected(BuildContext context, AppLocalizations l10n) {
-    if (subDistrictId != null && subDistrictId!.trim().isNotEmpty) {
-      return true;
-    }
+    final hasDistrict = districtId.trim().isNotEmpty;
+    final hasArea = subDistrictId != null && subDistrictId!.trim().isNotEmpty;
+    if (hasDistrict && hasArea) return true;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.selectSubDistrictRequired)),
+      SnackBar(
+        content: Text(
+          hasDistrict
+              ? l10n.selectSubDistrictRequired
+              : (l10n.localeName.startsWith('ar')
+                  ? 'يرجى اختيار القضاء والناحية أولاً.'
+                  : 'Please select district and area first.'),
+        ),
+      ),
     );
     return false;
   }
@@ -560,7 +568,23 @@ class _CustomerRegionFieldsState extends State<_CustomerRegionFields> {
     final provinceValue =
         provinces.any((p) => p.id == _provinceId) ? _provinceId : null;
     final districtValue =
-        districtsInProvince.any((d) => d.id == district.id) ? district.id : null;
+        districtsInProvince.any((d) => d.id == widget.districtId)
+            ? widget.districtId
+            : (districtsInProvince.isNotEmpty ? districtsInProvince.first.id : null);
+    // Keep parent district in sync when catalog/province make current id invalid.
+    if (districtValue != null &&
+        districtValue != widget.districtId &&
+        districtsInProvince.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onDistrictChanged(districtValue);
+      });
+    }
+
+    final subIds = district.subDistricts.map((s) => s.id).toSet();
+    final subValue = (widget.subDistrictId != null &&
+            subIds.contains(widget.subDistrictId))
+        ? widget.subDistrictId
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -630,7 +654,7 @@ class _CustomerRegionFieldsState extends State<_CustomerRegionFields> {
         DropdownButtonFormField<String>(
           isExpanded: true,
           isDense: true,
-          value: widget.subDistrictId,
+          value: subValue,
           decoration: InputDecoration(
             labelText: l10n.subDistrictLabel,
             isDense: true,
@@ -651,6 +675,24 @@ class _CustomerRegionFieldsState extends State<_CustomerRegionFields> {
               .toList(),
           onChanged: widget.onSubDistrictChanged,
         ),
+        if (subValue != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            l10n.searchRegionHint(
+              widget.isArabic
+                  ? district.subDistricts
+                      .firstWhere((s) => s.id == subValue)
+                      .nameAr
+                  : district.subDistricts
+                      .firstWhere((s) => s.id == subValue)
+                      .nameEn,
+            ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppBrandAssets.brandTeal,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ],
     );
   }

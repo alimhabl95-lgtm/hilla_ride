@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/business_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/service_area_catalog.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_chrome.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -20,12 +22,14 @@ class AdminFilterBar extends StatelessWidget {
       AdminFilterField.search,
     ],
     this.hintText,
+    this.margin = const EdgeInsets.fromLTRB(12, 12, 12, 0),
   });
 
   final AdminFilterCriteria value;
   final ValueChanged<AdminFilterCriteria> onChanged;
   final List<AdminFilterField> fields;
   final String? hintText;
+  final EdgeInsetsGeometry margin;
 
   @override
   Widget build(BuildContext context) {
@@ -39,15 +43,43 @@ class AdminFilterBar extends StatelessWidget {
         final districts = catalog.districtsForProvince(value.provinceId);
         final subs = catalog.subsForDistrict(value.districtId);
 
-        return Card(
-          margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Wrap(
+        return Container(
+          margin: margin,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AdminChrome.cardBorder),
+            boxShadow: AdminChrome.cardShadow,
+          ),
+          child: Wrap(
               spacing: 10,
               runSpacing: 10,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppBrandAssets.brandTeal,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.filter_alt_outlined,
+                          color: Colors.white, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        isAr ? 'تصفية' : 'Filter',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 if (fields.contains(AdminFilterField.province))
                   _Dropdown<String?>(
                     label: isAr ? 'المحافظة' : 'Governorate',
@@ -123,7 +155,6 @@ class AdminFilterBar extends StatelessWidget {
                   ),
                 ..._buildOtherFields(context, isAr),
               ],
-            ),
           ),
         );
       },

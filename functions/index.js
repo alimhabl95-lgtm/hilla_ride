@@ -600,6 +600,28 @@ exports.onRideUpdated = functions.firestore
             },
             { merge: true },
           );
+          // Prepaid wallet is the settlement path — clear cash "profits received" debt.
+          const driverEarnings = Math.trunc(Number(after.driverEarningsIqd) || 0);
+          await admin
+            .firestore()
+            .collection("drivers")
+            .doc(String(after.driverId))
+            .set(
+              {
+                outstandingPlatformCommissionIqd: 0,
+                outstandingDriverEarningsIqd: 0,
+                lastProfitReceivedAt: admin.firestore.FieldValue.serverTimestamp(),
+                lastWalletCommissionRideId: rideId,
+                lastWalletCommissionIqd: commission,
+              },
+              { merge: true },
+            );
+          functions.logger.info("wallet commission settled outstanding", {
+            rideId,
+            driverId: after.driverId,
+            commission,
+            driverEarnings,
+          });
         } catch (error) {
           functions.logger.error("wallet commission debit failed", {
             rideId,
@@ -607,8 +629,14 @@ exports.onRideUpdated = functions.firestore
             commission,
             message: error.message,
           });
-          // Fall back: keep outstanding debt and block wallet.
+          // Fall back: record cash debt and block wallet until recharged.
           const config = await getWalletConfig();
+          const failedCommission = Math.trunc(
+            Number(after.platformCommissionIqd) || commission || 0,
+          );
+          const failedEarnings = Math.trunc(
+            Number(after.driverEarningsIqd) || 0,
+          );
           await admin
             .firestore()
             .collection("drivers")
@@ -617,11 +645,24 @@ exports.onRideUpdated = functions.firestore
               {
                 walletStatus: "blocked",
                 walletUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                ...(failedCommission > 0
+                  ? {
+                      outstandingPlatformCommissionIqd:
+                        admin.firestore.FieldValue.increment(failedCommission),
+                    }
+                  : {}),
+                ...(failedEarnings > 0
+                  ? {
+                      outstandingDriverEarningsIqd:
+                        admin.firestore.FieldValue.increment(failedEarnings),
+                    }
+                  : {}),
               },
               { merge: true },
             );
           functions.logger.warn("driver wallet blocked after failed commission", {
             minBalanceIqd: config.minBalanceIqd,
+            failedCommission,
           });
         }
       } else {
@@ -635,6 +676,102 @@ exports.onRideUpdated = functions.firestore
           },
           { merge: true },
         );
+        // Zero commission (e.g. reward free trip) still settles cash outstanding.
+        await admin
+          .firestore()
+          .collection("drivers")
+          .doc(String(after.driverId))
+          .set(
+            {
+              outstandingPlatformCommissionIqd: 0,
+              outstandingDriverEarningsIqd: 0,
+              lastProfitReceivedAt: admin.firestore.FieldValue.serverTimestamp(),
+              lastWalletCommissionRideId: rideId,
+              lastWalletCommissionIqd: 0,
+            },
+            { merge: true },
+          );
+      }
+
+      // Platform pays the driver the full original fare for loyalty free rides.
+      const isLoyaltyFree =
+        after.loyaltyFreeRide === true ||
+        String(after.promoCode || "").toUpperCase() === "LOYALTY";
+      if (
+        isLoyaltyFree &&
+        after.loyaltyCompApplied !== true &&
+        after.driverId
+      ) {
+        const originalFare = Math.max(
+          0,
+          Math.trunc(Number(after.originalFareIqd) || 0),
+        );
+        const discountFallback = Math.max(
+          0,
+          Math.trunc(Number(after.promoDiscountIqd) || 0),
+        );
+        const creditIqd = originalFare > 0 ? originalFare : discountFallback;
+        if (creditIqd > 0) {
+          try {
+            await applyWalletDelta({
+              driverId: String(after.driverId),
+              amountIqd: creditIqd,
+              type: "bonus",
+              createdBy: "system",
+              note: `Loyalty free ride compensation for ride ${rideId}`,
+              rideId,
+              referenceId: `LOYALTY-COMP-${rideId}`,
+            });
+            await change.after.ref.set(
+              {
+                loyaltyCompApplied: true,
+                loyaltyCompIqd: creditIqd,
+              },
+              { merge: true },
+            );
+            try {
+              const driverSnap = await admin
+                .firestore()
+                .collection("drivers")
+                .doc(String(after.driverId))
+                .get();
+              const userSnap = await admin
+                .firestore()
+                .collection("users")
+                .doc(String(after.driverId))
+                .get();
+              const token =
+                userSnap.data()?.fcmToken ||
+                driverSnap.data()?.fcmToken ||
+                null;
+              await sendToToken(
+                token,
+                "Loyalty ride paid",
+                `You received ${creditIqd} IQD for a loyalty free ride`,
+                {
+                  type: "driver_loyalty_comp",
+                  rideId,
+                  amountIqd: String(creditIqd),
+                  titleAr: "تعويض مشوار الولاء",
+                  bodyAr: `حصلت على ${creditIqd} د.ع تعويضاً لمشوار ولاء مجاني`,
+                },
+                "default",
+              );
+            } catch (_) {}
+          } catch (error) {
+            functions.logger.error("loyalty compensation failed", {
+              rideId,
+              driverId: after.driverId,
+              creditIqd,
+              message: error.message,
+            });
+          }
+        } else {
+          await change.after.ref.set(
+            { loyaltyCompApplied: true, loyaltyCompIqd: 0 },
+            { merge: true },
+          );
+        }
       }
 
       // Evaluate reward campaigns after a completed (earnings-applied) trip.
@@ -1639,7 +1776,7 @@ const DEFAULT_DRIVER_DISTRICT = {
 };
 
 exports.setDriverApprovalStatus = functions.https.onCall(async (data, context) => {
-  await assertAdminPermission(context, "allDrivers");
+  await assertAdminPermissionAny(context, ["allDrivers", "pendingDrivers"]);
 
   const payload = parseCallableData(data);
   const driverId = String(payload.driverId || "").trim();
@@ -1660,6 +1797,7 @@ exports.setDriverApprovalStatus = functions.https.onCall(async (data, context) =
   }
 
   const existingData = existing.data() || {};
+  const previousStatus = String(existingData.approvalStatus || "").trim();
   const update = {
     approvalStatus: status,
     reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1705,9 +1843,67 @@ exports.setDriverApprovalStatus = functions.https.onCall(async (data, context) =
 
   await driverRef.set(update, { merge: true });
 
+  let registrationBonusIqd = 0;
+  if (status === "approved" && previousStatus !== "approved") {
+    try {
+      const walletConfig = await getWalletConfig();
+      registrationBonusIqd = Math.max(
+        0,
+        Math.trunc(Number(walletConfig.registrationBonusIqd) || 0),
+      );
+      const alreadyGranted = Boolean(existingData.registrationBonusGrantedAt);
+      if (registrationBonusIqd > 0 && !alreadyGranted) {
+        await applyWalletDelta({
+          driverId,
+          amountIqd: registrationBonusIqd,
+          type: "bonus",
+          createdBy: context.auth.uid,
+          note: "Registration bonus",
+          referenceId: `REG-BONUS-${driverId}`,
+        });
+        await driverRef.set(
+          {
+            registrationBonusGrantedAt: admin.firestore.FieldValue.serverTimestamp(),
+            registrationBonusIqd,
+          },
+          { merge: true },
+        );
+
+        try {
+          const userSnap = await db.collection("users").doc(driverId).get();
+          const token =
+            userSnap.data()?.fcmToken || existingData.fcmToken || null;
+          await sendToToken(
+            token,
+            "Registration bonus",
+            `You received ${registrationBonusIqd} IQD registration bonus`,
+            {
+              type: "driver_registration_bonus",
+              amountIqd: String(registrationBonusIqd),
+              titleAr: "مكافأة التسجيل",
+              bodyAr: `حصلت على ${registrationBonusIqd} د.ع مكافأة تسجيل`,
+            },
+            "default",
+          );
+        } catch (notifyError) {
+          functions.logger.warn("registration bonus notify failed", {
+            driverId,
+            message: notifyError.message,
+          });
+        }
+      }
+    } catch (bonusError) {
+      functions.logger.error("registration bonus failed", {
+        driverId,
+        message: bonusError.message,
+      });
+    }
+  }
+
   functions.logger.info("setDriverApprovalStatus", {
     driverId,
     status,
+    registrationBonusIqd,
     reviewedBy: context.auth.uid,
   });
 
@@ -1716,10 +1912,10 @@ exports.setDriverApprovalStatus = functions.https.onCall(async (data, context) =
     action: status === "approved" ? "driver.approved" : `driver.${status}`,
     entityType: "driver",
     entityId: driverId,
-    details: { status },
+    details: { status, registrationBonusIqd },
   });
 
-  return { ok: true, approvalStatus: status };
+  return { ok: true, approvalStatus: status, registrationBonusIqd };
 });
 
 exports.resetPasswordByPhone = authAdminCallable(async (data) =>
@@ -2087,6 +2283,35 @@ exports.submitDriverRegistration = functions.https.onCall(async (data, context) 
     },
     { merge: true },
   );
+
+  // Notify managers about the new pending driver (best effort).
+  try {
+    const managers = await admin
+      .firestore()
+      .collection("users")
+      .where("role", "==", "manager")
+      .limit(20)
+      .get();
+    for (const doc of managers.docs) {
+      const token = doc.data()?.fcmToken;
+      await sendToToken(
+        token,
+        "New driver pending",
+        `${name || "Driver"} submitted registration`,
+        {
+          type: "driver_pending_approval",
+          driverId: uid,
+          titleAr: "سائق بانتظار الموافقة",
+          bodyAr: `${name || "سائق"} قدّم طلب تسجيل`,
+        },
+        "default",
+      );
+    }
+  } catch (error) {
+    functions.logger.warn("pending driver manager notify failed", {
+      message: error.message,
+    });
+  }
 
   return { ok: true };
 });
@@ -2849,6 +3074,7 @@ async function getWalletConfig() {
     minWithdrawalIqd: Math.max(1000, Number(data.minWithdrawalIqd) || 5000),
     maxWithdrawalIqd: Math.max(0, Number(data.maxWithdrawalIqd) || 0),
     withdrawalsEnabled: data.withdrawalsEnabled !== false,
+    registrationBonusIqd: Math.max(0, Math.trunc(Number(data.registrationBonusIqd) || 0)),
     companySuperQiNumber: String(data.companySuperQiNumber || ""),
     companySuperQiName: String(data.companySuperQiName || "Hello Tuk-Tuk"),
     managerWhatsappNumber: String(data.managerWhatsappNumber || ""),
@@ -2863,6 +3089,16 @@ async function getWalletConfig() {
     enabledMethods: Array.isArray(data.enabledMethods)
       ? data.enabledMethods.map(String)
       : ["superQi", "cash", "bankTransfer"],
+  };
+}
+
+async function getLoyaltyConfig() {
+  const doc = await admin.firestore().collection("config").doc("loyalty").get();
+  const data = doc.data() || {};
+  return {
+    enabled: data.enabled === true,
+    ridesRequired: Math.max(1, Math.trunc(Number(data.ridesRequired) || 10)),
+    repeats: data.repeats !== false,
   };
 }
 
@@ -2997,6 +3233,10 @@ exports.saveWalletConfig = functions.https.onCall(async (data, context) => {
     Math.trunc(Number(data.maxWithdrawalIqd) || 0),
   );
   const withdrawalsEnabled = data.withdrawalsEnabled !== false;
+  const registrationBonusIqd = Math.max(
+    0,
+    Math.trunc(Number(data.registrationBonusIqd) || 0),
+  );
 
   await admin.firestore().collection("config").doc("wallet").set(
     {
@@ -3005,6 +3245,7 @@ exports.saveWalletConfig = functions.https.onCall(async (data, context) => {
       minWithdrawalIqd,
       maxWithdrawalIqd,
       withdrawalsEnabled,
+      registrationBonusIqd,
       companySuperQiNumber: String(data.companySuperQiNumber || "").trim(),
       companySuperQiName:
         String(data.companySuperQiName || "Hello Tuk-Tuk").trim() ||
@@ -3019,6 +3260,29 @@ exports.saveWalletConfig = functions.https.onCall(async (data, context) => {
     { merge: true },
   );
   return { ok: true };
+});
+
+exports.saveLoyaltyConfig = functions.https.onCall(async (data, context) => {
+  await assertAdminPermissionAny(context, ["promoCodes", "wallet", "earnings"]);
+  const payload = parseCallableData(data);
+  const enabled = payload.enabled === true;
+  const ridesRequired = Math.max(
+    1,
+    Math.trunc(Number(payload.ridesRequired) || 10),
+  );
+  const repeats = payload.repeats !== false;
+
+  await admin.firestore().collection("config").doc("loyalty").set(
+    {
+      enabled,
+      ridesRequired,
+      repeats,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: context.auth.uid,
+    },
+    { merge: true },
+  );
+  return { ok: true, enabled, ridesRequired, repeats };
 });
 
 /** One-time / ops: create wallet fields on drivers that never received them. */

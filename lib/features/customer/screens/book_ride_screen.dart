@@ -85,7 +85,18 @@ class _BookRideScreenState extends State<BookRideScreen> {
       if (!mounted) return;
 
       PromoApplication? promo;
-      if (widget.user.hasActivePromo && quote.fareIqd != null && quote.fareIqd! > 0) {
+      if (widget.user.hasLoyaltyFreeRide &&
+          quote.fareIqd != null &&
+          quote.fareIqd! > 0) {
+        promo = PromoApplication(
+          baseFareIqd: quote.fareIqd!,
+          discountIqd: quote.fareIqd!,
+          finalFareIqd: 0,
+          promoCode: 'LOYALTY',
+        );
+      } else if (widget.user.hasActivePromo &&
+          quote.fareIqd != null &&
+          quote.fareIqd! > 0) {
         try {
           final promoService = context.read<AppState>().promoService;
           final promoConfig = await promoService
@@ -135,9 +146,8 @@ class _BookRideScreenState extends State<BookRideScreen> {
 
     final promo = _promoApplication;
     final baseFare = quote.fareIqd!;
+    final isLoyalty = promo?.promoCode == 'LOYALTY';
     final finalFare = promo?.hasDiscount == true ? promo!.finalFareIqd : baseFare;
-
-
 
     setState(() => _isBooking = true);
 
@@ -174,6 +184,8 @@ class _BookRideScreenState extends State<BookRideScreen> {
             promoDiscountIqd: promo?.discountIqd ?? 0,
 
             promoCode: promo?.promoCode ?? '',
+
+            loyaltyFreeRide: isLoyalty,
 
           );
 

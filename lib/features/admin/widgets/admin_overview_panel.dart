@@ -6,11 +6,14 @@ import 'package:hilla_ride/core/models/admin_filter_models.dart';
 import 'package:hilla_ride/core/models/announcement.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/business_models.dart';
+import 'package:hilla_ride/core/models/promo_models.dart';
 import 'package:hilla_ride/core/models/wallet_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/admin_stats_service.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/service_area_catalog.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_chrome.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_filter_bar.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
@@ -33,11 +36,15 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
   List<DriverProfile> _drivers = const [];
   List<AppUser> _customers = const [];
   List<WalletRechargeRequest> _pendingRecharges = const [];
+  List<WalletWithdrawalRequest> _pendingWithdrawals = const [];
   List<Announcement> _announcements = const [];
   List<BusinessPartner> _businesses = const [];
   List<BusinessOrder> _orders = const [];
+  WalletConfig _walletConfig = const WalletConfig();
+  LoyaltyConfig _loyaltyConfig = const LoyaltyConfig();
   final _subs = <StreamSubscription>[];
   var _ready = false;
+  var _showAllMetrics = false;
   AdminFilterCriteria _filters = AdminFilterCriteria.empty;
 
   @override
@@ -68,6 +75,13 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
       wallet
           .watchPendingRechargeRequests()
           .listen((v) => _set(() => _pendingRecharges = v)),
+      wallet
+          .watchWithdrawalRequests(status: 'pending')
+          .listen((v) => _set(() => _pendingWithdrawals = v)),
+      wallet.watchConfig().listen((v) => _set(() => _walletConfig = v)),
+      app.promoService
+          .watchLoyaltyConfig()
+          .listen((v) => _set(() => _loyaltyConfig = v)),
       admin
           .watchRecentAnnouncements()
           .listen((v) => _set(() => _announcements = v)),
@@ -171,28 +185,52 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
       orders: orders,
     );
 
+    final pendingDrivers = drivers
+        .where((d) => !d.isApproved && !d.isRemoved)
+        .length;
+    final pendingPartners =
+        businesses.where((b) => b.status == BusinessStatus.pendingReview).length;
+    final alertCount = pendingRecharges.length +
+        _pendingWithdrawals.length +
+        pendingDrivers +
+        pendingPartners +
+        stats.blockedWalletDrivers.length +
+        stats.highDebtDrivers.length;
+    final recentOrders = [...orders]
+      ..sort((a, b) => (b.createdAt ?? DateTime(1970))
+          .compareTo(a.createdAt ?? DateTime(1970)));
+    final onlineDrivers = drivers
+        .where((d) => d.isOnline && d.isApproved && !d.isRemoved)
+        .take(8)
+        .toList();
+    final last7 = stats.dayBuckets.length > 7
+        ? stats.dayBuckets.sublist(stats.dayBuckets.length - 7)
+        : stats.dayBuckets;
+
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       children: [
         Text(
-          isAr ? 'لوحة العمليات' : 'Operations overview',
+          isAr ? 'مرحباً بك في لوحة الإدارة' : 'Welcome to the admin console',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w800,
+                color: AppBrandAssets.brandNavy,
               ),
         ),
         const SizedBox(height: 4),
         Text(
           isAr
-              ? 'إحصائيات حية لـ Hello Tuk-Tuk'
-              : 'Live Hello Tuk-Tuk operations center',
+              ? 'نظرة حية على الرحلات والطلبات والإيرادات والتنبيهات'
+              : 'Live view of rides, orders, revenue, and alerts',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.black54,
+                color: AppBrandAssets.brandMuted,
               ),
         ),
         const SizedBox(height: 12),
         AdminFilterBar(
           value: _filters,
           onChanged: (v) => setState(() => _filters = v),
+          margin: EdgeInsets.zero,
           fields: const [
             AdminFilterField.province,
             AdminFilterField.district,
@@ -201,140 +239,318 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
           ],
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _KpiCard(
-              icon: Icons.wifi_tethering,
-              label: isAr ? 'سائقون متصلون' : 'Online drivers',
-              value: '${stats.onlineDrivers}',
-              color: const Color(0xFF16A34A),
-            ),
-            _KpiCard(
-              icon: Icons.wifi_off,
-              label: isAr ? 'سائقون غير متصلين' : 'Offline drivers',
-              value: '${stats.offlineDrivers}',
-              color: const Color(0xFF64748B),
-            ),
-            _KpiCard(
-              icon: Icons.people_outline,
-              label: isAr ? 'العملاء النشطون' : 'Active customers',
-              value: '${stats.totalCustomers}',
-              color: const Color(0xFF7C3AED),
-            ),
-            _KpiCard(
-              icon: Icons.local_taxi,
-              label: isAr ? 'رحلات نشطة' : 'Active trips',
-              value: '${stats.activeTrips}',
-              color: const Color(0xFF2563EB),
-            ),
-            _KpiCard(
-              icon: Icons.check_circle_outline,
-              label: isAr ? 'مكتملة اليوم' : 'Completed today',
-              value: '${stats.completedToday}',
-              color: const Color(0xFF16A34A),
-            ),
-            _KpiCard(
-              icon: Icons.cancel_outlined,
-              label: isAr ? 'ملغاة اليوم' : 'Cancelled today',
-              value: '${stats.cancelledToday}',
-              color: const Color(0xFFDC2626),
-            ),
-            _KpiCard(
-              icon: Icons.payments_outlined,
-              label: isAr ? 'إيراد الرحلات (اليوم)' : 'Ride revenue (today)',
-              value: _fare.formatIqd(stats.dailyRevenueIqd, locale: l10n.localeName),
-              subtitle:
-                  '${isAr ? 'حجم' : 'GMV'}: ${_fare.formatIqd(stats.dailyGmvIqd, locale: l10n.localeName)}',
-              color: const Color(0xFFD97706),
-              wide: true,
-            ),
-            _KpiCard(
-              icon: Icons.delivery_dining,
-              label: isAr ? 'إيراد التوصيل (اليوم)' : 'Delivery revenue (today)',
-              value: _fare.formatIqd(stats.deliveryRevenueIqd, locale: l10n.localeName),
-              color: const Color(0xFFEA580C),
-            ),
-            _KpiCard(
-              icon: Icons.account_balance_wallet_outlined,
-              label: isAr ? 'رصيد المحافظ' : 'Wallet balance',
-              value: _fare.formatIqd(stats.walletBalanceTotalIqd, locale: l10n.localeName),
-              color: const Color(0xFF0F766E),
-            ),
-            _KpiCard(
-              icon: Icons.card_giftcard,
-              label: isAr ? 'المكافآت الممنوحة' : 'Rewards issued',
-              value: _fare.formatIqd(stats.rewardsIssuedIqd, locale: l10n.localeName),
-              color: const Color(0xFFEAB308),
-            ),
-            _KpiCard(
-              icon: Icons.restaurant,
-              label: isAr ? 'مطاعم نشطة' : 'Active restaurants',
-              value: '${stats.activeRestaurants}',
-              color: const Color(0xFFDC2626),
-            ),
-            _KpiCard(
-              icon: Icons.local_grocery_store,
-              label: isAr ? 'سوبرماركت نشطة' : 'Active supermarkets',
-              value: '${stats.activeSupermarkets}',
-              color: const Color(0xFF2563EB),
-            ),
-            _KpiCard(
-              icon: Icons.local_pharmacy,
-              label: isAr ? 'صيدليات نشطة' : 'Active pharmacies',
-              value: '${stats.activePharmacies}',
-              color: const Color(0xFF16A34A),
-            ),
-            _KpiCard(
-              icon: Icons.storefront,
-              label: isAr ? 'أعمال نشطة' : 'Active businesses',
-              value: '${stats.activeBusinesses}',
-              color: const Color(0xFF7C3AED),
-            ),
-            _KpiCard(
-              icon: Icons.receipt_long,
-              label: isAr ? 'طلبات اليوم' : 'Orders today',
-              value: '${stats.ordersToday}',
-              color: const Color(0xFF0F766E),
-            ),
-            _KpiCard(
-              icon: Icons.today,
-              label: isAr ? 'رحلات اليوم' : 'Trips today',
-              value: '${stats.tripsToday}',
-              color: const Color(0xFF0F766E),
-            ),
-            _KpiCard(
-              icon: Icons.groups_outlined,
-              label: isAr ? 'السائقون' : 'Drivers',
-              value: '${stats.totalDrivers}',
-              color: const Color(0xFF0F766E),
-            ),
-            _KpiCard(
-              label: isAr ? 'إيراد الأسبوع' : 'Weekly revenue',
-              value: _fare.formatIqd(stats.weeklyRevenueIqd, locale: l10n.localeName),
-              subtitle:
-                  '${isAr ? 'حجم' : 'GMV'}: ${_fare.formatIqd(stats.weeklyGmvIqd, locale: l10n.localeName)}',
-              color: const Color(0xFFEA580C),
-              wide: true,
-            ),
-            _KpiCard(
-              label: isAr ? 'إيراد الشهر' : 'Monthly revenue',
-              value: _fare.formatIqd(stats.monthlyRevenueIqd, locale: l10n.localeName),
-              subtitle:
-                  '${isAr ? 'حجم' : 'GMV'}: ${_fare.formatIqd(stats.monthlyGmvIqd, locale: l10n.localeName)}',
-              color: const Color(0xFFB45309),
-              wide: true,
-            ),
-            _KpiCard(
-              icon: Icons.star_outline,
-              label: isAr ? 'متوسط تقييم السائق' : 'Avg driver rating',
-              value: stats.averageDriverRating.toStringAsFixed(2),
-              color: const Color(0xFFEAB308),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cols = constraints.maxWidth >= 1200
+                ? 6
+                : constraints.maxWidth >= 900
+                    ? 3
+                    : constraints.maxWidth >= 600
+                        ? 2
+                        : 1;
+            final gap = 12.0;
+            final tileW = (constraints.maxWidth - gap * (cols - 1)) / cols;
+            final primary = [
+              AdminKpiTile(
+                icon: Icons.person_add_alt_1_outlined,
+                label: isAr ? 'سائقون بانتظار الموافقة' : 'Pending drivers',
+                value: '$pendingDrivers',
+                accent: AdminChrome.danger,
+                subtitle: isAr ? 'راجع طلبات التسجيل' : 'Review registrations',
+              ),
+              AdminKpiTile(
+                icon: Icons.local_taxi_outlined,
+                label: isAr ? 'رحلات اليوم' : "Today's rides",
+                value: '${stats.tripsToday}',
+                accent: AppBrandAssets.brandTeal,
+                subtitle:
+                    '${isAr ? 'نشطة' : 'Active'}: ${stats.activeTrips}',
+              ),
+              AdminKpiTile(
+                icon: Icons.wifi_tethering,
+                label: isAr ? 'سائقون متصلون' : 'Online drivers',
+                value: '${stats.onlineDrivers}',
+                accent: AdminChrome.success,
+                subtitle:
+                    '${isAr ? 'غير متصلين' : 'Offline'}: ${stats.offlineDrivers}',
+              ),
+              AdminKpiTile(
+                icon: Icons.people_outline,
+                label: isAr ? 'إجمالي العملاء' : 'Total customers',
+                value: NumberFormat.decimalPattern(l10n.localeName)
+                    .format(stats.totalCustomers),
+                accent: const Color(0xFF7C3AED),
+              ),
+              AdminKpiTile(
+                icon: Icons.payments_outlined,
+                label: isAr ? 'إيراد اليوم' : "Today's revenue",
+                value: _fare.formatIqd(
+                  stats.dailyRevenueIqd,
+                  locale: l10n.localeName,
+                ),
+                accent: const Color(0xFFD97706),
+                subtitle:
+                    '${isAr ? 'حجم' : 'GMV'}: ${_fare.formatIqd(stats.dailyGmvIqd, locale: l10n.localeName)}',
+              ),
+              AdminKpiTile(
+                icon: Icons.warning_amber_rounded,
+                label: isAr ? 'يحتاج انتباه' : 'Needs attention',
+                value: '$alertCount',
+                accent: AdminChrome.danger,
+                subtitle: isAr
+                    ? 'عناصر تتطلب مراجعة'
+                    : 'Items need review',
+              ),
+            ];
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final tile in primary)
+                  SizedBox(width: tileW, child: tile),
+              ],
+            );
+          },
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            onPressed: () =>
+                setState(() => _showAllMetrics = !_showAllMetrics),
+            icon: Icon(
+              _showAllMetrics ? Icons.expand_less : Icons.expand_more,
+            ),
+            label: Text(
+              _showAllMetrics
+                  ? (isAr ? 'إخفاء المقاييس الإضافية' : 'Hide extra metrics')
+                  : (isAr ? 'عرض كل المقاييس' : 'Show all metrics'),
+            ),
+          ),
+        ),
+        if (_showAllMetrics) ...[
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _MiniMetric(
+                label: isAr ? 'مكافأة التسجيل' : 'Registration bonus',
+                value: _walletConfig.registrationBonusIqd <= 0
+                    ? (isAr ? 'معطّل' : 'Off')
+                    : _fare.formatIqd(
+                        _walletConfig.registrationBonusIqd,
+                        locale: l10n.localeName,
+                      ),
+              ),
+              _MiniMetric(
+                label: isAr ? 'ولاء العملاء' : 'Customer loyalty',
+                value: _loyaltyConfig.summary(isAr),
+              ),
+              _MiniMetric(
+                label: isAr ? 'مكتملة اليوم' : 'Completed today',
+                value: '${stats.completedToday}',
+              ),
+              _MiniMetric(
+                label: isAr ? 'ملغاة اليوم' : 'Cancelled today',
+                value: '${stats.cancelledToday}',
+              ),
+              _MiniMetric(
+                label: isAr ? 'إيراد التوصيل' : 'Delivery revenue',
+                value: _fare.formatIqd(
+                  stats.deliveryRevenueIqd,
+                  locale: l10n.localeName,
+                ),
+              ),
+              _MiniMetric(
+                label: isAr ? 'رصيد المحافظ' : 'Wallet balance',
+                value: _fare.formatIqd(
+                  stats.walletBalanceTotalIqd,
+                  locale: l10n.localeName,
+                ),
+              ),
+              _MiniMetric(
+                label: isAr ? 'المكافآت الممنوحة' : 'Rewards issued',
+                value: _fare.formatIqd(
+                  stats.rewardsIssuedIqd,
+                  locale: l10n.localeName,
+                ),
+              ),
+              _MiniMetric(
+                label: isAr ? 'مطاعم نشطة' : 'Restaurants',
+                value: '${stats.activeRestaurants}',
+              ),
+              _MiniMetric(
+                label: isAr ? 'سوبرماركت' : 'Supermarkets',
+                value: '${stats.activeSupermarkets}',
+              ),
+              _MiniMetric(
+                label: isAr ? 'صيدليات' : 'Pharmacies',
+                value: '${stats.activePharmacies}',
+              ),
+              _MiniMetric(
+                label: isAr ? 'أعمال نشطة' : 'Businesses',
+                value: '${stats.activeBusinesses}',
+              ),
+              _MiniMetric(
+                label: isAr ? 'السائقون' : 'Drivers',
+                value: '${stats.totalDrivers}',
+              ),
+              _MiniMetric(
+                label: isAr ? 'إيراد الأسبوع' : 'Weekly revenue',
+                value: _fare.formatIqd(
+                  stats.weeklyRevenueIqd,
+                  locale: l10n.localeName,
+                ),
+              ),
+              _MiniMetric(
+                label: isAr ? 'إيراد الشهر' : 'Monthly revenue',
+                value: _fare.formatIqd(
+                  stats.monthlyRevenueIqd,
+                  locale: l10n.localeName,
+                ),
+              ),
+              _MiniMetric(
+                label: isAr ? 'متوسط التقييم' : 'Avg rating',
+                value: stats.averageDriverRating.toStringAsFixed(2),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 1100;
+            final mid = constraints.maxWidth >= 800;
+            final revenueCard = AdminSurfaceCard(
+              title: isAr ? 'الإيراد (آخر 7 أيام)' : 'Revenue (last 7 days)',
+              child: SizedBox(
+                height: 220,
+                child: _LineChart(
+                  values: last7
+                      .map((b) => b.platformRevenueIqd.toDouble())
+                      .toList(),
+                  labels: last7,
+                  color: AppBrandAssets.brandTeal,
+                ),
+              ),
+            );
+            final ordersCard = AdminSurfaceCard(
+              title: isAr ? 'نظرة على الطلبات' : 'Orders overview',
+              child: SizedBox(
+                height: 220,
+                child: _OrdersDonut(orders: orders, isAr: isAr),
+              ),
+            );
+            final alertsCard = AdminSurfaceCard(
+              title: isAr ? 'مهام عاجلة' : 'Needs attention',
+              child: _urgentTasks(
+                isAr: isAr,
+                pendingWithdrawals: _pendingWithdrawals.length,
+                pendingRecharges: pendingRecharges.length,
+                pendingDrivers: pendingDrivers,
+                pendingPartners: pendingPartners,
+                blockedWallets: stats.blockedWalletDrivers.length,
+                highDebt: stats.highDebtDrivers.length,
+                searching: stats.searchingCount,
+              ),
+            );
+            if (wide) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 5, child: revenueCard),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 3, child: ordersCard),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 3, child: alertsCard),
+                ],
+              );
+            }
+            if (mid) {
+              return Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 3, child: revenueCard),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 2, child: ordersCard),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  alertsCard,
+                ],
+              );
+            }
+            return Column(
+              children: [
+                revenueCard,
+                const SizedBox(height: 12),
+                ordersCard,
+                const SizedBox(height: 12),
+                alertsCard,
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 1100;
+            final mid = constraints.maxWidth >= 800;
+            final ridesCard = AdminSurfaceCard(
+              title: isAr ? 'أحدث الرحلات' : 'Recent rides',
+              child: _tripList(stats.recentTrips, isAr, l10n.localeName),
+            );
+            final ordersCard = AdminSurfaceCard(
+              title: isAr ? 'أحدث طلبات المتاجر' : 'Recent store orders',
+              child: _orderList(recentOrders.take(8).toList(), isAr, l10n.localeName),
+            );
+            final driversCard = AdminSurfaceCard(
+              title: isAr ? 'سائقون متصلون' : 'Online drivers',
+              child: _onlineDriversList(onlineDrivers, isAr),
+            );
+            if (wide) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: ridesCard),
+                  const SizedBox(width: 12),
+                  Expanded(child: ordersCard),
+                  const SizedBox(width: 12),
+                  Expanded(child: driversCard),
+                ],
+              );
+            }
+            if (mid) {
+              return Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: ridesCard),
+                      const SizedBox(width: 12),
+                      Expanded(child: ordersCard),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  driversCard,
+                ],
+              );
+            }
+            return Column(
+              children: [
+                ridesCard,
+                const SizedBox(height: 12),
+                ordersCard,
+                const SizedBox(height: 12),
+                driversCard,
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 1000;
@@ -345,16 +561,6 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
                   values: stats.dayBuckets.map((b) => b.trips.toDouble()).toList(),
                   labels: stats.dayBuckets,
                   color: const Color(0xFF0F766E),
-                ),
-              ),
-              _ChartCard(
-                title: isAr ? 'الإيراد (عمولة) / يوم' : 'Revenue / day',
-                child: _LineChart(
-                  values: stats.dayBuckets
-                      .map((b) => b.platformRevenueIqd.toDouble())
-                      .toList(),
-                  labels: stats.dayBuckets,
-                  color: const Color(0xFFD97706),
                 ),
               ),
               _ChartCard(
@@ -378,25 +584,13 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
               ),
             ];
             if (wide) {
-              return Column(
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: charts[0]),
-                      const SizedBox(width: 12),
-                      Expanded(child: charts[1]),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: charts[2]),
-                      const SizedBox(width: 12),
-                      Expanded(child: charts[3]),
-                    ],
-                  ),
+                  for (var i = 0; i < charts.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 12),
+                    Expanded(child: charts[i]),
+                  ],
                 ],
               );
             }
@@ -410,30 +604,27 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
             );
           },
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 1000;
             final widgets = [
-              _WidgetCard(
+              AdminSurfaceCard(
                 title: isAr ? 'ملخص العمليات الحية' : 'Live operations summary',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${isAr ? 'بحث' : 'Searching'}: ${stats.searchingCount}'),
-                    Text('${isAr ? 'معروض' : 'Matched'}: ${stats.matchedCount}'),
-                    Text(
-                      '${isAr ? 'قيد التنفيذ' : 'In progress'}: ${stats.inProgressCount}',
+                    _opsRow(isAr ? 'بحث' : 'Searching', stats.searchingCount),
+                    _opsRow(isAr ? 'معروض' : 'Matched', stats.matchedCount),
+                    _opsRow(
+                      isAr ? 'قيد التنفيذ' : 'In progress',
+                      stats.inProgressCount,
                     ),
-                    Text('${isAr ? 'نشط إجمالي' : 'Active total'}: ${stats.activeTrips}'),
+                    _opsRow(isAr ? 'نشط إجمالي' : 'Active total', stats.activeTrips),
                   ],
                 ),
               ),
-              _WidgetCard(
-                title: isAr ? 'أحدث الرحلات' : 'Recent trips',
-                child: _tripList(stats.recentTrips, isAr, l10n.localeName),
-              ),
-              _WidgetCard(
+              AdminSurfaceCard(
                 title: isAr ? 'تسجيلات العملاء' : 'Recent customers',
                 child: _peopleList(
                   stats.recentCustomers
@@ -442,7 +633,7 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
                   isAr,
                 ),
               ),
-              _WidgetCard(
+              AdminSurfaceCard(
                 title: isAr ? 'تسجيلات السائقين' : 'Recent drivers',
                 child: _peopleList(
                   stats.recentDrivers
@@ -451,7 +642,7 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
                   isAr,
                 ),
               ),
-              _WidgetCard(
+              AdminSurfaceCard(
                 title: isAr ? 'طلبات شحن المحفظة' : 'Wallet recharge requests',
                 child: pendingRecharges.isEmpty
                     ? Text(isAr ? 'لا طلبات معلّقة' : 'No pending requests')
@@ -471,7 +662,7 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
                         ],
                       ),
               ),
-              _WidgetCard(
+              AdminSurfaceCard(
                 title: isAr ? 'الإشعارات' : 'Notifications',
                 child: _announcements.isEmpty
                     ? Text(isAr ? 'لا إشعارات بعد' : 'No announcements yet')
@@ -491,7 +682,7 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
                         ],
                       ),
               ),
-              _WidgetCard(
+              AdminSurfaceCard(
                 title: isAr ? 'تنبيهات النظام' : 'System alerts',
                 child: _alerts(stats, isAr, l10n.localeName),
               ),
@@ -502,7 +693,10 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
                 runSpacing: 12,
                 children: [
                   for (final w in widgets)
-                    SizedBox(width: (constraints.maxWidth - 12) / 2, child: w),
+                    SizedBox(
+                      width: (constraints.maxWidth - 12) / 2,
+                      child: w,
+                    ),
                 ],
               );
             }
@@ -520,6 +714,105 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
     );
   }
 
+  Widget _opsRow(String label, int value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          Text(
+            '$value',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _urgentTasks({
+    required bool isAr,
+    required int pendingWithdrawals,
+    required int pendingRecharges,
+    required int pendingDrivers,
+    required int pendingPartners,
+    required int blockedWallets,
+    required int highDebt,
+    required int searching,
+  }) {
+    final items = <({String label, int count, Color color})>[
+      (
+        label: isAr ? 'طلبات سحب بانتظار الموافقة' : 'Withdrawal requests pending',
+        count: pendingWithdrawals,
+        color: AdminChrome.danger,
+      ),
+      (
+        label: isAr ? 'طلبات شحن معلّقة' : 'Recharge requests pending',
+        count: pendingRecharges,
+        color: AdminChrome.warning,
+      ),
+      (
+        label: isAr ? 'سائقون بانتظار التفعيل' : 'Drivers pending activation',
+        count: pendingDrivers,
+        color: AdminChrome.info,
+      ),
+      (
+        label: isAr ? 'شركاء بانتظار المراجعة' : 'Partners pending review',
+        count: pendingPartners,
+        color: const Color(0xFF7C3AED),
+      ),
+      (
+        label: isAr ? 'محافظ محظورة' : 'Blocked wallets',
+        count: blockedWallets,
+        color: AdminChrome.danger,
+      ),
+      (
+        label: isAr ? 'ديون عمولة مرتفعة' : 'High commission debt',
+        count: highDebt,
+        color: AdminChrome.warning,
+      ),
+      (
+        label: isAr ? 'رحلات تبحث عن سائق' : 'Rides searching',
+        count: searching,
+        color: AppBrandAssets.brandTeal,
+      ),
+    ];
+    return Column(
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.label,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 28),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: item.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${item.count}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: item.color,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _tripList(List<Ride> rides, bool isAr, String locale) {
     if (rides.isEmpty) {
       return Text(isAr ? 'لا رحلات' : 'No trips');
@@ -527,16 +820,142 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
     return Column(
       children: [
         for (final r in rides)
-          ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              '${r.pickupLabel} → ${r.destinationLabel}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                _StatusChip(label: r.status.value),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${r.pickupLabel} → ${r.destinationLabel}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        _fare.formatIqd(r.fareAmountIqd, locale: locale),
+                        style: const TextStyle(
+                          color: AppBrandAssets.brandMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            subtitle: Text(
-              '${r.status.value} • ${_fare.formatIqd(r.fareAmountIqd, locale: locale)}',
+          ),
+      ],
+    );
+  }
+
+  Widget _orderList(List<BusinessOrder> orders, bool isAr, String locale) {
+    if (orders.isEmpty) {
+      return Text(isAr ? 'لا طلبات' : 'No orders');
+    }
+    return Column(
+      children: [
+        for (final o in orders)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                _StatusChip(label: o.status.name),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        o.businessName.isEmpty
+                            ? (isAr ? 'متجر' : 'Store')
+                            : o.businessName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        '#${o.id.length > 6 ? o.id.substring(0, 6) : o.id}'
+                        ' • ${_fare.formatIqd(o.totalIqd, locale: locale)}',
+                        style: const TextStyle(
+                          color: AppBrandAssets.brandMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _onlineDriversList(List<DriverProfile> drivers, bool isAr) {
+    if (drivers.isEmpty) {
+      return Text(isAr ? 'لا سائقين متصلين' : 'No online drivers');
+    }
+    return Column(
+      children: [
+        for (final d in drivers)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: AppBrandAssets.brandTeal.withValues(alpha: 0.15),
+                  child: Text(
+                    (d.name.isNotEmpty ? d.name[0] : '?').toUpperCase(),
+                    style: const TextStyle(
+                      color: AppBrandAssets.brandTeal,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        d.name.isEmpty ? d.uid : d.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        '★ ${d.rating.toStringAsFixed(1)}',
+                        style: const TextStyle(
+                          color: AppBrandAssets.brandMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AdminChrome.success.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    isAr ? 'متصل' : 'Online',
+                    style: const TextStyle(
+                      color: AdminChrome.success,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
       ],
@@ -590,89 +1009,77 @@ class _AdminOverviewPanelState extends State<AdminOverviewPanel> {
   }
 }
 
-class _KpiCard extends StatelessWidget {
-  const _KpiCard({
-    required this.label,
-    required this.value,
-    required this.color,
-    this.subtitle,
-    this.wide = false,
-    this.icon,
-  });
+class _MiniMetric extends StatelessWidget {
+  const _MiniMetric({required this.label, required this.value});
 
   final String label;
   final String value;
-  final String? subtitle;
-  final Color color;
-  final bool wide;
-  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: wide ? 280 : 160,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, color: color, size: 22),
-                const SizedBox(height: 6),
-              ],
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.black54,
-                    ),
+      width: 160,
+      child: AdminSurfaceCard(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppBrandAssets.brandMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(height: 6),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.bold,
-                    ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
               ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  subtitle!,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _WidgetCard extends StatelessWidget {
-  const _WidgetCard({required this.title, required this.child});
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.label});
 
-  final String title;
-  final Widget child;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            child,
-          ],
+    final lower = label.toLowerCase();
+    Color color = AdminChrome.info;
+    if (lower.contains('complet') ||
+        lower.contains('deliver') ||
+        lower.contains('مكتمل')) {
+      color = AdminChrome.success;
+    } else if (lower.contains('cancel') || lower.contains('ملغ')) {
+      color = AdminChrome.danger;
+    } else if (lower.contains('progress') ||
+        lower.contains('ready') ||
+        lower.contains('search') ||
+        lower.contains('pending')) {
+      color = AdminChrome.warning;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -687,23 +1094,105 @@ class _ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+    return AdminSurfaceCard(
+      title: title,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      child: SizedBox(height: 180, child: child),
+    );
+  }
+}
+
+class _OrdersDonut extends StatelessWidget {
+  const _OrdersDonut({required this.orders, required this.isAr});
+
+  final List<BusinessOrder> orders;
+  final bool isAr;
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = <BusinessOrderStatus, int>{};
+    for (final o in orders) {
+      counts[o.status] = (counts[o.status] ?? 0) + 1;
+    }
+    final total = orders.length;
+    if (total == 0) {
+      return Center(child: Text(isAr ? 'لا طلبات' : 'No orders'));
+    }
+
+    final palette = <BusinessOrderStatus, Color>{
+      BusinessOrderStatus.pending: AdminChrome.warning,
+      BusinessOrderStatus.accepted: const Color(0xFF06B6D4),
+      BusinessOrderStatus.preparing: AdminChrome.info,
+      BusinessOrderStatus.ready: AppBrandAssets.brandTeal,
+      BusinessOrderStatus.outForDelivery: const Color(0xFF2563EB),
+      BusinessOrderStatus.delivered: AdminChrome.success,
+      BusinessOrderStatus.cancelled: AdminChrome.danger,
+      BusinessOrderStatus.rejected: AdminChrome.danger,
+    };
+
+    final sections = counts.entries
+        .where((e) => e.value > 0)
+        .map(
+          (e) => PieChartSectionData(
+            value: e.value.toDouble(),
+            color: palette[e.key] ?? AdminChrome.info,
+            radius: 48,
+            title: '',
+          ),
+        )
+        .toList();
+
+    return Row(
+      children: [
+        Expanded(
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 2,
+              centerSpaceRadius: 42,
+              sections: sections,
             ),
-            const SizedBox(height: 8),
-            SizedBox(height: 180, child: child),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                isAr ? 'الإجمالي $total' : 'Total $total',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              for (final e in counts.entries.take(5))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: palette[e.key] ?? AdminChrome.info,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${e.key.name} (${e.value})',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

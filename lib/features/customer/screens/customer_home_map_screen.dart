@@ -571,7 +571,9 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
       );
       return;
     }
-    if (_subDistrictId == null || _subDistrictId!.isEmpty) {
+    if (_districtId.trim().isEmpty ||
+        _subDistrictId == null ||
+        _subDistrictId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.selectSubDistrictRequired)),
       );

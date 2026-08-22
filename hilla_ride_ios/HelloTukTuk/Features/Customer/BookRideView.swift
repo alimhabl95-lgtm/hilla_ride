@@ -201,7 +201,14 @@ struct BookRideView: View {
         )
         quote = rideQuote
 
-        if let baseFare = rideQuote.fareIqd, user.hasPromoRemaining {
+        if let baseFare = rideQuote.fareIqd, user.hasLoyaltyFreeRide {
+            promo = PromoApplication(
+                baseFareIqd: baseFare,
+                discountIqd: baseFare,
+                finalFareIqd: 0,
+                promoCode: "LOYALTY"
+            )
+        } else if let baseFare = rideQuote.fareIqd, user.hasPromoRemaining {
             let config = await PromoService().getPromoCode(user.promoCode)
             promo = PromoService().applyPromo(user: user, config: config, baseFareIqd: baseFare)
         } else {
@@ -211,6 +218,7 @@ struct BookRideView: View {
 
     private func bookRide() async {
         guard let quote, let baseFare = quote.fareIqd else { return }
+        let isLoyalty = promo?.promoCode == "LOYALTY"
         let finalFare = promo?.hasDiscount == true ? promo!.finalFareIqd : baseFare
         errorMessage = nil
         isBooking = true
@@ -228,7 +236,8 @@ struct BookRideView: View {
                 distanceKm: quote.distanceKm,
                 originalFareIqd: promo?.hasDiscount == true ? baseFare : 0,
                 promoDiscountIqd: promo?.discountIqd ?? 0,
-                promoCode: promo?.promoCode ?? ""
+                promoCode: promo?.promoCode ?? "",
+                loyaltyFreeRide: isLoyalty
             )
             dismiss()
         } catch {

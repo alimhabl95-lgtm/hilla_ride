@@ -74,7 +74,8 @@ final class RideRepository {
         distanceKm: Double,
         originalFareIqd: Int = 0,
         promoDiscountIqd: Int = 0,
-        promoCode: String = ""
+        promoCode: String = "",
+        loyaltyFreeRide: Bool = false
     ) async throws -> Ride {
         guard RideLocationRules.areDistinct(pickup.coordinate, destination.coordinate) else {
             throw RideServiceError.pickupDestinationSame
@@ -113,6 +114,7 @@ final class RideRepository {
         if originalFareIqd > 0 { payload["originalFareIqd"] = originalFareIqd }
         if promoDiscountIqd > 0 { payload["promoDiscountIqd"] = promoDiscountIqd }
         if !promoCode.isEmpty { payload["promoCode"] = promoCode }
+        if loyaltyFreeRide { payload["loyaltyFreeRide"] = true }
 
         do {
             let result = try await functions.httpsCallable("createRide").call(payload)

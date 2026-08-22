@@ -495,7 +495,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get selectSubDistrictHint => 'اختر الناحية';
 
   @override
-  String get selectSubDistrictRequired => 'يرجى اختيار الناحية أولاً.';
+  String get selectSubDistrictRequired => 'يرجى اختيار القضاء والناحية أولاً.';
 
   @override
   String get fixedCustomerDistrictLabel => 'قضاء الهاشمية';
@@ -533,7 +533,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String searchRegionHint(String region) {
-    return 'البحث محصور في $region';
+    return 'نتائج البحث داخل $region فقط';
   }
 
   @override

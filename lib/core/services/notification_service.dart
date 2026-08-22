@@ -1,14 +1,13 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:hilla_ride/core/config/firebase_config.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
-import 'package:hilla_ride/firebase_options.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 enum RideAlertType {
@@ -587,7 +586,7 @@ class NotificationService {
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FirebaseConfig.ensureInitialized();
 
   final type = message.data['type'];
   final isRideAlert = type == 'ride_matched' || type == 'ride_accepted';

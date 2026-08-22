@@ -20,59 +20,6 @@ class AdminDriverDetailScreen extends StatefulWidget {
 }
 
 class _AdminDriverDetailScreenState extends State<AdminDriverDetailScreen> {
-  var _isReceivingProfits = false;
-
-  Future<void> _markProfitsReceived(DriverProfile driver) async {
-    final l10n = AppLocalizations.of(context)!;
-    final auth = context.read<AppState>().authService.currentUser;
-    if (auth == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.receivedProfitsTitle),
-        content: Text(
-          l10n.receivedProfitsConfirm(
-            FareService().formatIqd(
-              driver.owedPlatformCommissionIqd,
-              locale: l10n.localeName,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.receivedProfitsAction),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _isReceivingProfits = true);
-    try {
-      await context.read<AppState>().adminService.markProfitsReceived(
-            driverId: driver.uid,
-            receivedByUid: auth.uid,
-          );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.receivedProfitsSuccess)),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$error')),
-      );
-    } finally {
-      if (mounted) setState(() => _isReceivingProfits = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -166,16 +113,19 @@ class _AdminDriverDetailScreenState extends State<AdminDriverDetailScreen> {
                                     '${l10n.completedRidesCount}: ${driver.completedRidesCount}',
                                   ),
                                   Text(
-                                    '${l10n.outstandingProfitLabel}: ${fareService.formatIqd(driver.owedPlatformCommissionIqd, locale: l10n.localeName)}',
+                                    '${l10n.lifetimeProfitLabel}: ${fareService.formatIqd(driver.totalPlatformCommissionIqd, locale: l10n.localeName)}',
                                     style:
                                         Theme.of(context).textTheme.titleMedium,
                                   ),
-                                  Text(
-                                    '${l10n.lifetimeProfitLabel}: ${fareService.formatIqd(driver.totalPlatformCommissionIqd, locale: l10n.localeName)}',
-                                  ),
-                                  Text(
-                                    '${l10n.driverNetEarnings}: ${fareService.formatIqd(driver.outstandingDriverEarningsIqd, locale: l10n.localeName)}',
-                                  ),
+                                  if (driver.owedPlatformCommissionIqd > 0)
+                                    Text(
+                                      '${l10n.outstandingProfitLabel}: ${fareService.formatIqd(driver.owedPlatformCommissionIqd, locale: l10n.localeName)}',
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error,
+                                      ),
+                                    ),
                                   if (driver.pendingBonusIqd > 0)
                                     Text(
                                       '${l10n.pendingBonusLabel}: ${fareService.formatIqd(driver.pendingBonusIqd, locale: l10n.localeName)}',
@@ -199,22 +149,13 @@ class _AdminDriverDetailScreenState extends State<AdminDriverDetailScreen> {
                                       ),
                                     ),
                                   const SizedBox(height: 12),
-                                  if (driver.owedPlatformCommissionIqd > 0)
-                                    FilledButton.icon(
-                                      onPressed: _isReceivingProfits
-                                          ? null
-                                          : () => _markProfitsReceived(driver),
-                                      icon: _isReceivingProfits
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.check_circle),
-                                      label: Text(l10n.receivedProfitsAction),
-                                    ),
+                                  Text(
+                                    l10n.localeName.startsWith('ar')
+                                        ? 'العمولة تُخصم تلقائياً من محفظة السائق عند إكمال الرحلة.'
+                                        : 'Commission is taken automatically from the driver wallet when a ride completes.',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
                                   const SizedBox(height: 12),
                                   AdminDriverDistrictPanel(driver: driver),
                                   const SizedBox(height: 12),

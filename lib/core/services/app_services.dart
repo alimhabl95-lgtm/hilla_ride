@@ -614,47 +614,14 @@ class DriverService {
     required String driverId,
     required DriverApprovalStatus status,
   }) async {
-    final payload = <String, dynamic>{
-      'approvalStatus': status.value,
-      'reviewedAt': FieldValue.serverTimestamp(),
-      if (status == DriverApprovalStatus.approved) 'isBlocked': false,
-    };
-
-    if (status == DriverApprovalStatus.approved) {
-      final existing = await _firestore.collection('drivers').doc(driverId).get();
-      final districtId = existing.data()?['assignedDistrictId'] as String? ?? '';
-      final subDistrictId =
-          existing.data()?['assignedSubDistrictId'] as String? ?? '';
-      if (districtId.isEmpty || subDistrictId.isEmpty) {
-        final defaults = BabilRegions.customerDistrict;
-        final defaultSub = defaults.subDistricts.first;
-        payload.addAll({
-          'assignedDistrictId': defaults.id,
-          'assignedSubDistrictId': defaultSub.id,
-          'latitude': defaultSub.center.latitude,
-          'longitude': defaultSub.center.longitude,
-          'geohash':
-              Geohash.encode(defaultSub.center.latitude, defaultSub.center.longitude),
-          'locationUpdatedAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        final sub = BabilRegions.subDistrictById(districtId, subDistrictId);
-        payload.addAll({
-          if (existing.data()?['latitude'] == null)
-            'latitude': sub.center.latitude,
-          if (existing.data()?['longitude'] == null)
-            'longitude': sub.center.longitude,
-          if ((existing.data()?['geohash'] as String? ?? '').isEmpty)
-            'geohash': Geohash.encode(sub.center.latitude, sub.center.longitude),
-          'locationUpdatedAt': FieldValue.serverTimestamp(),
-        });
-      }
+    try {
+      await _functions.httpsCallable('setDriverApprovalStatus').call({
+        'driverId': driverId,
+        'status': status.value,
+      });
+    } on FirebaseFunctionsException catch (error) {
+      throw StateError(error.message ?? error.code);
     }
-
-    await _firestore.collection('drivers').doc(driverId).set(
-      payload,
-      SetOptions(merge: true),
-    );
   }
 
   Future<void> setDriverBlocked({
@@ -1177,6 +1144,7 @@ class RideService {
     int originalFareIqd = 0,
     int promoDiscountIqd = 0,
     String promoCode = '',
+    bool loyaltyFreeRide = false,
   }) async {
     if (!RideLocationRules.areDistinct(pickup, destination)) {
       throw StateError('pickup_destination_same');
@@ -1221,6 +1189,7 @@ class RideService {
         if (originalFareIqd > 0) 'originalFareIqd': originalFareIqd,
         if (promoDiscountIqd > 0) 'promoDiscountIqd': promoDiscountIqd,
         if (promoCode.isNotEmpty) 'promoCode': promoCode,
+        if (loyaltyFreeRide) 'loyaltyFreeRide': true,
       });
       final data = Map<String, dynamic>.from(result.data as Map? ?? {});
       final rideId = data['rideId'] as String? ?? '';
