@@ -310,14 +310,31 @@ final class RideRepository {
 
     private func mapRideCallableError(_ error: Error) -> Error {
         let ns = error as NSError
-        let message = (ns.localizedDescription + " " + (ns.userInfo["NSLocalizedFailureReason"] as? String ?? "")).lowercased()
+        var parts = [
+            ns.localizedDescription,
+            ns.userInfo["NSLocalizedFailureReason"] as? String ?? "",
+            ns.userInfo["NSLocalizedDescription"] as? String ?? ""
+        ]
+        if let details = ns.userInfo["details"] as? String {
+            parts.append(details)
+        }
+        if let details = ns.userInfo[NSLocalizedFailureReasonErrorKey] as? String {
+            parts.append(details)
+        }
+        // Firebase Functions often stores the server message under this key.
+        for (_, value) in ns.userInfo {
+            if let text = value as? String {
+                parts.append(text)
+            }
+        }
+        let message = parts.joined(separator: " ").lowercased()
         if message.contains("active_ride") || message.contains("active ride") {
             return RideServiceError.activeRideExists
         }
         if message.contains("outside_area") || message.contains("out_of_service") || message.contains("out of service") || message.contains("area_inactive") || message.contains("area_closed") {
             return RideServiceError.outOfService
         }
-        if message.contains("no_drivers") {
+        if message.contains("no_drivers") || message.contains("no drivers") {
             return RideServiceError.noDrivers
         }
         if message.contains("ride_not_found") {

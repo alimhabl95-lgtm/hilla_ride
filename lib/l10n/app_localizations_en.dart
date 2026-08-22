@@ -769,7 +769,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noDriversInDistrict =>
-      'No drivers are online in this city right now. Ask the manager to assign drivers to this area.';
+      'No drivers are online in this area right now. We will keep searching.';
 
   @override
   String get openChat => 'Chat';

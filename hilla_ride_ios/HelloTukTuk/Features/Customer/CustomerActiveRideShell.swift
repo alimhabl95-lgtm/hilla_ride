@@ -1,4 +1,5 @@
 import CoreLocation
+import FirebaseAuth
 import FirebaseFirestore
 import SwiftUI
 import UIKit
@@ -75,8 +76,11 @@ struct FindingDriverView: View {
     var onSessionEnded: (() -> Void)?
 
     @State private var isRetrying = false
+    @State private var isCancelling = false
     @State private var waitingForDrivers = false
-    @State private var retryTask: Task<Void, Never>?
+    @State private var actionError: String?
+    @State private var assignmentTask: Task<Void, Never>?
+    @State private var autoRetryTask: Task<Void, Never>?
     @State private var pulseScale: CGFloat = 1
 
     var body: some View {
@@ -110,19 +114,47 @@ struct FindingDriverView: View {
                 .padding(.horizontal, AppSpacing.xl)
             }
 
+            if let actionError {
+                AppBanner(
+                    message: actionError,
+                    systemImage: "exclamationmark.triangle.fill",
+                    tone: .danger
+                )
+                .padding(.horizontal, AppSpacing.xl)
+            }
+
             Spacer()
 
             VStack(spacing: AppSpacing.md) {
-                Button(L10n.string(.retryDriverSearch, language: appState.language)) {
-                    Task { await retryAssignment() }
+                Button {
+                    startAssignment(manual: true)
+                } label: {
+                    HStack {
+                        if isRetrying {
+                            ProgressView()
+                                .tint(BrandColors.tealDark)
+                        }
+                        Text(L10n.string(.retryDriverSearch, language: appState.language))
+                    }
                 }
                 .buttonStyle(SecondaryButtonStyle())
-                .disabled(isRetrying)
+                .disabled(isRetrying || isCancelling)
+                .opacity((isRetrying || isCancelling) ? 0.55 : 1)
 
-                Button(L10n.string(.cancelRide, language: appState.language)) {
+                Button {
                     Task { await cancelRide() }
+                } label: {
+                    HStack {
+                        if isCancelling {
+                            ProgressView()
+                                .tint(BrandColors.danger)
+                        }
+                        Text(L10n.string(.cancelRide, language: appState.language))
+                    }
                 }
                 .buttonStyle(SecondaryButtonStyle(destructive: true))
+                .disabled(isCancelling)
+                .opacity(isCancelling ? 0.55 : 1)
             }
             .padding(.horizontal, AppSpacing.xl)
             .padding(.bottom, AppSpacing.xl)
@@ -133,44 +165,130 @@ struct FindingDriverView: View {
             withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
                 pulseScale = 1.15
             }
-            Task { await retryAssignment() }
+            startAssignment(manual: false)
         }
         .onDisappear {
-            retryTask?.cancel()
+            assignmentTask?.cancel()
+            autoRetryTask?.cancel()
+        }
+    }
+
+    private func startAssignment(manual: Bool) {
+        guard !isCancelling else { return }
+        if manual {
+            autoRetryTask?.cancel()
+        }
+        assignmentTask?.cancel()
+        assignmentTask = Task {
+            await retryAssignment()
         }
     }
 
     private func retryAssignment() async {
-        guard !isRetrying else { return }
-        isRetrying = true
-        defer { isRetrying = false }
+        guard !isRetrying, !isCancelling else { return }
+        await MainActor.run {
+            isRetrying = true
+            actionError = nil
+        }
+        defer {
+            Task { @MainActor in
+                isRetrying = false
+            }
+        }
 
         do {
-            try await RideRepository().assignNearestDriver(rideId: ride.id)
-            waitingForDrivers = false
-            retryTask?.cancel()
+            try await withTimeout(seconds: 20) {
+                try await RideRepository().assignNearestDriver(rideId: ride.id)
+            }
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                waitingForDrivers = false
+                actionError = nil
+            }
+            autoRetryTask?.cancel()
+        } catch is CancellationError {
+            return
         } catch RideServiceError.noDrivers {
-            waitingForDrivers = true
+            guard !Task.isCancelled else { return }
+            await MainActor.run { waitingForDrivers = true }
             scheduleAutoRetry()
         } catch {
-            waitingForDrivers = false
+            guard !Task.isCancelled else { return }
+            let raw = String(describing: error).lowercased() + " " + error.localizedDescription.lowercased()
+            if raw.contains("no_drivers") || raw.contains("no drivers") {
+                await MainActor.run { waitingForDrivers = true }
+                scheduleAutoRetry()
+                return
+            }
+            await MainActor.run {
+                waitingForDrivers = true
+                actionError = AuthErrorMessages.message(for: error)
+            }
+            scheduleAutoRetry()
         }
     }
 
     private func scheduleAutoRetry() {
-        retryTask?.cancel()
-        retryTask = Task {
+        autoRetryTask?.cancel()
+        autoRetryTask = Task {
             try? await Task.sleep(nanoseconds: 8_000_000_000)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, !isCancelling else { return }
             await retryAssignment()
         }
     }
 
     private func cancelRide() async {
-        guard let customerId = appState.currentUser?.uid else { return }
-        retryTask?.cancel()
-        try? await RideRepository().cancelRide(rideId: ride.id, cancelledBy: customerId)
-        onSessionEnded?()
+        guard !isCancelling else { return }
+        await MainActor.run {
+            isCancelling = true
+            actionError = nil
+        }
+        assignmentTask?.cancel()
+        autoRetryTask?.cancel()
+
+        let customerId = appState.currentUser?.uid
+            ?? Auth.auth().currentUser?.uid
+        guard let customerId else {
+            await MainActor.run {
+                isCancelling = false
+                actionError = L10n.string(.networkError, language: appState.language)
+            }
+            return
+        }
+
+        do {
+            try await withTimeout(seconds: 20) {
+                try await RideRepository().cancelRide(rideId: ride.id, cancelledBy: "customer")
+            }
+            await MainActor.run {
+                isCancelling = false
+                onSessionEnded?()
+            }
+        } catch {
+            // If the ride is already cancelled / gone, leave the screen anyway.
+            await MainActor.run {
+                isCancelling = false
+                onSessionEnded?()
+            }
+        }
+    }
+
+    private func withTimeout<T>(
+        seconds: Double,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw URLError(.timedOut)
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
     }
 }
 
@@ -215,12 +333,16 @@ struct DriverAssignedView: View {
                 Spacer()
             }
 
-            Button(L10n.string(.cancelRide, language: appState.language)) {
+            Button {
                 Task {
-                    guard let customerId = appState.currentUser?.uid else { return }
-                    try? await RideRepository().cancelRide(rideId: ride.id, cancelledBy: customerId)
+                    let customerId = appState.currentUser?.uid
+                        ?? Auth.auth().currentUser?.uid
+                    guard customerId != nil else { return }
+                    try? await RideRepository().cancelRide(rideId: ride.id, cancelledBy: "customer")
                     onSessionEnded?()
                 }
+            } label: {
+                Text(L10n.string(.cancelRide, language: appState.language))
             }
             .buttonStyle(SecondaryButtonStyle(destructive: true))
             .padding(.horizontal, AppSpacing.xl)

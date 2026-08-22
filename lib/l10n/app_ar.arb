@@ -264,7 +264,7 @@
   "driverWorkDistrictRequired": "يجب على المدير تعيين مدينة عمل قبل أن يستلم السائق الطلبات.",
   "driverWorkDistrictSaved": "تم تحديث مدينة عمل السائق.",
   "saveDriverWorkDistrict": "حفظ مدينة العمل",
-  "noDriversInDistrict": "لا يوجد سائقون متصلون في هذه المدينة حالياً. اطلب من المدير تعيين سائقين لهذه المنطقة.",
+  "noDriversInDistrict": "لا يوجد سائقون متصلون في هذه المنطقة حالياً. سنواصل البحث.",
   "openChat": "محادثة",
   "supportTitle": "الدعم",
   "contactManagement": "التواصل مع الإدارة",

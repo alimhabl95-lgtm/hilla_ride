@@ -264,7 +264,7 @@
   "driverWorkDistrictRequired": "Manager must assign a work city before this driver can receive rides.",
   "driverWorkDistrictSaved": "Driver work city updated.",
   "saveDriverWorkDistrict": "Save work city",
-  "noDriversInDistrict": "No drivers are online in this city right now. Ask the manager to assign drivers to this area.",
+  "noDriversInDistrict": "No drivers are online in this area right now. We will keep searching.",
   "openChat": "Chat",
   "supportTitle": "Support",
   "contactManagement": "Contact management",

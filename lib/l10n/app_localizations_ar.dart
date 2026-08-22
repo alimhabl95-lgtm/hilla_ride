@@ -759,7 +759,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noDriversInDistrict =>
-      'لا يوجد سائقون متصلون في هذه المدينة حالياً. اطلب من المدير تعيين سائقين لهذه المنطقة.';
+      'لا يوجد سائقون متصلون في هذه المنطقة حالياً. سنواصل البحث.';
 
   @override
   String get openChat => 'محادثة';

@@ -556,8 +556,8 @@ enum L10n {
         .searchAction: [.english: "Search", .arabic: "بحث"],
         .finalFare: [.english: "Your fare", .arabic: "أجرتك"],
         .noDriversInDistrict: [
-            .english: "No drivers are online in this city right now. We will keep searching.",
-            .arabic: "لا يوجد سائقون متصلون في هذه المدينة حالياً. سنواصل البحث."
+            .english: "No drivers are online in this area right now. We will keep searching.",
+            .arabic: "لا يوجد سائقون متصلون في هذه المنطقة حالياً. سنواصل البحث."
         ],
         .rideChatTitle: [.english: "Ride chat", .arabic: "محادثة المشوار"],
         .chatHint: [.english: "Type a message", .arabic: "اكتب رسالة"],

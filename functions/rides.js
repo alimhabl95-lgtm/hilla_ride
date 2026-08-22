@@ -124,24 +124,28 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     const walletConfig = await getWalletConfig();
     const exclude = new Set(excludeDriverIds.map(String));
 
-    let driversSnap;
-    if (districtId && subDistrictId) {
-      driversSnap = await db()
-        .collection("drivers")
-        .where("isOnline", "==", true)
-        .where("approvalStatus", "==", "approved")
-        .where("assignedDistrictId", "==", districtId)
-        .where("assignedSubDistrictId", "==", subDistrictId)
-        .limit(40)
-        .get();
-    } else {
-      driversSnap = await db()
-        .collection("drivers")
-        .where("isOnline", "==", true)
-        .where("approvalStatus", "==", "approved")
-        .limit(40)
-        .get();
+    if (!subDistrictId) {
+      // Never fall back to city-wide / nationwide search — only the selected ناحية.
+      await rideRef.set(
+        {
+          status: "searching",
+          offeredDriverIds: [],
+          notifyDrivers: false,
+        },
+        { merge: true },
+      );
+      throw new functions.https.HttpsError("failed-precondition", "no_drivers");
     }
+
+    let query = db()
+      .collection("drivers")
+      .where("isOnline", "==", true)
+      .where("approvalStatus", "==", "approved")
+      .where("assignedSubDistrictId", "==", subDistrictId);
+    if (districtId) {
+      query = query.where("assignedDistrictId", "==", districtId);
+    }
+    const driversSnap = await query.limit(40).get();
 
     const candidates = [];
     for (const doc of driversSnap.docs) {

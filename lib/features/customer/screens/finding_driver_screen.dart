@@ -198,22 +198,33 @@ class _FindingDriverScreenState extends State<FindingDriverScreen>
                           ),
                     ),
                     if (_waitingForDrivers) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        l10n.retry,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppBrandAssets.brandTealDark,
-                            ),
-                        textAlign: TextAlign.center,
+                      const SizedBox(height: AppSpacing.lg),
+                      AppPrimaryButton(
+                        label: l10n.retry,
+                        icon: Icons.refresh,
+                        isLoading: _started,
+                        onPressed: _started
+                            ? null
+                            : () {
+                                _retryTimer?.cancel();
+                                setState(() => _started = false);
+                                _findDriver();
+                              },
                       ),
                     ],
                     if (ride != null && customerCanCancelRide(ride.status)) ...[
-                      const SizedBox(height: AppSpacing.xxxl),
+                      const SizedBox(height: AppSpacing.md),
                       AppSecondaryButton(
                         label: l10n.cancel,
                         destructive: true,
-                        onPressed: () =>
-                            cancelCustomerRideAndExit(context, widget.rideId),
+                        onPressed: () async {
+                          _retryTimer?.cancel();
+                          setState(() => _started = false);
+                          await cancelCustomerRideAndExit(
+                            context,
+                            widget.rideId,
+                          );
+                        },
                       ),
                     ],
                   ],
