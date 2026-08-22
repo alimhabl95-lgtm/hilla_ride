@@ -33,10 +33,16 @@ struct CustomerActiveRideShell: View {
                     .background(BrandColors.surface.ignoresSafeArea())
             }
         }
-        .onAppear { startWatchingRide() }
+        .onAppear {
+            startWatchingRide()
+            if let uid = Auth.auth().currentUser?.uid {
+                CustomerLocationPublisher.shared.start(for: uid)
+            }
+        }
         .onDisappear {
             rideTask?.cancel()
             rideTask = nil
+            CustomerLocationPublisher.shared.stop()
         }
     }
 

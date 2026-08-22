@@ -85,6 +85,8 @@ class AppUser {
     this.loyaltyFreeRidesRemaining = 0,
     this.loyaltyFreeRidesEarned = 0,
     this.roleTemplate = '',
+    this.latitude,
+    this.longitude,
   });
 
   final String uid;
@@ -112,6 +114,8 @@ class AppUser {
   final int loyaltyFreeRidesRemaining;
   final int loyaltyFreeRidesEarned;
   final String roleTemplate;
+  final double? latitude;
+  final double? longitude;
 
   bool get hasActivePromo =>
       promoCode.isNotEmpty && promoRidesUsed < promoRidesLimit;
@@ -167,6 +171,8 @@ class AppUser {
       loyaltyFreeRidesEarned:
           (data['loyaltyFreeRidesEarned'] as num?)?.toInt() ?? 0,
       roleTemplate: data['roleTemplate'] as String? ?? '',
+      latitude: (data['latitude'] as num?)?.toDouble(),
+      longitude: (data['longitude'] as num?)?.toDouble(),
     );
   }
 

@@ -51,7 +51,8 @@ struct DriverHomeView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     LanguageToggle()
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    CurrentRideIconButton(role: .driver)
                     overflowMenu
                 }
             }
@@ -93,6 +94,12 @@ struct DriverHomeView: View {
         .onDisappear { stopWatching() }
         .onChange(of: activeRide?.customerId) { customerId in
             startWatchingCustomer(customerId)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToCurrentRide)) { _ in
+            // Driver home already shows activeRide when present; ensure watchers are live.
+            if activeRide == nil {
+                startWatching()
+            }
         }
     }
 
@@ -481,7 +488,12 @@ struct DriverHomeView: View {
 
     @ViewBuilder
     private func driverRidePanel(ride: Ride) -> some View {
-        DriverActiveRideMapPanel(ride: ride) {
+        DriverActiveRideMapPanel(
+            ride: ride,
+            driverCoordinate: currentDriver.sortCoordinate,
+            driverHeading: currentDriver.heading,
+            customerCoordinate: activeCustomer?.coordinate
+        ) {
             driverRideBottomPanel(ride: ride)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -791,6 +803,9 @@ struct DriverHomeView: View {
 private struct DriverActiveRideMapPanel<Bottom: View>: View {
     @EnvironmentObject private var appState: AppState
     let ride: Ride
+    var driverCoordinate: CLLocationCoordinate2D?
+    var driverHeading: Double = 0
+    var customerCoordinate: CLLocationCoordinate2D?
     @ViewBuilder var bottom: () -> Bottom
 
     @State private var recenterToken = 1
@@ -800,13 +815,18 @@ private struct DriverActiveRideMapPanel<Bottom: View>: View {
         ZStack(alignment: .bottom) {
             if MapsConfig.isConfigured {
                 GoogleMapView(
-                    cameraTarget: ride.pickupCoordinate,
+                    cameraTarget: driverCoordinate ?? customerCoordinate ?? ride.pickupCoordinate,
                     zoom: 14,
-                    pickup: MapPlace(label: ride.pickupLabel, coordinate: ride.pickupCoordinate),
+                    pickup: MapPlace(
+                        label: ride.pickupLabel,
+                        coordinate: customerCoordinate ?? ride.pickupCoordinate
+                    ),
                     destination: MapPlace(
                         label: ride.destinationLabel,
                         coordinate: ride.destinationCoordinate
                     ),
+                    driverCoordinate: driverCoordinate,
+                    driverHeading: driverHeading,
                     routePath: routePath,
                     recenterToken: recenterToken
                 )
@@ -837,12 +857,18 @@ private struct DriverActiveRideMapPanel<Bottom: View>: View {
 
             bottom()
         }
-        .task(id: "\(ride.id)-\(ride.status.rawValue)") {
-            routePath = [ride.pickupCoordinate, ride.destinationCoordinate]
-            let path = await DirectionsRouteService().routePath(
-                from: ride.pickupCoordinate,
-                to: ride.destinationCoordinate
-            )
+        .task(id: "\(ride.id)-\(ride.status.rawValue)-\(driverCoordinate?.latitude ?? 0)-\(customerCoordinate?.latitude ?? 0)") {
+            let from = driverCoordinate ?? ride.pickupCoordinate
+            let to: CLLocationCoordinate2D = {
+                switch ride.status {
+                case .accepted, .matched:
+                    return customerCoordinate ?? ride.pickupCoordinate
+                default:
+                    return ride.destinationCoordinate
+                }
+            }()
+            routePath = [from, to]
+            let path = await DirectionsRouteService().routePath(from: from, to: to)
             if path.count >= 2 {
                 routePath = path
             }

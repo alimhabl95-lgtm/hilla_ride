@@ -4,6 +4,7 @@ import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
+/// Toolbar button that returns the user to their active ride screen.
 class CurrentRideIconButton extends StatelessWidget {
   const CurrentRideIconButton({super.key, required this.role});
 
@@ -26,13 +27,29 @@ class CurrentRideIconButton extends StatelessWidget {
     return StreamBuilder<Ride?>(
       stream: stream,
       builder: (context, snapshot) {
-        final hasRide = snapshot.data != null;
+        final ride = snapshot.data;
+        final hasRide = ride != null;
 
         return IconButton(
           tooltip: l10n.currentRideTitle,
-          onPressed: hasRide
-              ? () => Navigator.of(context).popUntil((route) => route.isFirst)
-              : null,
+          onPressed: !hasRide
+              ? null
+              : () {
+                  // Pop overlays (chat/profile/search) back to the shell that
+                  // hosts the live ride UI.
+                  final navigator = Navigator.of(context);
+                  navigator.popUntil((route) => route.isFirst);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        l10n.localeName.startsWith('ar')
+                            ? 'تم فتح المشوار الحالي'
+                            : 'Opened your current ride',
+                      ),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
           icon: Badge(
             isLabelVisible: hasRide,
             smallSize: 10,

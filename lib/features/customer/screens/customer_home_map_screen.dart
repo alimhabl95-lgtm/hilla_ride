@@ -186,16 +186,30 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     });
   }
 
-  /// Align governorate / district / area to a coordinate (like iOS adoptPlaceArea).
+  /// Keep the customer's chosen قضاء/ناحية. Only auto-fill when empty.
   bool _adoptPlaceArea(ll.LatLng coordinate) {
+    final hasUserArea =
+        _districtId.trim().isNotEmpty && (_subDistrictId?.trim().isNotEmpty ?? false);
+    final nearDistrict = _districtId.trim().isNotEmpty
+        ? BabilRegions.isNearDistrictForSearch(
+            _districtId,
+            coordinate,
+            extraBufferKm: 35,
+          )
+        : false;
+    final inBox = BabilRegions.isInBabilServiceBox(coordinate);
+
+    if (hasUserArea) {
+      return nearDistrict || inBox;
+    }
+
     final resolved = BabilRegions.resolveFromPoint(coordinate);
-    final nearDistrict = BabilRegions.isNearDistrictForSearch(
+    final nearResolved = BabilRegions.isNearDistrictForSearch(
       resolved.districtId,
       coordinate,
       extraBufferKm: 35,
     );
-    final inBox = BabilRegions.isInBabilServiceBox(coordinate);
-    if (!nearDistrict && !inBox) {
+    if (!nearResolved && !inBox) {
       return false;
     }
 

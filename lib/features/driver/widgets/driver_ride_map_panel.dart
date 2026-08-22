@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:hilla_ride/core/models/app_models.dart';
+import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/driving_distance_service.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
@@ -10,6 +11,7 @@ import 'package:hilla_ride/core/widgets/map_camera_follow.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:latlong2/latlong.dart' as latlng;
+import 'package:provider/provider.dart';
 
 class DriverRideMapPanel extends StatefulWidget {
   const DriverRideMapPanel({
@@ -40,6 +42,8 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
   var _loadingRoutes = true;
   String? _loadedTripKey;
   String? _loadedDriverKey;
+  AppUser? _customer;
+  StreamSubscription<AppUser?>? _customerSub;
 
   @override
   void initState() {
@@ -49,6 +53,28 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
       _loadTripMarkers();
     });
     _loadRoutes();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _watchCustomer());
+  }
+
+  @override
+  void dispose() {
+    _customerSub?.cancel();
+    super.dispose();
+  }
+
+  void _watchCustomer() {
+    if (!mounted) return;
+    final customerId = widget.ride.customerId;
+    if (customerId.isEmpty) return;
+    _customerSub?.cancel();
+    _customerSub = context
+        .read<AppState>()
+        .authService
+        .watchUser(customerId)
+        .listen((user) {
+      if (!mounted) return;
+      setState(() => _customer = user);
+    });
   }
 
   Future<void> _loadTripMarkers() async {
@@ -88,8 +114,14 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
     _loadRoutes();
   }
 
-  latlng.LatLng get _pickup =>
-      latlng.LatLng(widget.ride.pickupLat, widget.ride.pickupLng);
+  latlng.LatLng get _pickup {
+    final lat = _customer?.latitude;
+    final lng = _customer?.longitude;
+    if (lat != null && lng != null) {
+      return latlng.LatLng(lat, lng);
+    }
+    return latlng.LatLng(widget.ride.pickupLat, widget.ride.pickupLng);
+  }
 
   latlng.LatLng get _destination =>
       latlng.LatLng(widget.ride.destinationLat, widget.ride.destinationLng);
@@ -192,7 +224,8 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
       return const {};
     }
 
-    final pickup = gmaps.LatLng(widget.ride.pickupLat, widget.ride.pickupLng);
+    final pickupPoint = _pickup;
+    final pickup = gmaps.LatLng(pickupPoint.latitude, pickupPoint.longitude);
     final destination = gmaps.LatLng(
       widget.ride.destinationLat,
       widget.ride.destinationLng,
@@ -205,6 +238,11 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
         icon: _pickupMarkerIcon!,
         anchor: const Offset(0.5, 0.72),
         zIndexInt: 2,
+        infoWindow: gmaps.InfoWindow(
+          title: _customer?.latitude != null
+              ? l10n.roleCustomer
+              : l10n.pickup,
+        ),
       ),
       gmaps.Marker(
         markerId: const gmaps.MarkerId('destination'),

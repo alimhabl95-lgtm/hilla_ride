@@ -767,46 +767,34 @@ struct CustomerHomeMapView: View {
         return false
     }
 
-    /// Aligns governorate / district / area to a coordinate. Accepts any point
-    /// inside the service catalog (or near it), instead of blocking the user.
+    /// Keep the customer's chosen قضاء/ناحية. Only auto-fill when empty.
+    /// Selecting pickup/destination must not rewrite the area they picked.
     @discardableResult
     private func adoptPlaceArea(for coordinate: CLLocationCoordinate2D) -> Bool {
-        let resolved = BabilRegions.resolveFromPoint(coordinate)
-
-        // Prefer keeping the user's selected district when the point is near it.
-        if !selectedDistrictId.isEmpty,
-           BabilRegions.isNearDistrictForSearch(
-               districtId: selectedDistrictId,
-               point: coordinate,
-               extraBufferKm: 35
-           ) {
-            if resolved.districtId == selectedDistrictId {
-                selectedSubDistrictId = resolved.subDistrictId
-            } else if let nearestInDistrict = subDistrictsInSelectedDistrict.min(by: {
-                GeoMath.distanceKm(from: $0.center, to: coordinate)
-                    < GeoMath.distanceKm(from: $1.center, to: coordinate)
-            }) {
-                selectedSubDistrictId = nearestInDistrict.id
+        let hasUserArea = !selectedDistrictId.isEmpty && !selectedSubDistrictId.isEmpty
+        if hasUserArea {
+            let nearSelected = BabilRegions.isNearDistrictForSearch(
+                districtId: selectedDistrictId,
+                point: coordinate,
+                extraBufferKm: 35
+            ) || ServiceAreaCatalog.shared.isWithinAnyActiveArea(coordinate)
+                || ((31.7...33.2).contains(coordinate.latitude)
+                    && (43.8...45.4).contains(coordinate.longitude))
+            if nearSelected {
+                return true
             }
-            selectedProvinceId = BabilRegions.provinceId(forDistrict: selectedDistrictId)
-            return true
+            errorMessage = L10n.string(.searchOutsideRegion, language: appState.language)
+            return false
         }
 
-        // Otherwise jump to the area that actually contains this point.
+        let resolved = BabilRegions.resolveFromPoint(coordinate)
         if BabilRegions.isNearDistrictForSearch(
             districtId: resolved.districtId,
             point: coordinate,
             extraBufferKm: 35
-        ) || ServiceAreaCatalog.shared.isWithinAnyActiveArea(coordinate) {
-            selectedDistrictId = resolved.districtId
-            selectedSubDistrictId = resolved.subDistrictId
-            selectedProvinceId = BabilRegions.provinceId(forDistrict: resolved.districtId)
-            return true
-        }
-
-        // Final safety net for Babil service footprint (search uses the same box).
-        if (31.7...33.2).contains(coordinate.latitude),
-           (43.8...45.4).contains(coordinate.longitude) {
+        ) || ServiceAreaCatalog.shared.isWithinAnyActiveArea(coordinate)
+            || ((31.7...33.2).contains(coordinate.latitude)
+                && (43.8...45.4).contains(coordinate.longitude)) {
             selectedDistrictId = resolved.districtId
             selectedSubDistrictId = resolved.subDistrictId
             selectedProvinceId = BabilRegions.provinceId(forDistrict: resolved.districtId)

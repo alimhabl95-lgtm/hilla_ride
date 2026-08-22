@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/core/services/customer_location_publisher.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/customer/screens/customer_home_map_screen.dart';
 import 'package:hilla_ride/features/customer/screens/driver_assigned_screen.dart';
@@ -10,7 +13,7 @@ import 'package:hilla_ride/features/customer/screens/trip_completed_screen.dart'
 import 'package:provider/provider.dart';
 
 /// Restores the customer's in-progress trip after refresh or re-login.
-class CustomerActiveRideShell extends StatelessWidget {
+class CustomerActiveRideShell extends StatefulWidget {
   const CustomerActiveRideShell({
     super.key,
     required this.user,
@@ -21,11 +24,31 @@ class CustomerActiveRideShell extends StatelessWidget {
   final String rideId;
 
   @override
+  State<CustomerActiveRideShell> createState() =>
+      _CustomerActiveRideShellState();
+}
+
+class _CustomerActiveRideShellState extends State<CustomerActiveRideShell> {
+  final _locationPublisher = CustomerLocationPublisher();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_locationPublisher.start(widget.user.uid));
+  }
+
+  @override
+  void dispose() {
+    unawaited(_locationPublisher.stop());
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final rideService = context.read<AppState>().rideService;
 
     return StreamBuilder<Ride?>(
-      stream: rideService.watchRide(rideId),
+      stream: rideService.watchRide(widget.rideId),
       builder: (context, snapshot) {
         final ride = snapshot.data;
         if (ride == null) {
@@ -34,26 +57,26 @@ class CustomerActiveRideShell extends StatelessWidget {
               body: AppLoadingState(),
             );
           }
-          return CustomerHomeMapScreen(user: user);
+          return CustomerHomeMapScreen(user: widget.user);
         }
 
         if (ride.status == RideStatus.cancelled) {
-          return CustomerHomeMapScreen(user: user);
+          return CustomerHomeMapScreen(user: widget.user);
         }
 
         switch (ride.status) {
           case RideStatus.searching:
-            return FindingDriverScreen(rideId: rideId, embedded: true);
+            return FindingDriverScreen(rideId: widget.rideId, embedded: true);
           case RideStatus.matched:
-            return DriverAssignedScreen(rideId: rideId, embedded: true);
+            return DriverAssignedScreen(rideId: widget.rideId, embedded: true);
           case RideStatus.accepted:
           case RideStatus.inProgress:
           case RideStatus.awaitingCashPayment:
-            return TrackDriverScreen(rideId: rideId, embedded: true);
+            return TrackDriverScreen(rideId: widget.rideId, embedded: true);
           case RideStatus.completed:
-            return TripCompletedScreen(rideId: rideId);
+            return TripCompletedScreen(rideId: widget.rideId);
           case RideStatus.cancelled:
-            return CustomerHomeMapScreen(user: user);
+            return CustomerHomeMapScreen(user: widget.user);
         }
       },
     );

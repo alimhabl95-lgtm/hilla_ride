@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 
 enum UserRole: String, Codable, CaseIterable, Identifiable {
@@ -32,6 +33,8 @@ struct AppUser: Identifiable, Equatable {
     let referralCode: String
     let completedRidesCount: Int
     let loyaltyFreeRidesRemaining: Int
+    let latitude: Double?
+    let longitude: Double?
 
     var id: String { uid }
     var hasPromoRemaining: Bool {
@@ -42,6 +45,10 @@ struct AppUser: Identifiable, Equatable {
     }
     var isProfileComplete: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && age > 0
+    }
+    var coordinate: CLLocationCoordinate2D? {
+        guard let latitude, let longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 
     init(
@@ -59,7 +66,9 @@ struct AppUser: Identifiable, Equatable {
         promoRidesLimit: Int = 0,
         referralCode: String = "",
         completedRidesCount: Int = 0,
-        loyaltyFreeRidesRemaining: Int = 0
+        loyaltyFreeRidesRemaining: Int = 0,
+        latitude: Double? = nil,
+        longitude: Double? = nil
     ) {
         self.uid = uid
         self.phone = phone
@@ -76,6 +85,8 @@ struct AppUser: Identifiable, Equatable {
         self.referralCode = referralCode
         self.completedRidesCount = completedRidesCount
         self.loyaltyFreeRidesRemaining = loyaltyFreeRidesRemaining
+        self.latitude = latitude
+        self.longitude = longitude
     }
 
     init?(documentID: String, data: [String: Any]) {
@@ -95,5 +106,7 @@ struct AppUser: Identifiable, Equatable {
         referralCode = data["referralCode"] as? String ?? ""
         completedRidesCount = (data["completedRidesCount"] as? NSNumber)?.intValue ?? 0
         loyaltyFreeRidesRemaining = (data["loyaltyFreeRidesRemaining"] as? NSNumber)?.intValue ?? 0
+        latitude = (data["latitude"] as? NSNumber)?.doubleValue
+        longitude = (data["longitude"] as? NSNumber)?.doubleValue
     }
 }

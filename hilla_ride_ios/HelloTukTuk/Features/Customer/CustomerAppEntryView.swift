@@ -32,6 +32,9 @@ struct CustomerAppEntryView: View {
            .onChange(of: activeRide?.id) { newId in
             if let newId {
                 sessionRideId = newId
+            } else {
+                // Ride ended/cancelled — return to home so the icon can reopen later.
+                sessionRideId = nil
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToCurrentRide)) { _ in

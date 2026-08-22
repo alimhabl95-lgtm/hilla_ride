@@ -309,10 +309,16 @@ class _BottomSheetSearch extends StatelessWidget {
         AppSpacing.lg,
         AppSpacing.lg,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxH = MediaQuery.sizeOf(context).height * 0.55;
+          return ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxH),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
           const AppSheetHandle(),
           const SizedBox(height: AppSpacing.sm),
           Text(
@@ -414,7 +420,11 @@ class _BottomSheetSearch extends StatelessWidget {
               ),
             ),
           ],
-        ],
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -571,14 +581,8 @@ class _CustomerRegionFieldsState extends State<_CustomerRegionFields> {
         districtsInProvince.any((d) => d.id == widget.districtId)
             ? widget.districtId
             : (districtsInProvince.isNotEmpty ? districtsInProvince.first.id : null);
-    // Keep parent district in sync when catalog/province make current id invalid.
-    if (districtValue != null &&
-        districtValue != widget.districtId &&
-        districtsInProvince.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        widget.onDistrictChanged(districtValue);
-      });
-    }
+    // Do not auto-rewrite parent district — that cleared the customer's
+    // selected ناحية and blocked destination search after pickup.
 
     final subIds = district.subDistricts.map((s) => s.id).toSet();
     final subValue = (widget.subDistrictId != null &&
