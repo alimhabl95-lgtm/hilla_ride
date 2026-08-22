@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/region_search_context.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
@@ -250,56 +251,77 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: TextField(
-              controller: _controller,
-              textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isArabic ? TextAlign.right : TextAlign.left,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: l10n.searchFieldHint,
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: _clearQuery,
-                ),
-              ),
-              onSubmitted: _applyFilter,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Column(
+          Container(
+            width: double.infinity,
+            color: AppBrandAssets.brandSurface,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Row(
               children: [
-                Text(
-                  l10n.searchRegionHint(regionLabel),
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
+                const Icon(
+                  Icons.location_on_outlined,
+                  color: AppBrandAssets.brandTealDark,
                 ),
-                if (_placesBlocked && _results.isEmpty && !_isSearching)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      l10n.placesApiDenied,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                else if (_placesBlocked && _results.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      l10n.searchUsingOpenStreetMap,
-                      style: Theme.of(context).textTheme.bodySmall,
-                      textAlign: TextAlign.center,
-                    ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.searchRegionHint(regionLabel),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppBrandAssets.brandNavy,
+                        ),
                   ),
+                ),
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    textDirection:
+                        isArabic ? TextDirection.rtl : TextDirection.ltr,
+                    textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: l10n.searchFieldHint,
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: _clearQuery,
+                      ),
+                    ),
+                    onSubmitted: _applyFilter,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () => _applyFilter(_controller.text),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppBrandAssets.brandTealDark,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                  child: Text(isArabic ? 'بحث' : 'Search'),
+                ),
+              ],
+            ),
+          ),
+          if (_placesBlocked && _results.isEmpty && !_isSearching)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                l10n.placesApiDenied,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ),
           if (_uid != null && _controller.text.trim().isEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -370,8 +392,7 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
               },
             ),
           ),
-          if (_isSearching)
-            const LinearProgressIndicator(minHeight: 2),
+          if (_isSearching) const LinearProgressIndicator(minHeight: 2),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
@@ -395,35 +416,38 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
                       final place = _results[index];
                       final isSaved = _matchSaved(place) != null;
                       return ListTile(
-                        leading: const Icon(Icons.place_outlined),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        leading: const Icon(
+                          Icons.place,
+                          color: AppBrandAssets.brandTealDark,
+                        ),
                         title: Text(
                           place.label,
                           textDirection:
                               isArabic ? TextDirection.rtl : TextDirection.ltr,
-                          textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                          textAlign:
+                              isArabic ? TextAlign.right : TextAlign.left,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         trailing: _uid == null
-                            ? null
-                            : TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                ),
+                            ? const Icon(Icons.chevron_right)
+                            : IconButton(
+                                tooltip: isSaved
+                                    ? l10n.placeRemoveFromSaved
+                                    : l10n.savePlaceShort,
                                 onPressed: () => _toggleSave(place),
                                 icon: Icon(
                                   isSaved
                                       ? Icons.bookmark
                                       : Icons.bookmark_border,
-                                  size: 20,
                                   color: isSaved
                                       ? Theme.of(context).colorScheme.primary
-                                      : null,
-                                ),
-                                label: Text(
-                                  isSaved
-                                      ? l10n.placeRemoveFromSaved
-                                      : l10n.savePlaceShort,
+                                      : AppBrandAssets.brandTealDark,
                                 ),
                               ),
                         onTap: () => Navigator.of(context).pop(place),

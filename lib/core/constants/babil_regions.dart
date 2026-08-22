@@ -227,6 +227,71 @@ class BabilRegions {
         2.0;
   }
 
+  /// Soft district match for place search — keeps Google/OSM hits near any
+  /// sub-district center even when Admin polygons/radii are tight.
+  static bool isNearDistrictForSearch(
+    String districtId,
+    LatLng point, {
+    double extraBufferKm = 12,
+  }) {
+    if (isWithinDistrict(districtId, point)) return true;
+    final district = districtById(districtId);
+    if (district.subDistricts.isEmpty) return false;
+    return district.subDistricts.any((sub) {
+      final bias = searchBiasRadiusKmFor(districtId, sub.id);
+      final allowed =
+          (sub.searchRadiusKm > bias ? sub.searchRadiusKm : bias);
+      final capped = allowed < 20 ? 20.0 : allowed;
+      final km = _distance.as(LengthUnit.Kilometer, sub.center, point);
+      return km <= capped + extraBufferKm;
+    });
+  }
+
+  /// Bias radius large enough to cover the whole district for providers.
+  static double searchBiasRadiusKmForDistrict(String districtId) {
+    final district = districtById(districtId);
+    if (district.subDistricts.isEmpty) {
+      return defaultSubDistrictRadiusKm + 10;
+    }
+    final centers = district.subDistricts.map((s) => s.center).toList();
+    final avgLat =
+        centers.map((c) => c.latitude).reduce((a, b) => a + b) / centers.length;
+    final avgLon =
+        centers.map((c) => c.longitude).reduce((a, b) => a + b) / centers.length;
+    final centroid = LatLng(avgLat, avgLon);
+    var maxKm = defaultSubDistrictRadiusKm;
+    for (final sub in district.subDistricts) {
+      final reach = _distance.as(LengthUnit.Kilometer, centroid, sub.center) +
+          (sub.searchRadiusKm > searchBiasRadiusKmFor(districtId, sub.id)
+              ? sub.searchRadiusKm
+              : searchBiasRadiusKmFor(districtId, sub.id));
+      if (reach > maxKm) maxKm = reach;
+    }
+    final padded = maxKm + 8;
+    return padded > 55 ? 55 : padded;
+  }
+
+  static LatLng districtSearchCenter(String districtId) {
+    final district = districtById(districtId);
+    if (district.subDistricts.isEmpty) {
+      return const LatLng(32.374, 44.665);
+    }
+    final centers = district.subDistricts.map((s) => s.center).toList();
+    final avgLat =
+        centers.map((c) => c.latitude).reduce((a, b) => a + b) / centers.length;
+    final avgLon =
+        centers.map((c) => c.longitude).reduce((a, b) => a + b) / centers.length;
+    return LatLng(avgLat, avgLon);
+  }
+
+  /// Rough Babil / south-central Iraq box used as a search safety net.
+  static bool isInBabilServiceBox(LatLng point) {
+    return point.latitude >= 31.7 &&
+        point.latitude <= 33.2 &&
+        point.longitude >= 43.8 &&
+        point.longitude <= 45.4;
+  }
+
   /// True when [point] falls inside the sub-district's effective boundary:
   /// its Admin-drawn polygon when present, otherwise a polygon synthesized
   /// from its center + search radius. Always a true geographic boundary

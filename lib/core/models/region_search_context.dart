@@ -38,7 +38,7 @@ class RegionSearchContext {
 
   double get searchRadiusKm {
     if (!hasSubDistrict) {
-      return BabilRegions.defaultSubDistrictRadiusKm;
+      return BabilRegions.searchBiasRadiusKmForDistrict(districtId);
     }
     return BabilRegions.searchRadiusKmFor(districtId, subDistrictId!);
   }
@@ -49,14 +49,19 @@ class RegionSearchContext {
   /// candidates in odd-shaped/elongated areas.
   double get searchBiasRadiusKm {
     if (!hasSubDistrict) {
-      return BabilRegions.defaultSubDistrictRadiusKm;
+      return BabilRegions.searchBiasRadiusKmForDistrict(districtId);
     }
-    return BabilRegions.searchBiasRadiusKmFor(districtId, subDistrictId!);
+    // Prefer whole-district bias so places in neighboring نواحٍ still appear.
+    final districtBias =
+        BabilRegions.searchBiasRadiusKmForDistrict(districtId);
+    final subBias =
+        BabilRegions.searchBiasRadiusKmFor(districtId, subDistrictId!);
+    return districtBias > subBias ? districtBias : subBias;
   }
 
   LatLng get searchCenter {
     if (!hasSubDistrict) {
-      return district.subDistricts.first.center;
+      return BabilRegions.districtSearchCenter(districtId);
     }
     return subDistrict.center;
   }

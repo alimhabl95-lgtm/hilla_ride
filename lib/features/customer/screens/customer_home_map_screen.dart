@@ -53,6 +53,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   LatLng? _lastWatchCenter;
   double _cameraZoom = 14;
   LatLng? _lastKnownDeviceLocation;
+  bool _suppressLocationClear = false;
 
   @override
   void initState() {
@@ -154,10 +155,11 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   }
 
   void _clearDestinationIfOutsideRegion() {
+    if (_suppressLocationClear) return;
     final destination = _destination;
     if (destination == null) return;
     final geocoding = context.read<AppState>().geocodingService;
-    if (!geocoding.isWithinRegion(
+    if (!geocoding.isNearSelectedArea(
       _region,
       ll.LatLng(destination.latitude, destination.longitude),
     )) {
@@ -166,10 +168,11 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   }
 
   void _clearPickupIfOutsideRegion() {
+    if (_suppressLocationClear) return;
     final pickup = _pickup;
     if (pickup == null) return;
     final geocoding = context.read<AppState>().geocodingService;
-    if (!geocoding.isWithinRegion(
+    if (!geocoding.isNearSelectedArea(
       _region,
       ll.LatLng(pickup.latitude, pickup.longitude),
     )) {
@@ -177,19 +180,95 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     }
   }
 
-  Future<void> _useCurrentLocation() async {
-    if (!mounted) return;
+  void _releaseLocationClearSuppress() {
+    Future<void>.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) _suppressLocationClear = false;
+    });
+  }
+
+  /// Align governorate / district / area to a coordinate (like iOS adoptPlaceArea).
+  bool _adoptPlaceArea(ll.LatLng coordinate) {
+    final resolved = BabilRegions.resolveFromPoint(coordinate);
+    final nearDistrict = BabilRegions.isNearDistrictForSearch(
+      resolved.districtId,
+      coordinate,
+      extraBufferKm: 35,
+    );
+    final inBox = BabilRegions.isInBabilServiceBox(coordinate);
+    if (!nearDistrict && !inBox) {
+      return false;
+    }
+
+    setState(() {
+      _districtId = resolved.districtId;
+      _subDistrictId = resolved.subDistrictId;
+    });
+    context.read<AppState>().pricingService.prefetchConfig(
+          districtId: resolved.districtId,
+          subDistrictId: resolved.subDistrictId,
+        );
+    return true;
+  }
+
+  void _setPickupFromSearch(PlaceResult place) {
     final l10n = AppLocalizations.of(context)!;
-    if (_subDistrictId == null || _subDistrictId!.isEmpty) {
+    final point = ll.LatLng(place.latitude, place.longitude);
+    final destination = _destination;
+    if (destination != null &&
+        !RideLocationRules.areDistinctPlaces(place, destination)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.selectSubDistrictRequired)),
+        SnackBar(content: Text(l10n.pickupDestinationMustDiffer)),
       );
       return;
     }
+
+    _suppressLocationClear = true;
+    // Always apply the tapped place first so the field never stays blank.
+    setState(() => _pickup = place);
+    if (!_adoptPlaceArea(point)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.searchOutsideRegion)),
+      );
+    }
+    _releaseLocationClearSuppress();
+    _moveMap(LatLng(place.latitude, place.longitude));
+    _fitTripOnMap();
+    unawaited(_refreshTripMarkers());
+    _restartNearbyWatch(force: true);
+  }
+
+  bool _applyDestination(PlaceResult place) {
+    final l10n = AppLocalizations.of(context)!;
+    final point = ll.LatLng(place.latitude, place.longitude);
+    final pickup = _pickup;
+    if (pickup != null && !RideLocationRules.areDistinctPlaces(pickup, place)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.pickupDestinationMustDiffer)),
+      );
+      return false;
+    }
+
+    _suppressLocationClear = true;
+    setState(() => _destination = place);
+    if (!_adoptPlaceArea(point)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.searchOutsideRegion)),
+      );
+    }
+    _releaseLocationClearSuppress();
+    unawaited(_refreshTripMarkers());
+    _moveMap(LatLng(place.latitude, place.longitude));
+    _fitTripOnMap();
+    return true;
+  }
+
+  Future<void> _useCurrentLocation() async {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
     setState(() => _pickupLoading = true);
 
     final geocoding = context.read<AppState>().geocodingService;
-    final district = BabilRegions.customerDistrict;
+    final district = BabilRegions.districtById(_districtId);
     final isArabic = l10n.localeName.startsWith('ar');
     final districtName = isArabic ? district.nameAr : district.nameEn;
     ll.LatLng point = _region.searchCenter;
@@ -225,9 +304,13 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
           final candidate = ll.LatLng(position.latitude, position.longitude);
           _lastKnownDeviceLocation =
               LatLng(position.latitude, position.longitude);
-          if (geocoding.isWithinRegion(_region, candidate)) {
+          if (geocoding.isNearSelectedArea(_region, candidate) ||
+              BabilRegions.isInBabilServiceBox(candidate)) {
             point = candidate;
             usedGps = true;
+            _suppressLocationClear = true;
+            _adoptPlaceArea(candidate);
+            _releaseLocationClearSuppress();
           } else if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.searchOutsideRegion)),
@@ -288,79 +371,8 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     }
   }
 
-  void _setPickupFromSearch(PlaceResult place) {
-    final l10n = AppLocalizations.of(context)!;
-    if (_subDistrictId == null || _subDistrictId!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.selectSubDistrictRequired)),
-      );
-      return;
-    }
-    final geocoding = context.read<AppState>().geocodingService;
-    if (!geocoding.isWithinRegion(
-      _region,
-      ll.LatLng(place.latitude, place.longitude),
-    )) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.searchOutsideRegion)),
-      );
-      return;
-    }
-    final destination = _destination;
-    if (destination != null &&
-        !RideLocationRules.areDistinctPlaces(place, destination)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.pickupDestinationMustDiffer)),
-      );
-      return;
-    }
-    setState(() => _pickup = place);
-    _moveMap(LatLng(place.latitude, place.longitude));
-    _fitTripOnMap();
-    unawaited(_refreshTripMarkers());
-    _restartNearbyWatch(force: true);
-  }
-
-  bool _applyDestination(PlaceResult place) {
-    final l10n = AppLocalizations.of(context)!;
-    if (_subDistrictId == null || _subDistrictId!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.selectSubDistrictRequired)),
-      );
-      return false;
-    }
-    final geocoding = context.read<AppState>().geocodingService;
-    if (!geocoding.isWithinRegion(
-      _region,
-      ll.LatLng(place.latitude, place.longitude),
-    )) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.searchOutsideRegion)),
-      );
-      return false;
-    }
-    final pickup = _pickup;
-    if (pickup != null && !RideLocationRules.areDistinctPlaces(pickup, place)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.pickupDestinationMustDiffer)),
-      );
-      return false;
-    }
-    setState(() => _destination = place);
-    unawaited(_refreshTripMarkers());
-    _moveMap(LatLng(place.latitude, place.longitude));
-    _fitTripOnMap();
-    return true;
-  }
-
   Future<void> _openPinPicker({required bool forPickup}) async {
     final l10n = AppLocalizations.of(context)!;
-    if (_subDistrictId == null || _subDistrictId!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.selectSubDistrictRequired)),
-      );
-      return;
-    }
     final initial = forPickup
         ? (_pickup != null
             ? ll.LatLng(_pickup!.latitude, _pickup!.longitude)
@@ -501,9 +513,19 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   /// before booking, exactly like a fresh area selection.
   void _onDistrictChanged(String? id) {
     if (id == null || id.isEmpty || id == _districtId) return;
+    if (_suppressLocationClear) {
+      setState(() => _districtId = id);
+      return;
+    }
     setState(() {
       _districtId = id;
-      _subDistrictId = null;
+      // Keep current sub-district when still valid for the new district.
+      final stillValid = BabilRegions.districtById(id)
+          .subDistricts
+          .any((s) => s.id == _subDistrictId);
+      if (!stillValid) {
+        _subDistrictId = null;
+      }
     });
     context.read<AppState>().pricingService.prefetchConfig(districtId: id);
     _clearDestinationIfOutsideRegion();
@@ -518,6 +540,10 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   }
 
   void _onSubDistrictChanged(String? id) {
+    if (_suppressLocationClear) {
+      setState(() => _subDistrictId = id);
+      return;
+    }
     setState(() => _subDistrictId = id);
     if (id == null || id.isEmpty) return;
     context.read<AppState>().pricingService.prefetchConfig(
@@ -561,12 +587,17 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
     final geocoding = context.read<AppState>().geocodingService;
     final pickupPoint = ll.LatLng(pickup.latitude, pickup.longitude);
     final destinationPoint = ll.LatLng(destination.latitude, destination.longitude);
-    if (!geocoding.isWithinRegion(_region, pickupPoint) ||
-        !geocoding.isWithinRegion(_region, destinationPoint)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.searchOutsideRegion)),
-      );
-      return;
+    if (!geocoding.isNearSelectedArea(_region, pickupPoint) ||
+        !geocoding.isNearSelectedArea(_region, destinationPoint)) {
+      // Soft adopt if still inside Babil service footprint.
+      final adoptedPickup = _adoptPlaceArea(pickupPoint);
+      final adoptedDest = _adoptPlaceArea(destinationPoint);
+      if (!adoptedPickup || !adoptedDest) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.searchOutsideRegion)),
+        );
+        return;
+      }
     }
 
     try {

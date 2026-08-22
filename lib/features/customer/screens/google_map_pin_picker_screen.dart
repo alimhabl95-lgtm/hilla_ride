@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/models/region_search_context.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
@@ -114,7 +115,9 @@ class _GoogleMapPinPickerScreenState extends State<GoogleMapPinPickerScreen> {
   void _confirm() async {
     final l10n = AppLocalizations.of(context)!;
     final geocoding = context.read<AppState>().geocodingService;
-    if (!geocoding.isWithinRegion(widget.region, _selectedPoint)) {
+    final near = geocoding.isNearSelectedArea(widget.region, _selectedPoint);
+    final inBox = BabilRegions.isInBabilServiceBox(_selectedPoint);
+    if (!near && !inBox) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.searchOutsideRegion)),
       );

@@ -87,16 +87,6 @@ class RideSearchPanel extends StatelessWidget {
     }
   }
 
-  bool _ensureSubDistrictSelected(BuildContext context, AppLocalizations l10n) {
-    if (subDistrictId != null && subDistrictId!.trim().isNotEmpty) {
-      return true;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.selectSubDistrictRequired)),
-    );
-    return false;
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -122,10 +112,10 @@ class RideSearchPanel extends StatelessWidget {
         destinationLabel: destinationLabel,
         pickupLoading: pickupLoading,
         pickup: pickup,
+        destination: destination,
         onDistrictChanged: onDistrictChanged,
         onSubDistrictChanged: onSubDistrictChanged,
         onOpenDestinationSearch: () {
-          if (!_ensureSubDistrictSelected(context, l10n)) return;
           _openSearch(
             context,
             title: l10n.whereTo,
@@ -137,7 +127,6 @@ class RideSearchPanel extends StatelessWidget {
         onOpenPickupSearch: pickupLoading
             ? null
             : () {
-                if (!_ensureSubDistrictSelected(context, l10n)) return;
                 _openSearch(
                   context,
                   title: l10n.pickup,
@@ -146,28 +135,11 @@ class RideSearchPanel extends StatelessWidget {
                   onSelected: onPickupSelected,
                 );
               },
-        onPinPickup: () {
-          if (!_ensureSubDistrictSelected(context, l10n)) return;
-          onPinPickup();
-        },
-        onUseCurrentLocation: () {
-          if (!_ensureSubDistrictSelected(context, l10n)) return;
-          onUseCurrentLocation();
-        },
-        onPinDestination: () {
-          if (!_ensureSubDistrictSelected(context, l10n)) return;
-          onPinDestination();
-        },
-        onSavedPlaceSelected: (place) {
-          if (!_ensureSubDistrictSelected(context, l10n)) return;
-          onSavedPlaceSelected(place);
-        },
-        onBookRide: onBookRide == null
-            ? null
-            : () {
-                if (!_ensureSubDistrictSelected(context, l10n)) return;
-                onBookRide!();
-              },
+        onPinPickup: onPinPickup,
+        onUseCurrentLocation: onUseCurrentLocation,
+        onPinDestination: onPinDestination,
+        onSavedPlaceSelected: onSavedPlaceSelected,
+        onBookRide: onBookRide,
       );
     }
 
@@ -253,6 +225,7 @@ class _BottomSheetSearch extends StatelessWidget {
     required this.destinationLabel,
     required this.pickupLoading,
     required this.pickup,
+    required this.destination,
     required this.onDistrictChanged,
     required this.onSubDistrictChanged,
     required this.onOpenDestinationSearch,
@@ -273,6 +246,7 @@ class _BottomSheetSearch extends StatelessWidget {
   final String? destinationLabel;
   final bool pickupLoading;
   final PlaceResult? pickup;
+  final PlaceResult? destination;
   final ValueChanged<String?> onDistrictChanged;
   final ValueChanged<String?> onSubDistrictChanged;
   final VoidCallback onOpenDestinationSearch;
@@ -286,9 +260,10 @@ class _BottomSheetSearch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasPickup = !pickupLoading && pickup != null;
+    final hasDestination = destination != null;
     final destinationText = destinationLabel?.trim();
-    final hasDestination =
-        destinationText != null && destinationText.isNotEmpty;
+    final canBook = hasPickup && hasDestination;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -303,6 +278,14 @@ class _BottomSheetSearch extends StatelessWidget {
         children: [
           const AppSheetHandle(),
           const SizedBox(height: AppSpacing.sm),
+          Text(
+            l10n.bookRideTitle,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppBrandAssets.brandNavy,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
           if (customerOnly)
             _CustomerRegionFields(
               districtId: districtId,
@@ -319,23 +302,23 @@ class _BottomSheetSearch extends StatelessWidget {
               onDistrictChanged: onDistrictChanged,
               onSubDistrictChanged: onSubDistrictChanged,
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _TripSearchField(
             onTap: onOpenPickupSearch,
             theme: theme,
             text: pickupLoading
                 ? l10n.locatingCurrentPosition
                 : (pickupLabel ?? l10n.pickup),
-            emphasized: !pickupLoading &&
-                pickupLabel != null &&
-                pickupLabel!.trim().isNotEmpty,
+            emphasized: hasPickup,
             leading: Container(
-              width: 14,
-              height: 14,
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
               decoration: const BoxDecoration(
                 color: MapMarkerColors.pickup,
                 shape: BoxShape.circle,
               ),
+              child: const Icon(Icons.trip_origin, size: 14, color: Colors.white),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -354,47 +337,44 @@ class _BottomSheetSearch extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           _TripSearchField(
             onTap: onOpenDestinationSearch,
             theme: theme,
-            text: hasDestination ? destinationText : l10n.whereTo,
+            text: hasDestination
+                ? (destinationText ?? destination!.label)
+                : l10n.whereTo,
             emphasized: hasDestination,
-            leading: Icon(
-              Icons.search,
-              color: theme.colorScheme.outline,
+            leading: Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: MapMarkerColors.destination,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.search, size: 14, color: Colors.white),
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _MiniAction(
-                  tooltip: l10n.pinOnMap,
-                  icon: Icons.edit_location_alt_outlined,
-                  onPressed: onPinDestination,
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: MapMarkerColors.destination,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              ],
+            trailing: _MiniAction(
+              tooltip: l10n.pinOnMap,
+              icon: Icons.edit_location_alt_outlined,
+              onPressed: onPinDestination,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           SavedPlacesBar(
             compact: true,
             onPlaceSelected: onSavedPlaceSelected,
           ),
           if (onBookRide != null) ...[
             const SizedBox(height: AppSpacing.md),
-            AppPrimaryButton(
-              label: l10n.bookRideButton,
-              icon: Icons.local_taxi,
-              onPressed: onBookRide,
+            Opacity(
+              opacity: canBook ? 1 : 0.55,
+              child: AppPrimaryButton(
+                label: l10n.bookRideButton,
+                icon: Icons.local_taxi,
+                onPressed: onBookRide,
+              ),
             ),
           ],
         ],

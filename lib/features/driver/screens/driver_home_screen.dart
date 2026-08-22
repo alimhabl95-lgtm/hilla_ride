@@ -378,22 +378,143 @@ class _IdleDriverPanel extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
-        Center(
-          child: ProfileAvatarCircle.driver(
-            driverId: driver.uid,
-            name: driver.name,
-            profilePhotoUrl: driver.profilePhotoUrl,
-            radius: 44,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          isAr ? 'حساب السائق' : 'Driver account',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: AppBrandAssets.brandNavy,
+        Row(
+          children: [
+            ProfileAvatarCircle.driver(
+              driverId: driver.uid,
+              name: driver.name,
+              profilePhotoUrl: driver.profilePhotoUrl,
+              radius: 28,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isAr ? 'مرحباً' : 'Welcome',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppBrandAssets.brandMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  Text(
+                    driver.name.isEmpty
+                        ? (isAr ? 'حساب السائق' : 'Driver')
+                        : driver.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppBrandAssets.brandNavy,
+                        ),
+                  ),
+                ],
               ),
+            ),
+            IconButton.filledTonal(
+              onPressed: onOpenWallet,
+              style: IconButton.styleFrom(
+                foregroundColor: AppBrandAssets.brandTealDark,
+                backgroundColor:
+                    AppBrandAssets.brandTeal.withValues(alpha: 0.12),
+              ),
+              icon: const Icon(Icons.account_balance_wallet_outlined),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: driver.isOnline
+                          ? AppBrandAssets.brandSuccess
+                          : AppBrandAssets.brandMuted,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    isAr ? 'الحالة' : 'Availability',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppBrandAssets.brandNavy,
+                        ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (driver.isOnline
+                              ? AppBrandAssets.brandSuccess
+                              : AppBrandAssets.brandMuted)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      driver.isOnline
+                          ? (isAr ? 'متصل' : 'Online')
+                          : (isAr ? 'غير متصل' : 'Offline'),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        color: driver.isOnline
+                            ? AppBrandAssets.brandSuccess
+                            : AppBrandAssets.brandMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                availabilityHint,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: driver.hasAssignedWorkArea
+                          ? AppBrandAssets.brandMuted
+                          : AppBrandAssets.brandDanger,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (isUpdatingOnline)
+                const Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: AppBrandAssets.brandTeal,
+                    ),
+                  ),
+                )
+              else if (driver.isOnline)
+                AppSecondaryButton(
+                  label: isAr ? 'إيقاف العمل' : 'Go offline',
+                  icon: Icons.pause_circle_filled,
+                  onPressed: !driver.hasAssignedWorkArea
+                      ? null
+                      : () => onToggleOnline(false),
+                )
+              else
+                AppPrimaryButton(
+                  label: isAr ? 'ابدأ استقبال الطلبات' : 'Go online',
+                  icon: Icons.play_circle_filled,
+                  onPressed: !driver.hasAssignedWorkArea
+                      ? null
+                      : () => onToggleOnline(true),
+                ),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.lg),
         AppWalletCard(
@@ -407,66 +528,6 @@ class _IdleDriverPanel extends StatelessWidget {
               : (isAr ? 'غير متصل' : 'Offline'),
           actionLabel: isAr ? 'فتح المحفظة / شحن' : 'Open wallet / recharge',
           onAction: onOpenWallet,
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        AppCard(
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isAr ? 'الحالة' : 'Status',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppBrandAssets.brandNavy,
-                          ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      driver.isOnline
-                          ? (isAr ? 'متصل' : 'Online')
-                          : (isAr ? 'غير متصل' : 'Offline'),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: driver.isOnline
-                                ? AppBrandAssets.brandTealDark
-                                : AppBrandAssets.brandMuted,
-                          ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      availabilityHint,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: driver.hasAssignedWorkArea
-                                ? AppBrandAssets.brandMuted
-                                : AppBrandAssets.brandDanger,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isUpdatingOnline)
-                const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: AppBrandAssets.brandTeal,
-                  ),
-                )
-              else
-                Switch(
-                  value: driver.isOnline,
-                  activeTrackColor: AppBrandAssets.brandTeal,
-                  activeThumbColor: Colors.white,
-                  onChanged: !driver.hasAssignedWorkArea
-                      ? null
-                      : onToggleOnline,
-                ),
-            ],
-          ),
         ),
         const SizedBox(height: AppSpacing.lg),
         DriverDeliveryOrdersPanel(driverId: driver.uid),
