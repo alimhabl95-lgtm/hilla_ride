@@ -46,6 +46,7 @@ enum L10nKey {
     case phoneAlreadyRegistered
     case networkError
     case tooManyRequests
+    case authInternalError
     case sessionActive
     case acceptTerms
     case privacyPolicy
@@ -346,6 +347,10 @@ enum L10n {
         ],
         .networkError: [.english: "Network error. Try again.", .arabic: "خطأ في الشبكة. حاول مرة أخرى."],
         .tooManyRequests: [.english: "Too many attempts. Try again later.", .arabic: "محاولات كثيرة. حاول لاحقاً."],
+        .authInternalError: [
+            .english: "Login service is temporarily unavailable. Please try again in a minute.",
+            .arabic: "خدمة تسجيل الدخول غير متاحة مؤقتاً. حاول مرة أخرى بعد دقيقة."
+        ],
         .sessionActive: [
             .english: "This account is already open on another phone.",
             .arabic: "هذا الحساب مفتوح على هاتف آخر."

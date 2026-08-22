@@ -20,7 +20,13 @@ enum AuthErrorMessages {
                 return L10n.string(.networkError)
             case .tooManyRequests:
                 return L10n.string(.tooManyRequests)
+            case .internalError:
+                return L10n.string(.authInternalError)
             default:
+                let description = authError.localizedDescription.lowercased()
+                if description.contains("internal error") {
+                    return L10n.string(.authInternalError)
+                }
                 return authError.localizedDescription
             }
         }

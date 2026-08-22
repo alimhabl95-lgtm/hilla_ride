@@ -2,21 +2,23 @@
 ///
 /// Manage keys: https://console.cloud.google.com/apis/credentials?project=hello-tiktok-57dc5
 ///
-/// ## iOS key (Firebase) — map tiles on iPhone
+/// ## iOS key (Firebase) — map tiles on iPhone only
 /// `AIzaSyDD4…` → native iOS `GMSApiKey` / `MapsConfig.mapRenderKey`
 /// Application restrictions: **iOS apps** → `com.hillaride.hillaRide`
-/// APIs: **Maps SDK for iOS** (+ Places/Directions if needed)
+/// APIs: **Maps SDK for iOS** only is OK for this key
+/// Do NOT use this Maps-only key in GoogleService-Info.plist (breaks login).
 ///
-/// ## Android key (Firebase) — map tiles on Android
+/// ## Android key (Firebase) — map tiles on Android only
 /// [androidMapApiKey] → `android/app/src/main/AndroidManifest.xml`
 /// Application restrictions: **Android apps** → package `com.hillaride.hilla_ride` + SHA-1
-/// APIs: **Maps SDK for Android**, Places API (New) recommended
+/// APIs: **Maps SDK for Android**
+/// Do NOT use this Maps-only key in google-services.json (breaks login).
 ///
-/// ## Browser key (Firebase) — place search HTTP + web map
-/// [placesWebApiKey] → [GooglePlacesService] / `web/index.html`
+/// ## Browser key (Firebase) — Auth + place search HTTP + web map
+/// [placesWebApiKey] → GoogleService-Info / google-services.json / Places / `web/index.html`
 /// Application restrictions: **None** (or HTTP referrers for hosting domains)
-/// APIs required: **Places API (New)**, **Maps JavaScript API**
-/// Optional: Geocoding API, Directions API
+/// APIs required: **Identity Toolkit**, **Places API (New)**, **Maps JavaScript API**
+/// Optional: Geocoding API, Directions API, Token Service API
 class MapsConfig {
   MapsConfig._();
 
