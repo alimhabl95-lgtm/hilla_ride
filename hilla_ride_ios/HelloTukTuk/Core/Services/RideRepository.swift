@@ -86,7 +86,16 @@ final class RideRepository {
             pickup: pickup.coordinate,
             destination: destination.coordinate
         ) != nil {
-            throw RideServiceError.outOfService
+            // Soft client gate only — server re-checks with the same soft rules.
+            // Keep booking usable when catalog sync is stale or polygons overlap.
+            let inBabilBox: (CLLocationCoordinate2D) -> Bool = { point in
+                (31.7...33.2).contains(point.latitude) && (43.8...45.4).contains(point.longitude)
+            }
+            let pickupOk = inBabilBox(pickup.coordinate)
+            let destinationOk = inBabilBox(destination.coordinate)
+            if !(pickupOk && destinationOk) {
+                throw RideServiceError.outOfService
+            }
         }
 
         var payload: [String: Any] = [
@@ -305,7 +314,7 @@ final class RideRepository {
         if message.contains("active_ride") || message.contains("active ride") {
             return RideServiceError.activeRideExists
         }
-        if message.contains("out_of_service") || message.contains("out of service") {
+        if message.contains("outside_area") || message.contains("out_of_service") || message.contains("out of service") || message.contains("area_inactive") || message.contains("area_closed") {
             return RideServiceError.outOfService
         }
         if message.contains("no_drivers") {

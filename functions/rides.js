@@ -1,4 +1,4 @@
-const { isWithinBoundaryUnique } = require("./geo");
+const { isWithinBoundary, distanceKm } = require("./geo");
 
 /**
  * Server-authoritative ride lifecycle mutations.
@@ -7,19 +7,12 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
   const db = () => admin.firestore();
 
   /**
-   * Defense-in-depth: re-validates pickup/destination against the
-   * resolved sub-district's effective boundary (Admin-drawn polygon, or
-   * one synthesized from center + radius) — mirrors the client-side
-   * checks so a compromised/modified client can't bypass area scoping.
-   * Also mirrors the client's nearest-center tie-break for overlapping
-   * temporary circle boundaries, so the backend can't be tricked into
-   * accepting a point that the client would have rejected (e.g. a point
-   * inside Qasim's circle that also happens to fall inside Al-Shumali's
-   * larger overlapping circle). Throws `outside_area` / `area_inactive`
-   * HttpsErrors when invalid. No-ops when `subDistrictId` is empty
-   * (unscoped ride creation).
+   * Soft area check for booking — selected ناحية (+ buffer), or any active
+   * ناحية in the same district. Avoid unique/nearest rejects when Admin
+   * circles overlap (common for الشوملي / مركز الهاشمية).
    */
   async function assertWithinServiceArea({
+    districtId,
     subDistrictId,
     pickup,
     destination,
@@ -33,17 +26,22 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     if (String(sub.status || "inactive") !== "active") {
       throw new functions.https.HttpsError("failed-precondition", "area_inactive");
     }
-    const center = { lat: Number(sub.latitude) || 0, lng: Number(sub.longitude) || 0 };
-    const radiusKm = Number(sub.searchRadiusKm) || 22;
-    const storedBoundary = Array.isArray(sub.boundary) ? sub.boundary : undefined;
 
-    const othersSnap = await db()
-      .collection("serviceSubDistricts")
-      .where("status", "==", "active")
-      .get();
-    const others = othersSnap.docs
-      .filter((doc) => doc.id !== subDistrictId)
-      .map((doc) => {
+    const resolvedDistrictId = String(districtId || sub.districtId || "").trim();
+    const selected = {
+      center: { lat: Number(sub.latitude) || 0, lng: Number(sub.longitude) || 0 },
+      radiusKm: Number(sub.searchRadiusKm) || 22,
+      boundary: Array.isArray(sub.boundary) ? sub.boundary : undefined,
+    };
+
+    let districtSubs = [selected];
+    if (resolvedDistrictId) {
+      const peersSnap = await db()
+        .collection("serviceSubDistricts")
+        .where("districtId", "==", resolvedDistrictId)
+        .where("status", "==", "active")
+        .get();
+      districtSubs = peersSnap.docs.map((doc) => {
         const data = doc.data() || {};
         return {
           center: { lat: Number(data.latitude) || 0, lng: Number(data.longitude) || 0 },
@@ -51,10 +49,27 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
           boundary: Array.isArray(data.boundary) ? data.boundary : undefined,
         };
       });
+      if (districtSubs.length === 0) {
+        districtSubs = [selected];
+      }
+    }
+
+    function nearArea(point, area) {
+      const softRadius = Math.max(Number(area.radiusKm) || 22, 12) + 12;
+      if (isWithinBoundary(point, area.center, softRadius, area.boundary)) {
+        return true;
+      }
+      return distanceKm(area.center, point) <= softRadius;
+    }
+
+    function pointAllowed(point) {
+      if (nearArea(point, selected)) return true;
+      return districtSubs.some((area) => nearArea(point, area));
+    }
 
     for (const point of [pickup, destination]) {
       if (!point) continue;
-      if (!isWithinBoundaryUnique(point, center, radiusKm, storedBoundary, others)) {
+      if (!pointAllowed(point)) {
         throw new functions.https.HttpsError("failed-precondition", "outside_area");
       }
     }
@@ -213,6 +228,7 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     }
 
     await assertWithinServiceArea({
+      districtId,
       subDistrictId,
       pickup: { lat: pickupLat, lng: pickupLng },
       destination: { lat: destinationLat, lng: destinationLng },
