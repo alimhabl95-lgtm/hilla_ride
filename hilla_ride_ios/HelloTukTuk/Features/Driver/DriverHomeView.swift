@@ -720,8 +720,21 @@ struct DriverHomeView: View {
                 }
             }
         }
-        .buttonStyle(style == .primary ? PrimaryButtonStyle() : SecondaryButtonStyle(destructive: true))
         .disabled(pending)
+        .modifier(RideActionButtonStyleModifier(style: style))
+    }
+
+    private struct RideActionButtonStyleModifier: ViewModifier {
+        let style: RideActionStyle
+
+        func body(content: Content) -> some View {
+            switch style {
+            case .primary:
+                content.buttonStyle(PrimaryButtonStyle())
+            case .secondaryDestructive:
+                content.buttonStyle(SecondaryButtonStyle(destructive: true))
+            }
+        }
     }
 
     private func rideActionKey(rideId: String, action: String) -> String {

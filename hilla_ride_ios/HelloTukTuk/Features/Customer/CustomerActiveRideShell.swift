@@ -254,7 +254,7 @@ struct FindingDriverView: View {
 
         let customerId = appState.currentUser?.uid
             ?? Auth.auth().currentUser?.uid
-        guard let customerId else {
+        guard customerId != nil else {
             await MainActor.run {
                 isCancelling = false
                 actionError = L10n.string(.networkError, language: appState.language)
