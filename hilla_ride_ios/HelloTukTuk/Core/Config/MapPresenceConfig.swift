@@ -12,6 +12,12 @@ enum MapPresenceConfig {
     static let locationPublishMinMoveMeters: CLLocationDistance = 10
     static let markerAnimationDuration: TimeInterval = 0.9
     static let routeRefreshInterval: TimeInterval = 18
+    static let routeRefreshMinMoveMeters: CLLocationDistance = 40
+}
+
+enum CustomerFeatureFlags {
+    /// Marketplace / Stores — hidden for first ride-only release (code remains).
+    static let storesTabEnabled = false
 }
 
 enum DriverOperationalStatus: String {

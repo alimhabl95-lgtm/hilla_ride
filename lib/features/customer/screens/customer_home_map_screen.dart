@@ -560,7 +560,17 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
       setState(() => _subDistrictId = id);
       return;
     }
-    setState(() => _subDistrictId = id);
+    setState(() {
+      _subDistrictId = id;
+      if (id != null && id.isNotEmpty) {
+        for (final district in BabilRegions.customerDistricts) {
+          if (district.subDistricts.any((sub) => sub.id == id)) {
+            _districtId = district.id;
+            break;
+          }
+        }
+      }
+    });
     if (id == null || id.isEmpty) return;
     context.read<AppState>().pricingService.prefetchConfig(
           districtId: _districtId,

@@ -115,7 +115,8 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
     required Ride ride,
     required LatLng driverPos,
   }) async {
-    final toPickup = ride.status == RideStatus.accepted;
+    final toPickup = ride.status == RideStatus.accepted ||
+        ride.status == RideStatus.matched;
     final destination = toPickup
         ? LatLng(ride.pickupLat, ride.pickupLng)
         : LatLng(ride.destinationLat, ride.destinationLng);

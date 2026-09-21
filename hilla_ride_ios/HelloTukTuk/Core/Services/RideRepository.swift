@@ -81,22 +81,13 @@ final class RideRepository {
             throw RideServiceError.pickupDestinationSame
         }
 
-        if await ServiceAreaCatalog.shared.validateForNewRide(
+        if let areaError = await ServiceAreaCatalog.shared.validateForNewRide(
             districtId: districtId,
             subDistrictId: subDistrictId,
             pickup: pickup.coordinate,
             destination: destination.coordinate
-        ) != nil {
-            // Soft client gate only — server re-checks with the same soft rules.
-            // Keep booking usable when catalog sync is stale or polygons overlap.
-            let inBabilBox: (CLLocationCoordinate2D) -> Bool = { point in
-                (31.7...33.2).contains(point.latitude) && (43.8...45.4).contains(point.longitude)
-            }
-            let pickupOk = inBabilBox(pickup.coordinate)
-            let destinationOk = inBabilBox(destination.coordinate)
-            if !(pickupOk && destinationOk) {
-                throw RideServiceError.outOfService
-            }
+        ) {
+            throw RideServiceError.outOfService
         }
 
         var payload: [String: Any] = [

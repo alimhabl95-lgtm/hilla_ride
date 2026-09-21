@@ -1166,13 +1166,7 @@ class RideService {
       destination: destination,
     );
     if (areaError != null) {
-      // Soft fallback: allow when both points are inside the Babil service box
-      // so overlapping Admin polygons don't block short local trips.
-      final inBox = BabilRegions.isInBabilServiceBox(pickup) &&
-          BabilRegions.isInBabilServiceBox(destination);
-      if (!inBox) {
-        throw StateError(areaError);
-      }
+      throw StateError(areaError);
     }
 
     try {

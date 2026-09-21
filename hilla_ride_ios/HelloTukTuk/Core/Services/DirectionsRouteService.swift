@@ -3,6 +3,12 @@ import FirebaseFunctions
 import Foundation
 import os.log
 
+struct DrivingRouteResult {
+    let path: [CLLocationCoordinate2D]
+    let distanceKm: Double
+    let durationMinutes: Int
+}
+
 /// Fetches road polylines via the same `getDrivingRoute` Cloud Function Flutter uses,
 /// with optional direct Google fallbacks.
 final class DirectionsRouteService {
@@ -18,22 +24,51 @@ final class DirectionsRouteService {
         from origin: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
     ) async -> [CLLocationCoordinate2D] {
-        if let cloud = await cloudFunctionRoute(from: origin, to: destination), !cloud.isEmpty {
-            return cloud
-        }
-        if let routes = await computeRoutes(from: origin, to: destination), !routes.isEmpty {
-            return routes
-        }
-        if let legacy = await legacyDirections(from: origin, to: destination), !legacy.isEmpty {
-            return legacy
+        if let full = await drivingRoute(from: origin, to: destination) {
+            return full.path
         }
         return [origin, destination]
+    }
+
+    func drivingRoute(
+        from origin: CLLocationCoordinate2D,
+        to destination: CLLocationCoordinate2D
+    ) async -> DrivingRouteResult? {
+        if let cloud = await cloudFunctionRoute(from: origin, to: destination) {
+            return cloud
+        }
+        if let routes = await computeRoutes(from: origin, to: destination), routes.count >= 2 {
+            let km = polylineLengthKm(routes)
+            return DrivingRouteResult(
+                path: routes,
+                distanceKm: km,
+                durationMinutes: NearbyProvidersService.estimateMinutes(distanceKm: km)
+            )
+        }
+        if let legacy = await legacyDirections(from: origin, to: destination), legacy.count >= 2 {
+            let km = polylineLengthKm(legacy)
+            return DrivingRouteResult(
+                path: legacy,
+                distanceKm: km,
+                durationMinutes: NearbyProvidersService.estimateMinutes(distanceKm: km)
+            )
+        }
+        return nil
+    }
+
+    private func polylineLengthKm(_ path: [CLLocationCoordinate2D]) -> Double {
+        guard path.count >= 2 else { return 0 }
+        var total = 0.0
+        for i in 1..<path.count {
+            total += NearbyProvidersService.distanceKm(from: path[i - 1], to: path[i])
+        }
+        return total
     }
 
     private func cloudFunctionRoute(
         from origin: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
-    ) async -> [CLLocationCoordinate2D]? {
+    ) async -> DrivingRouteResult? {
         do {
             let result = try await functions.httpsCallable("getDrivingRoute").call([
                 "originLat": origin.latitude,
@@ -46,7 +81,17 @@ final class DirectionsRouteService {
                   !encoded.isEmpty else {
                 return nil
             }
-            return Self.decodePolyline(encoded)
+            let path = Self.decodePolyline(encoded)
+            guard path.count >= 2 else { return nil }
+            let distanceKm = (data["distanceKm"] as? NSNumber)?.doubleValue
+                ?? polylineLengthKm(path)
+            let durationMinutes = (data["durationMinutes"] as? NSNumber)?.intValue
+                ?? NearbyProvidersService.estimateMinutes(distanceKm: distanceKm)
+            return DrivingRouteResult(
+                path: path,
+                distanceKm: distanceKm,
+                durationMinutes: max(1, durationMinutes)
+            )
         } catch {
             log.error("getDrivingRoute CF failed: \(error.localizedDescription, privacy: .public)")
             return nil

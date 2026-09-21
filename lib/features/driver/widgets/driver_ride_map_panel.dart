@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:hilla_ride/core/models/app_models.dart';
+import 'package:hilla_ride/core/constants/map_presence_config.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/driving_distance_service.dart';
+import 'package:hilla_ride/core/services/nearby_providers_service.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
 import 'package:hilla_ride/core/widgets/map_camera_follow.dart';
@@ -37,11 +39,14 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
   gmaps.BitmapDescriptor? _destinationMarkerIcon;
   String? _loadedMarkerKey;
 
-  List<gmaps.LatLng> _toPickupRoute = const [];
-  List<gmaps.LatLng> _tripRoute = const [];
+  List<gmaps.LatLng> _activeRoute = const [];
   var _loadingRoutes = true;
-  String? _loadedTripKey;
-  String? _loadedDriverKey;
+  String? _loadedRouteKey;
+  RideStatus? _lastRideStatus;
+  int? _etaMinutes;
+  double? _distanceKm;
+  DateTime? _lastRouteRefreshAt;
+  latlng.LatLng? _lastRouteOrigin;
   AppUser? _customer;
   StreamSubscription<AppUser?>? _customerSub;
 
@@ -111,7 +116,23 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
       _loadedMarkerKey = null;
       unawaited(_loadTripMarkers());
     }
-    _loadRoutes();
+    if (oldWidget.ride.status != widget.ride.status) {
+      _loadedRouteKey = null;
+      _lastRouteOrigin = null;
+      _lastRouteRefreshAt = null;
+    }
+    unawaited(_loadRoutes());
+  }
+
+  bool get _enRouteToPickup {
+    final status = widget.ride.status;
+    return status == RideStatus.accepted || status == RideStatus.matched;
+  }
+
+  bool get _onTripLeg {
+    final status = widget.ride.status;
+    return status == RideStatus.inProgress ||
+        status == RideStatus.awaitingCashPayment;
   }
 
   latlng.LatLng get _pickup {
@@ -133,55 +154,71 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
     return latlng.LatLng(lat, lng);
   }
 
-  String get _tripKey =>
-      '${widget.ride.pickupLat}|${widget.ride.pickupLng}|'
-      '${widget.ride.destinationLat}|${widget.ride.destinationLng}';
-
-  String get _driverKey {
-    final pos = _driverPosition;
-    if (pos == null) return 'none';
-    return '${pos.latitude.toStringAsFixed(5)}|${pos.longitude.toStringAsFixed(5)}';
+  latlng.LatLng? get _routeDestination {
+    if (_enRouteToPickup) return _pickup;
+    if (_onTripLeg) return _destination;
+    return null;
   }
 
   Future<void> _loadRoutes() async {
-    final tripKey = _tripKey;
-    final driverKey = _driverKey;
-    final needsTrip = _loadedTripKey != tripKey;
-    final needsDriver = _loadedDriverKey != driverKey;
-
-    if (!needsTrip && !needsDriver) return;
-
-    if (needsTrip || needsDriver) {
-      setState(() => _loadingRoutes = true);
+    final driverPos = _driverPosition;
+    final dest = _routeDestination;
+    if (driverPos == null || dest == null) {
+      if (mounted) {
+        setState(() {
+          _activeRoute = const [];
+          _loadingRoutes = false;
+          _etaMinutes = null;
+          _distanceKm = null;
+        });
+      }
+      return;
     }
 
-    try {
-      if (needsTrip) {
-        final tripPoints = await _routeService.getRoutePolylinePoints(
-          _pickup,
-          _destination,
-        );
-        _tripRoute = _toGooglePoints(tripPoints);
-        _loadedTripKey = tripKey;
-      }
+    final legKey = _enRouteToPickup ? 'pickup' : 'dest';
+    final routeKey =
+        '$legKey|${dest.latitude.toStringAsFixed(5)}|${dest.longitude.toStringAsFixed(5)}';
 
-      if (needsDriver) {
-        final driverPos = _driverPosition;
-        if (driverPos != null) {
-          final toPickupPoints = await _routeService.getRoutePolylinePoints(
-            driverPos,
-            _pickup,
-          );
-          _toPickupRoute = _toGooglePoints(toPickupPoints);
-        } else {
-          _toPickupRoute = const [];
-        }
-        _loadedDriverKey = driverKey;
-      }
+    final now = DateTime.now();
+    final statusChanged = _lastRideStatus != widget.ride.status;
+    final movedEnough = _lastRouteOrigin == null ||
+        NearbyProvidersService.straightLineKm(_lastRouteOrigin!, driverPos) *
+                1000 >=
+            MapPresenceConfig.routeRefreshMinMoveMeters;
+    final timedOut = _lastRouteRefreshAt == null ||
+        now.difference(_lastRouteRefreshAt!) >=
+            MapPresenceConfig.routeRefreshInterval;
+
+    if (!statusChanged &&
+        _loadedRouteKey == routeKey &&
+        !movedEnough &&
+        !timedOut) {
+      return;
+    }
+
+    if (statusChanged || _loadedRouteKey != routeKey) {
+      _loadedRouteKey = routeKey;
+      _lastRouteOrigin = null;
+      _lastRouteRefreshAt = null;
+    }
+
+    if (mounted) setState(() => _loadingRoutes = true);
+
+    try {
+      final info = await _routeService.getDrivingRoute(driverPos, dest);
+      final points = await _routeService.getRoutePolylinePoints(driverPos, dest);
+      if (!mounted) return;
+      setState(() {
+        _activeRoute = _toGooglePoints(points);
+        _etaMinutes = info.durationMinutes;
+        _distanceKm = info.distanceKm;
+        _lastRouteRefreshAt = now;
+        _lastRouteOrigin = driverPos;
+        _lastRideStatus = widget.ride.status;
+      });
     } finally {
       if (mounted) {
         setState(() => _loadingRoutes = false);
-        // Routes/markers update freely — camera only on initial fit / Recenter.
         if (!_didInitialCameraFit && _mapController != null) {
           _didInitialCameraFit = true;
           unawaited(_fitCamera(force: true));
@@ -204,8 +241,7 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
     final points = <gmaps.LatLng>[
       gmaps.LatLng(widget.ride.pickupLat, widget.ride.pickupLng),
       gmaps.LatLng(widget.ride.destinationLat, widget.ride.destinationLng),
-      ..._tripRoute,
-      ..._toPickupRoute,
+      ..._activeRoute,
     ];
 
     final driverPos = _driverPosition;
@@ -271,31 +307,18 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
   }
 
   Set<gmaps.Polyline> _buildPolylines() {
-    final polylines = <gmaps.Polyline>{};
-
-    if (_toPickupRoute.length >= 2) {
-      polylines.add(
-        gmaps.Polyline(
-          polylineId: const gmaps.PolylineId('driver_to_pickup'),
-          points: _toPickupRoute,
-          color: const Color(0xFF2563EB),
-          width: 5,
-        ),
-      );
-    }
-
-    if (_tripRoute.length >= 2) {
-      polylines.add(
-        gmaps.Polyline(
-          polylineId: const gmaps.PolylineId('pickup_to_destination'),
-          points: _tripRoute,
-          color: const Color(0xFF0F766E),
-          width: 5,
-        ),
-      );
-    }
-
-    return polylines;
+    if (_activeRoute.length < 2) return const {};
+    final color = _enRouteToPickup
+        ? const Color(0xFF2563EB)
+        : const Color(0xFF0F766E);
+    return {
+      gmaps.Polyline(
+        polylineId: const gmaps.PolylineId('active_route'),
+        points: _activeRoute,
+        color: color,
+        width: 5,
+      ),
+    };
   }
 
   @override
@@ -361,6 +384,46 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
               ),
             ),
           ),
+        if (_etaMinutes != null && _distanceKm != null)
+          Positioned(
+            top: 12,
+            left: 12,
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.schedule,
+                      size: 18,
+                      color: AppBrandAssets.brandTealDark,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$_etaMinutes ${l10n.minutes}',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(
+                      Icons.route,
+                      size: 18,
+                      color: AppBrandAssets.brandGold,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_distanceKm!.toStringAsFixed(1)} km',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         Positioned(
           left: 12,
           right: 12,
@@ -368,29 +431,24 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
           child: Card(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      _LegendDot(color: Color(0xFF16A34A), label: l10n.pickup),
-                      const SizedBox(width: 12),
-                      _LegendDot(
-                        color: Color(0xFFDC2626),
-                        label: l10n.destination,
-                      ),
-                    ],
+                  _LegendDot(color: const Color(0xFF16A34A), label: l10n.pickup),
+                  const SizedBox(width: 12),
+                  _LegendDot(
+                    color: const Color(0xFFDC2626),
+                    label: l10n.destination,
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      _LegendDot(color: Color(0xFF2563EB), label: l10n.routeToPickup),
-                      const SizedBox(width: 12),
-                      _LegendDot(
-                        color: Color(0xFF0F766E),
-                        label: l10n.routeToDestination,
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _LegendDot(
+                      color: _enRouteToPickup
+                          ? const Color(0xFF2563EB)
+                          : const Color(0xFF0F766E),
+                      label: _enRouteToPickup
+                          ? l10n.routeToPickup
+                          : l10n.routeToDestination,
+                    ),
                   ),
                 ],
               ),
@@ -410,25 +468,23 @@ class _LegendDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

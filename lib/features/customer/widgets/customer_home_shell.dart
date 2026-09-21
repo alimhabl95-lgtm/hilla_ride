@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/config/customer_feature_flags.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/features/customer/screens/customer_home_map_screen.dart';
@@ -6,7 +7,7 @@ import 'package:hilla_ride/features/customer/screens/marketplace_home_screen.dar
 import 'package:hilla_ride/features/shared/widgets/announcement_banner.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 
-/// Customer home with Ride + Marketplace tabs (marketplace is fully live/synced).
+/// Customer home — rides-only when [CustomerFeatureFlags.storesTabEnabled] is false.
 class CustomerHomeShell extends StatefulWidget {
   const CustomerHomeShell({super.key, required this.user});
 
@@ -21,6 +22,15 @@ class _CustomerHomeShellState extends State<CustomerHomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (!CustomerFeatureFlags.storesTabEnabled) {
+      return Column(
+        children: [
+          const AnnouncementBanner(audience: 'customers'),
+          Expanded(child: CustomerHomeMapScreen(user: widget.user)),
+        ],
+      );
+    }
+
     final isAr = AppLocalizations.of(context)!.localeName.startsWith('ar');
     return Column(
       children: [

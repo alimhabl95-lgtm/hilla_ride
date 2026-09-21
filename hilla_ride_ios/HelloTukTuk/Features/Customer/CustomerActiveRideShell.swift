@@ -461,6 +461,8 @@ struct ActiveRideMapView: View {
     @State private var driverTask: Task<Void, Never>?
     @State private var showChat = false
     @State private var lastRouteRefresh: Date?
+    @State private var lastRouteOrigin: CLLocationCoordinate2D?
+    @State private var lastRouteKey: String?
     @State private var recenterToken = 1
 
     var body: some View {
@@ -609,7 +611,10 @@ struct ActiveRideMapView: View {
             startWatchingDriver()
         }
         .onChange(of: ride.status) { _ in
-            refreshRouteIfNeeded()
+            lastRouteKey = nil
+            lastRouteOrigin = nil
+            lastRouteRefresh = nil
+            refreshRouteIfNeeded(force: true)
         }
     }
 
@@ -655,36 +660,50 @@ struct ActiveRideMapView: View {
         UIApplication.shared.open(url)
     }
 
-    private func refreshRouteIfNeeded() {
+    private func refreshRouteIfNeeded(force: Bool = false) {
         guard let driverCoordinate else { return }
-        let now = Date()
-        if let lastRouteRefresh, now.timeIntervalSince(lastRouteRefresh) < MapPresenceConfig.routeRefreshInterval {
-            return
+        let toPickup = ride.status == .accepted || ride.status == .matched
+        let target = toPickup ? ride.pickupCoordinate : ride.destinationCoordinate
+        let routeKey = "\(toPickup ? "pickup" : "dest")|\(target.latitude)|\(target.longitude)"
+
+        if routeKey != lastRouteKey {
+            lastRouteKey = routeKey
+            lastRouteOrigin = nil
+            lastRouteRefresh = nil
+            force = true
         }
+
+        let now = Date()
+        if !force {
+            if let lastRouteRefresh,
+               now.timeIntervalSince(lastRouteRefresh) < MapPresenceConfig.routeRefreshInterval {
+                if let lastRouteOrigin {
+                    let moved = CLLocation(latitude: lastRouteOrigin.latitude, longitude: lastRouteOrigin.longitude)
+                        .distance(from: CLLocation(latitude: driverCoordinate.latitude, longitude: driverCoordinate.longitude))
+                    if moved < MapPresenceConfig.routeRefreshMinMoveMeters {
+                        return
+                    }
+                } else {
+                    return
+                }
+            }
+        }
+
         lastRouteRefresh = now
-        let target = ride.status == .accepted || ride.status == .matched
-            ? ride.pickupCoordinate
-            : ride.destinationCoordinate
+        lastRouteOrigin = driverCoordinate
+
         let km = NearbyProvidersService.distanceKm(from: driverCoordinate, to: target)
         distanceKm = km
         etaMinutes = NearbyProvidersService.estimateMinutes(distanceKm: km)
-        // Keep a straight fallback immediately, then upgrade to a road polyline.
         routePath = [driverCoordinate, target]
         let origin = driverCoordinate
         Task {
-            let path = await DirectionsRouteService().routePath(from: origin, to: target)
-            await MainActor.run {
-                guard path.count >= 2 else { return }
-                routePath = path
-                if path.count > 2 {
-                    var roadKm = 0.0
-                    for i in 1..<path.count {
-                        roadKm += NearbyProvidersService.distanceKm(from: path[i - 1], to: path[i])
-                    }
-                    if roadKm > 0 {
-                        distanceKm = roadKm
-                        etaMinutes = NearbyProvidersService.estimateMinutes(distanceKm: roadKm)
-                    }
+            if let route = await DirectionsRouteService().drivingRoute(from: origin, to: target) {
+                await MainActor.run {
+                    guard route.path.count >= 2 else { return }
+                    routePath = route.path
+                    distanceKm = route.distanceKm
+                    etaMinutes = route.durationMinutes
                 }
             }
         }

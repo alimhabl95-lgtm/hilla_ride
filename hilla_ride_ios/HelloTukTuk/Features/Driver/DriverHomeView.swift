@@ -856,6 +856,11 @@ private struct DriverActiveRideMapPanel<Bottom: View>: View {
 
     @State private var recenterToken = 1
     @State private var routePath: [CLLocationCoordinate2D] = []
+    @State private var etaMinutes: Int?
+    @State private var distanceKm: Double?
+    @State private var lastRouteRefresh: Date?
+    @State private var lastRouteOrigin: CLLocationCoordinate2D?
+    @State private var lastRouteKey: String?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -881,6 +886,28 @@ private struct DriverActiveRideMapPanel<Bottom: View>: View {
                 BrandColors.surface.ignoresSafeArea()
             }
 
+            if let etaMinutes, let distanceKm {
+                VStack {
+                    HStack(spacing: AppSpacing.md) {
+                        Label("\(etaMinutes) \(appState.language == .arabic ? "د" : "min")", systemImage: "clock.fill")
+                        Label(
+                            appState.language == .arabic
+                                ? "\(String(format: "%.1f", distanceKm)) كم"
+                                : "\(String(format: "%.1f", distanceKm)) km",
+                            systemImage: "point.topleft.down.curvedto.point.bottomright.up"
+                        )
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(BrandColors.navy)
+                    .padding(.horizontal, AppSpacing.md)
+                    .padding(.vertical, AppSpacing.sm)
+                    .background(.white, in: Capsule())
+                    .shadow(color: BrandColors.navy.opacity(0.12), radius: 8, y: 2)
+                    .padding(.top, AppSpacing.lg)
+                    Spacer()
+                }
+            }
+
             VStack {
                 Spacer()
                 HStack {
@@ -903,20 +930,82 @@ private struct DriverActiveRideMapPanel<Bottom: View>: View {
 
             bottom()
         }
-        .task(id: "\(ride.id)-\(ride.status.rawValue)-\(driverCoordinate?.latitude ?? 0)-\(customerCoordinate?.latitude ?? 0)") {
-            let from = driverCoordinate ?? ride.pickupCoordinate
-            let to: CLLocationCoordinate2D = {
-                switch ride.status {
-                case .accepted, .matched:
-                    return customerCoordinate ?? ride.pickupCoordinate
-                default:
-                    return ride.destinationCoordinate
+        .task(id: "\(ride.id)-\(ride.status.rawValue)") {
+            await refreshActiveRoute(force: true)
+        }
+        .onChange(of: driverLocationKey) { _ in
+            Task { await refreshActiveRoute(force: false) }
+        }
+    }
+
+    private var driverLocationKey: String {
+        guard let c = driverCoordinate else { return "none" }
+        return String(format: "%.4f,%.4f", c.latitude, c.longitude)
+    }
+
+    private func refreshActiveRoute(force: Bool) async {
+        guard let from = driverCoordinate else {
+            await MainActor.run {
+                routePath = []
+                etaMinutes = nil
+                distanceKm = nil
+            }
+            return
+        }
+
+        let toPickup = ride.status == .accepted || ride.status == .matched
+        let onTrip = ride.status == .inProgress || ride.status == .awaitingCashPayment
+        guard toPickup || onTrip else {
+            await MainActor.run {
+                routePath = []
+                etaMinutes = nil
+                distanceKm = nil
+            }
+            return
+        }
+
+        let to = toPickup
+            ? (customerCoordinate ?? ride.pickupCoordinate)
+            : ride.destinationCoordinate
+        let routeKey = "\(toPickup ? "pickup" : "dest")|\(to.latitude)|\(to.longitude)"
+
+        var shouldFetch = force
+        if routeKey != lastRouteKey {
+            await MainActor.run {
+                lastRouteKey = routeKey
+                lastRouteOrigin = nil
+                lastRouteRefresh = nil
+            }
+            shouldFetch = true
+        }
+
+        if !shouldFetch {
+            let now = Date()
+            if let lastRouteRefresh,
+               now.timeIntervalSince(lastRouteRefresh) < MapPresenceConfig.routeRefreshInterval {
+                if let lastRouteOrigin {
+                    let moved = CLLocation(latitude: lastRouteOrigin.latitude, longitude: lastRouteOrigin.longitude)
+                        .distance(from: CLLocation(latitude: from.latitude, longitude: from.longitude))
+                    if moved < MapPresenceConfig.routeRefreshMinMoveMeters {
+                        return
+                    }
+                } else {
+                    return
                 }
-            }()
+            }
+        }
+
+        await MainActor.run {
+            lastRouteRefresh = Date()
+            lastRouteOrigin = from
             routePath = [from, to]
-            let path = await DirectionsRouteService().routePath(from: from, to: to)
-            if path.count >= 2 {
-                routePath = path
+        }
+
+        if let route = await DirectionsRouteService().drivingRoute(from: from, to: to) {
+            await MainActor.run {
+                routePath = route.path
+                etaMinutes = route.durationMinutes
+                distanceKm = route.distanceKm
             }
         }
     }

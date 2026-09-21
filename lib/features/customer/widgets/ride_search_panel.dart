@@ -254,6 +254,36 @@ class RideSearchPanel extends StatelessWidget {
   }
 }
 
+String _effectiveDistrictId(String districtId, String? subDistrictId) {
+  if (subDistrictId == null || subDistrictId.isEmpty) return districtId;
+  for (final district in BabilRegions.customerDistricts) {
+    if (district.subDistricts.any((sub) => sub.id == subDistrictId)) {
+      return district.id;
+    }
+  }
+  return districtId;
+}
+
+List<BabilDistrict> _customerDistrictOptions({
+  required String provinceId,
+  required String districtId,
+  required String? subDistrictId,
+}) {
+  final effectiveDistrictId = _effectiveDistrictId(districtId, subDistrictId);
+  var options =
+      ServiceAreaCatalog.instance.customerDistrictsForProvince(provinceId);
+  if (options.isEmpty) {
+    options = BabilRegions.customerDistricts;
+  }
+  if (!options.any((district) => district.id == effectiveDistrictId)) {
+    options = [
+      BabilRegions.districtById(effectiveDistrictId),
+      ...options.where((district) => district.id != effectiveDistrictId),
+    ];
+  }
+  return options;
+}
+
 class _BottomSheetSearch extends StatelessWidget {
   const _BottomSheetSearch({
     required this.l10n,
@@ -386,28 +416,15 @@ class _BottomSheetSearch extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _TripSearchField(
-            onTap: onOpenDestinationSearch,
-            theme: theme,
-            text: hasDestination
+          _PlaceSearchBox(
+            label: l10n.destination,
+            value: hasDestination
                 ? (destinationText ?? destination!.label)
-                : l10n.whereTo,
-            emphasized: hasDestination,
-            leading: Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: MapMarkerColors.destination,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.search, size: 14, color: Colors.white),
-            ),
-            trailing: _MiniAction(
-              tooltip: l10n.pinOnMap,
-              icon: Icons.edit_location_alt_outlined,
-              onPressed: onPinDestination,
-            ),
+                : null,
+            hint: l10n.searchPlaces,
+            onTap: onOpenDestinationSearch,
+            onPin: onPinDestination,
+            pinTooltip: l10n.pinOnMap,
           ),
           const SizedBox(height: 12),
           SavedPlacesBar(
@@ -441,6 +458,106 @@ class MapMarkerColors {
 
   static const Color pickup = AppBrandAssets.brandGold;
   static const Color destination = AppBrandAssets.brandTeal;
+}
+
+class _PlaceSearchBox extends StatefulWidget {
+  const _PlaceSearchBox({
+    required this.label,
+    required this.value,
+    required this.hint,
+    required this.onTap,
+    required this.onPin,
+    required this.pinTooltip,
+  });
+
+  final String label;
+  final String? value;
+  final String hint;
+  final VoidCallback onTap;
+  final VoidCallback onPin;
+  final String pinTooltip;
+
+  @override
+  State<_PlaceSearchBox> createState() => _PlaceSearchBoxState();
+}
+
+class _PlaceSearchBoxState extends State<_PlaceSearchBox> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value ?? '');
+  }
+
+  @override
+  void didUpdateWidget(_PlaceSearchBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = widget.value ?? '';
+    if (_controller.text != next) {
+      _controller.text = next;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasValue = widget.value != null && widget.value!.trim().isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          widget.label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.outline,
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: _controller,
+          readOnly: true,
+          showCursor: false,
+          enableInteractiveSelection: false,
+          onTap: widget.onTap,
+          decoration: InputDecoration(
+            hintText: widget.hint,
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            prefixIcon: const Icon(
+              Icons.search,
+              color: AppBrandAssets.brandTealDark,
+              size: 22,
+            ),
+            suffixIcon: IconButton(
+              tooltip: widget.pinTooltip,
+              icon: const Icon(Icons.edit_location_alt_outlined),
+              onPressed: widget.onPin,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadii.md),
+              borderSide: const BorderSide(color: AppBrandAssets.brandBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadii.md),
+              borderSide: BorderSide(
+                color: hasValue
+                    ? AppBrandAssets.brandTeal.withValues(alpha: 0.35)
+                    : AppBrandAssets.brandBorder,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _TripSearchField extends StatelessWidget {
@@ -573,20 +690,25 @@ class _CustomerRegionFieldsState extends State<_CustomerRegionFields> {
     final theme = Theme.of(context);
     final catalog = ServiceAreaCatalog.instance;
     final provinces = catalog.customerProvinces;
-    final districtsInProvince =
-        catalog.customerDistrictsForProvince(_provinceId);
+    final effectiveDistrictId =
+        _effectiveDistrictId(widget.districtId, widget.subDistrictId);
+    final districtsInProvince = _customerDistrictOptions(
+      provinceId: _provinceId,
+      districtId: widget.districtId,
+      subDistrictId: widget.subDistrictId,
+    );
     final district = districtsInProvince.firstWhere(
-      (d) => d.id == widget.districtId,
-      orElse: () => districtsInProvince.isNotEmpty
-          ? districtsInProvince.first
-          : BabilRegions.districtById(widget.districtId),
+      (d) => d.id == effectiveDistrictId,
+      orElse: () => BabilRegions.districtById(effectiveDistrictId),
     );
     final provinceValue =
         provinces.any((p) => p.id == _provinceId) ? _provinceId : null;
-    final districtValue =
-        districtsInProvince.any((d) => d.id == widget.districtId)
-            ? widget.districtId
-            : (districtsInProvince.isNotEmpty ? districtsInProvince.first.id : null);
+    final districtValue = districtsInProvince
+            .any((d) => d.id == effectiveDistrictId)
+        ? effectiveDistrictId
+        : (districtsInProvince.isNotEmpty
+            ? districtsInProvince.first.id
+            : null);
     // Do not auto-rewrite parent district — that cleared the customer's
     // selected ناحية and blocked destination search after pickup.
 
@@ -661,15 +783,21 @@ class _CustomerRegionFieldsState extends State<_CustomerRegionFields> {
           onChanged: widget.onDistrictChanged,
         ),
         const SizedBox(height: 10),
+        Text(
+          l10n.subDistrictLabel,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.outline,
+          ),
+        ),
+        const SizedBox(height: 4),
         DropdownButtonFormField<String>(
           isExpanded: true,
           isDense: true,
           value: subValue,
-          decoration: InputDecoration(
-            labelText: l10n.subDistrictLabel,
+          decoration: const InputDecoration(
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           ),
           hint: Text(l10n.selectSubDistrictHint),
           items: district.subDistricts
@@ -687,6 +815,42 @@ class _CustomerRegionFieldsState extends State<_CustomerRegionFields> {
         ),
         if (subValue != null) ...[
           const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppBrandAssets.brandTeal.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppRadii.pill),
+              border: Border.all(
+                color: AppBrandAssets.brandTeal.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.place_outlined,
+                  size: 16,
+                  color: AppBrandAssets.brandTealDark,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    widget.isArabic
+                        ? district.subDistricts
+                            .firstWhere((s) => s.id == subValue)
+                            .nameAr
+                        : district.subDistricts
+                            .firstWhere((s) => s.id == subValue)
+                            .nameEn,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: AppBrandAssets.brandTealDark,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
           Text(
             l10n.searchRegionHint(
               widget.isArabic

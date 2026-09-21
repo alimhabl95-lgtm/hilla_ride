@@ -90,7 +90,7 @@ service cloud.firestore {
 
         && (
 
-          request.resource.data.role in ['customer', 'driver', 'manager']
+          request.resource.data.role in ['customer', 'driver']
 
           || (
 
@@ -158,7 +158,7 @@ service cloud.firestore {
 
         || (
 
-          signedIn()
+          isSelf(userId)
 
           && request.resource.data.diff(resource.data).affectedKeys()
 
@@ -259,7 +259,7 @@ service cloud.firestore {
 
         || (
 
-          signedIn()
+          isSelf(driverId)
 
           && request.resource.data.diff(resource.data).affectedKeys()
 

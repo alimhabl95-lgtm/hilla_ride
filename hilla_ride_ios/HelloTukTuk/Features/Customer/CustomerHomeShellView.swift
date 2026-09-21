@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Customer home with Ride + Stores tabs (marketplace is fully live/synced).
+/// Customer home — rides-only when [CustomerFeatureFlags.storesTabEnabled] is false.
 struct CustomerHomeShellView: View {
     @EnvironmentObject private var appState: AppState
     let user: AppUser
@@ -10,15 +10,17 @@ struct CustomerHomeShellView: View {
         VStack(spacing: 0) {
             AnnouncementBannerView(audience: "customers")
             Group {
-                if selectedTab == 0 {
-                    CustomerHomeMapView(user: user)
-                } else {
+                if CustomerFeatureFlags.storesTabEnabled, selectedTab == 1 {
                     MarketplaceHomeView()
+                } else {
+                    CustomerHomeMapView(user: user)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            tabBar
+            if CustomerFeatureFlags.storesTabEnabled {
+                tabBar
+            }
         }
     }
 

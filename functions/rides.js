@@ -86,6 +86,110 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
+  const DEFAULT_PRICING = {
+    maxDistanceKm: 5,
+    brackets: [
+      { minKm: 0, maxKm: 1.25, priceIqd: 1000 },
+      { minKm: 1.26, maxKm: 2.0, priceIqd: 2000 },
+      { minKm: 2.01, maxKm: 3.5, priceIqd: 3000 },
+      { minKm: 3.51, maxKm: 5.0, priceIqd: 5000 },
+    ],
+  };
+
+  async function loadPricingConfig(districtId, subDistrictId) {
+    const district = String(districtId || "").trim();
+    const sub = String(subDistrictId || "").trim();
+    const candidates = [];
+    if (district && sub) {
+      candidates.push(`pricing_${district}_${sub}`);
+    }
+    if (district) {
+      candidates.push(`pricing_${district}`);
+    }
+    candidates.push("pricing");
+    for (const id of candidates) {
+      const snap = await db().collection("config").doc(id).get();
+      if (!snap.exists) continue;
+      const data = snap.data() || {};
+      const maxDistanceKm = Number(data.maxDistanceKm) || DEFAULT_PRICING.maxDistanceKm;
+      const rawBrackets = Array.isArray(data.brackets) ? data.brackets : DEFAULT_PRICING.brackets;
+      const brackets = rawBrackets
+        .map((b) => ({
+          minKm: Number(b.minKm) || 0,
+          maxKm: Number(b.maxKm) || 0,
+          priceIqd: Math.trunc(Number(b.priceIqd) || 0),
+        }))
+        .filter((b) => b.priceIqd > 0 && b.maxKm >= b.minKm);
+      if (brackets.length === 0) continue;
+      return { maxDistanceKm, brackets };
+    }
+    return DEFAULT_PRICING;
+  }
+
+  function quoteFareFromDistanceKm(distanceKm, config) {
+    if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
+      return { ok: false, reason: "invalid_distance" };
+    }
+    if (distanceKm > config.maxDistanceKm + 0.05) {
+      return { ok: false, reason: "out_of_range" };
+    }
+    for (const bracket of config.brackets) {
+      if (distanceKm >= bracket.minKm && distanceKm <= bracket.maxKm + 0.05) {
+        return { ok: true, fareIqd: bracket.priceIqd };
+      }
+    }
+    return { ok: false, reason: "no_bracket" };
+  }
+
+  async function assertFareMatchesQuote({
+    districtId,
+    subDistrictId,
+    pickupLat,
+    pickupLng,
+    destinationLat,
+    destinationLng,
+    distanceKm,
+    fareAmountIqd,
+    originalFareIqd,
+    promoDiscountIqd,
+    loyaltyFreeRide,
+  }) {
+    if (loyaltyFreeRide) return;
+
+    const straightKm = haversineKm(pickupLat, pickupLng, destinationLat, destinationLng);
+    const estimatedRoadKm = straightKm * 1.3;
+    const clientKm = Number(distanceKm) || 0;
+    if (clientKm <= 0 || clientKm > estimatedRoadKm * 1.35 + 0.5) {
+      throw new functions.https.HttpsError("invalid-argument", "invalid_distance");
+    }
+
+    const pricing = await loadPricingConfig(districtId, subDistrictId);
+    const quoteKm = Math.max(clientKm, estimatedRoadKm * 0.85);
+    const quote = quoteFareFromDistanceKm(quoteKm, pricing);
+    if (!quote.ok) {
+      throw new functions.https.HttpsError("failed-precondition", "out_of_service");
+    }
+
+    const expectedFare = quote.fareIqd;
+    const discount = Math.max(0, Math.trunc(Number(promoDiscountIqd) || 0));
+    const original = Math.trunc(Number(originalFareIqd) || 0);
+    if (discount > 0) {
+      const base = original > 0 ? original : expectedFare;
+      if (base !== expectedFare) {
+        throw new functions.https.HttpsError("invalid-argument", "invalid_fare");
+      }
+      const expectedNet = Math.max(0, base - discount);
+      if (Math.trunc(Number(fareAmountIqd) || 0) !== expectedNet) {
+        throw new functions.https.HttpsError("invalid-argument", "invalid_fare");
+      }
+      return;
+    }
+
+    if (Math.trunc(Number(fareAmountIqd) || 0) !== expectedFare) {
+      throw new functions.https.HttpsError("invalid-argument", "invalid_fare");
+    }
+  }
+
   async function getWalletConfig() {
     const doc = await db().collection("config").doc("wallet").get();
     const data = doc.data() || {};
@@ -300,6 +404,20 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
       subDistrictId,
       pickup: { lat: pickupLat, lng: pickupLng },
       destination: { lat: destinationLat, lng: destinationLng },
+    });
+
+    await assertFareMatchesQuote({
+      districtId,
+      subDistrictId,
+      pickupLat,
+      pickupLng,
+      destinationLat,
+      destinationLng,
+      distanceKm,
+      fareAmountIqd,
+      originalFareIqd,
+      promoDiscountIqd,
+      loyaltyFreeRide,
     });
 
     const active = await db()
