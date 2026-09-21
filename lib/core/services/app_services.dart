@@ -1333,8 +1333,8 @@ class RideService {
   Stream<Ride?> watchAssignedRideForDriver(String driverId) {
     late final StreamController<Ride?> controller;
     Ride? assignedRide;
-    Ride? offeredRide;
-    Ride? searchingRide;
+    Ride? arrayOfferedRide;
+    Ride? districtOfferedRide;
     var walletEligible = true;
     var minBalanceIqd = 1;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? assignedSubscription;
@@ -1349,10 +1349,11 @@ class RideService {
         void publish() {
           final assigned = _driverVisibleRide(assignedRide, driverId: driverId);
           // Empty/blocked wallet: hide new offers; keep already-accepted trips.
+          // Only show explicit matched offers — not other customers' searching rides.
+          final pendingOffer = arrayOfferedRide ?? districtOfferedRide;
           final next = assigned ??
               (walletEligible
-                  ? (_driverVisibleRide(offeredRide, driverId: driverId) ??
-                      _driverVisibleRide(searchingRide, driverId: driverId))
+                  ? _driverVisibleRide(pendingOffer, driverId: driverId)
                   : null);
           if (next?.id == current?.id &&
               next?.status == current?.status &&
@@ -1375,26 +1376,19 @@ class RideService {
               .limit(20)
               .snapshots()
               .listen((snapshot) {
-            searchingRide = null;
             Ride? matchedInDistrict;
             for (final doc in snapshot.docs) {
               final data = doc.data();
               final assigned = data['driverId'];
               if (assigned is String && assigned.trim().isNotEmpty) continue;
               final ride = Ride.fromMap(doc.id, data);
-              if (ride.status == RideStatus.searching) {
-                searchingRide = ride;
-                break;
-              }
               if (ride.status == RideStatus.matched &&
                   (ride.offeredDriverIds.isEmpty ||
                       ride.offeredDriverIds.contains(driverId))) {
                 matchedInDistrict ??= ride;
               }
             }
-            if (searchingRide == null && matchedInDistrict != null) {
-              offeredRide = matchedInDistrict;
-            }
+            districtOfferedRide = matchedInDistrict;
             publish();
           });
         }
@@ -1434,7 +1428,7 @@ class RideService {
             nextOffer = Ride.fromMap(doc.id, data);
             break;
           }
-          offeredRide = nextOffer;
+          arrayOfferedRide = nextOffer;
           publish();
         });
 
@@ -1460,8 +1454,8 @@ class RideService {
               walletBalance > 0 &&
               walletBalance >= minBalanceIqd;
           if (!walletEligible) {
-            offeredRide = null;
-            searchingRide = null;
+            arrayOfferedRide = null;
+            districtOfferedRide = null;
             subDistrictSubscription?.cancel();
             subDistrictSubscription = null;
             publish();
@@ -1474,7 +1468,6 @@ class RideService {
           if (districtId.isEmpty) {
             subDistrictSubscription?.cancel();
             subDistrictSubscription = null;
-            searchingRide = null;
             publish();
             return;
           }

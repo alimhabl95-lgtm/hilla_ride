@@ -4,7 +4,19 @@ import SwiftUI
 struct CustomerHomeShellView: View {
     @EnvironmentObject private var appState: AppState
     let user: AppUser
+    var activeRideId: String?
+    var onOpenCurrentRide: (() -> Void)?
     @State private var selectedTab = 0
+
+    init(
+        user: AppUser,
+        activeRideId: String? = nil,
+        onOpenCurrentRide: (() -> Void)? = nil
+    ) {
+        self.user = user
+        self.activeRideId = activeRideId
+        self.onOpenCurrentRide = onOpenCurrentRide
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -13,7 +25,11 @@ struct CustomerHomeShellView: View {
                 if CustomerFeatureFlags.storesTabEnabled, selectedTab == 1 {
                     MarketplaceHomeView()
                 } else {
-                    CustomerHomeMapView(user: user)
+                    CustomerHomeMapView(
+                        user: user,
+                        activeRideId: activeRideId,
+                        onOpenCurrentRide: onOpenCurrentRide
+                    )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

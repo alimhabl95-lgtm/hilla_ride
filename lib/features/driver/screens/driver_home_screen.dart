@@ -746,7 +746,9 @@ class _ActiveRidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rideService = context.read<AppState>().rideService;
-    final isMatched = ride.status == RideStatus.matched;
+    final isMatched = ride.status == RideStatus.matched ||
+        (ride.status == RideStatus.searching &&
+            ride.offeredDriverIds.contains(driver.uid));
 
     return Column(
       children: [

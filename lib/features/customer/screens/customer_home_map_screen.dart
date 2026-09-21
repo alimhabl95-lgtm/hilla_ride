@@ -28,9 +28,16 @@ import 'package:latlong2/latlong.dart' as ll;
 import 'package:provider/provider.dart';
 
 class CustomerHomeMapScreen extends StatefulWidget {
-  const CustomerHomeMapScreen({super.key, required this.user});
+  const CustomerHomeMapScreen({
+    super.key,
+    required this.user,
+    this.activeRideId,
+    this.onOpenCurrentRide,
+  });
 
   final AppUser user;
+  final String? activeRideId;
+  final VoidCallback? onOpenCurrentRide;
 
   @override
   State<CustomerHomeMapScreen> createState() => _CustomerHomeMapScreenState();
@@ -652,6 +659,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     final isArabic = l10n.localeName.startsWith('ar');
     final mapCenter = LatLng(
       _region.searchCenter.latitude,
@@ -701,6 +709,57 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
               ),
             ),
           ),
+          if (widget.activeRideId != null && widget.onOpenCurrentRide != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    56,
+                    AppSpacing.lg,
+                    0,
+                  ),
+                  child: Material(
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(AppRadii.lg),
+                    color: AppBrandAssets.brandTealDark,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadii.lg),
+                      onTap: widget.onOpenCurrentRide,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.local_taxi, color: Colors.white),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                l10n.currentRideTitle,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Positioned(
             right: AppSpacing.lg,
             bottom: 340,

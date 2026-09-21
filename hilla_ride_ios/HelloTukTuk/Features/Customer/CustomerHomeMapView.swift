@@ -5,6 +5,18 @@ struct CustomerHomeMapView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var areaCatalog = ServiceAreaCatalog.shared
     let user: AppUser
+    var activeRideId: String?
+    var onOpenCurrentRide: (() -> Void)?
+
+    init(
+        user: AppUser,
+        activeRideId: String? = nil,
+        onOpenCurrentRide: (() -> Void)? = nil
+    ) {
+        self.user = user
+        self.activeRideId = activeRideId
+        self.onOpenCurrentRide = onOpenCurrentRide
+    }
 
     @StateObject private var locationService = LocationService()
     @State private var selectedProvinceId = ""
@@ -112,6 +124,14 @@ struct CustomerHomeMapView: View {
         return false
     }
 
+    /// Opens place search even without ناحية; booking still requires full area.
+    private func warnIfSubDistrictMissing() {
+        guard !hasSubDistrict else { return }
+        syncAreaSelection()
+        guard !hasSubDistrict else { return }
+        errorMessage = L10n.string(.selectSubDistrictFirst, language: appState.language)
+    }
+
     private var mapCameraTarget: CLLocationCoordinate2D {
         cameraTargetOverride
             ?? pickup?.coordinate
@@ -144,6 +164,16 @@ struct CustomerHomeMapView: View {
                     .ignoresSafeArea(edges: .top)
                 } else {
                     mapsUnavailableView
+                }
+
+                if activeRideId != nil, let onOpenCurrentRide {
+                    VStack {
+                        currentRideBanner(action: onOpenCurrentRide)
+                            .padding(.horizontal, AppSpacing.lg)
+                            .padding(.top, AppSpacing.sm)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
 
                 VStack {
@@ -538,6 +568,26 @@ struct CustomerHomeMapView: View {
         }
     }
 
+    private func currentRideBanner(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: AppSpacing.sm) {
+                Image(systemName: "car.fill")
+                    .foregroundStyle(.white)
+                Text(appState.language == .arabic ? "الرحلة الحالية" : "Current ride")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .padding(.horizontal, AppSpacing.md)
+            .padding(.vertical, AppSpacing.sm)
+            .background(BrandColors.tealDark, in: RoundedRectangle(cornerRadius: AppRadii.lg))
+            .shadow(color: BrandColors.navy.opacity(0.12), radius: 6, y: 2)
+        }
+        .buttonStyle(.plain)
+    }
+
     /// Pickup and destination rows in one card — Uber-style trip planner.
     private var tripPlannerCard: some View {
         VStack(spacing: 0) {
@@ -560,7 +610,10 @@ struct CustomerHomeMapView: View {
                 title: L10n.string(.destinationLabel, language: appState.language),
                 value: destination?.label ?? L10n.string(.selectDestination, language: appState.language),
                 isSet: destination != nil,
-                onSearch: { if requireSubDistrict() { showDestinationSearch = true } },
+                onSearch: {
+                    warnIfSubDistrictMissing()
+                    showDestinationSearch = true
+                },
                 onPickMap: { if requireSubDistrict() { showDestinationPinPicker = true } }
             )
         }

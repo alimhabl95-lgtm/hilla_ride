@@ -89,10 +89,28 @@ class RideSearchPanel extends StatelessWidget {
     }
   }
 
-  bool _ensureSubDistrictSelected(BuildContext context, AppLocalizations l10n) {
+  bool _ensureSubDistrictSelected(
+    BuildContext context,
+    AppLocalizations l10n, {
+    bool warnOnly = false,
+  }) {
     final hasDistrict = districtId.trim().isNotEmpty;
     final hasArea = subDistrictId != null && subDistrictId!.trim().isNotEmpty;
     if (hasDistrict && hasArea) return true;
+    if (warnOnly) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hasDistrict
+                ? l10n.selectSubDistrictRequired
+                : (l10n.localeName.startsWith('ar')
+                    ? 'يرجى اختيار القضاء والناحية لنتائج أدق.'
+                    : 'Select district and area for better results.'),
+          ),
+        ),
+      );
+      return true;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -136,7 +154,9 @@ class RideSearchPanel extends StatelessWidget {
         onDistrictChanged: onDistrictChanged,
         onSubDistrictChanged: onSubDistrictChanged,
         onOpenDestinationSearch: () {
-          if (!_ensureSubDistrictSelected(context, l10n)) return;
+          if (!_ensureSubDistrictSelected(context, l10n, warnOnly: true)) {
+            return;
+          }
           _openSearch(
             context,
             title: l10n.whereTo,
@@ -416,15 +436,28 @@ class _BottomSheetSearch extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _PlaceSearchBox(
-            label: l10n.destination,
-            value: hasDestination
-                ? (destinationText ?? destination!.label)
-                : null,
-            hint: l10n.searchPlaces,
+          _TripSearchField(
             onTap: onOpenDestinationSearch,
-            onPin: onPinDestination,
-            pinTooltip: l10n.pinOnMap,
+            theme: theme,
+            text: hasDestination
+                ? (destinationText ?? destination!.label)
+                : l10n.searchPlaces,
+            emphasized: hasDestination,
+            leading: Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: MapMarkerColors.destination,
+                borderRadius: BorderRadius.all(Radius.circular(6)),
+              ),
+              child: const Icon(Icons.search, size: 16, color: Colors.white),
+            ),
+            trailing: _MiniAction(
+              tooltip: l10n.pinOnMap,
+              icon: Icons.edit_location_alt_outlined,
+              onPressed: onPinDestination,
+            ),
           ),
           const SizedBox(height: 12),
           SavedPlacesBar(
@@ -458,106 +491,6 @@ class MapMarkerColors {
 
   static const Color pickup = AppBrandAssets.brandGold;
   static const Color destination = AppBrandAssets.brandTeal;
-}
-
-class _PlaceSearchBox extends StatefulWidget {
-  const _PlaceSearchBox({
-    required this.label,
-    required this.value,
-    required this.hint,
-    required this.onTap,
-    required this.onPin,
-    required this.pinTooltip,
-  });
-
-  final String label;
-  final String? value;
-  final String hint;
-  final VoidCallback onTap;
-  final VoidCallback onPin;
-  final String pinTooltip;
-
-  @override
-  State<_PlaceSearchBox> createState() => _PlaceSearchBoxState();
-}
-
-class _PlaceSearchBoxState extends State<_PlaceSearchBox> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.value ?? '');
-  }
-
-  @override
-  void didUpdateWidget(_PlaceSearchBox oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final next = widget.value ?? '';
-    if (_controller.text != next) {
-      _controller.text = next;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final hasValue = widget.value != null && widget.value!.trim().isNotEmpty;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          widget.label,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: theme.colorScheme.outline,
-          ),
-        ),
-        const SizedBox(height: 4),
-        TextField(
-          controller: _controller,
-          readOnly: true,
-          showCursor: false,
-          enableInteractiveSelection: false,
-          onTap: widget.onTap,
-          decoration: InputDecoration(
-            hintText: widget.hint,
-            isDense: true,
-            filled: true,
-            fillColor: Colors.white,
-            prefixIcon: const Icon(
-              Icons.search,
-              color: AppBrandAssets.brandTealDark,
-              size: 22,
-            ),
-            suffixIcon: IconButton(
-              tooltip: widget.pinTooltip,
-              icon: const Icon(Icons.edit_location_alt_outlined),
-              onPressed: widget.onPin,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadii.md),
-              borderSide: const BorderSide(color: AppBrandAssets.brandBorder),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadii.md),
-              borderSide: BorderSide(
-                color: hasValue
-                    ? AppBrandAssets.brandTeal.withValues(alpha: 0.35)
-                    : AppBrandAssets.brandBorder,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _TripSearchField extends StatelessWidget {

@@ -128,21 +128,30 @@ struct CurrentRideIconButton: View {
     @State private var task: Task<Void, Never>?
 
     var body: some View {
-        Button {
-            NotificationCenter.default.post(name: .navigateToCurrentRide, object: nil)
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "car.fill")
-                    .foregroundStyle(hasActiveRide ? BrandColors.teal : .secondary)
-                if hasActiveRide {
-                    Circle()
-                        .fill(.red)
-                        .frame(width: 8, height: 8)
-                        .offset(x: 4, y: -4)
+        Group {
+            if hasActiveRide {
+                Button {
+                    NotificationCenter.default.post(name: .navigateToCurrentRide, object: nil)
+                } label: {
+                    HStack(spacing: 4) {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "car.fill")
+                                .foregroundStyle(BrandColors.teal)
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 8, height: 8)
+                                .offset(x: 4, y: -4)
+                        }
+                        Text(appState.language == .arabic ? "الرحلة الحالية" : "Current ride")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(BrandColors.tealDark)
+                    }
                 }
+                .accessibilityLabel(
+                    appState.language == .arabic ? "الرحلة الحالية" : "Current ride"
+                )
             }
         }
-        .disabled(!hasActiveRide)
         .onAppear { startWatching() }
         .onDisappear { task?.cancel() }
     }

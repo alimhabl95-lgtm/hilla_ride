@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
+import 'package:hilla_ride/features/customer/customer_ride_navigation.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
-/// Toolbar button that returns the user to their active ride screen.
+/// Toolbar control to reopen the active ride UI (hidden when no active ride).
 class CurrentRideIconButton extends StatelessWidget {
   const CurrentRideIconButton({super.key, required this.role});
 
@@ -29,35 +30,31 @@ class CurrentRideIconButton extends StatelessWidget {
       builder: (context, snapshot) {
         final ride = snapshot.data;
         final hasRide = ride != null;
+        if (!hasRide) {
+          return const SizedBox.shrink();
+        }
 
-        return IconButton(
-          tooltip: l10n.currentRideTitle,
-          onPressed: !hasRide
-              ? null
-              : () {
-                  // Pop overlays (chat/profile/search) back to the shell that
-                  // hosts the live ride UI.
-                  final navigator = Navigator.of(context);
-                  navigator.popUntil((route) => route.isFirst);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        l10n.localeName.startsWith('ar')
-                            ? 'تم فتح المشوار الحالي'
-                            : 'Opened your current ride',
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
+        return TextButton.icon(
+          onPressed: () {
+            if (role == UserRole.customer) {
+              CustomerRideNavigation.openSession(ride.id);
+            } else {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          },
           icon: Badge(
-            isLabelVisible: hasRide,
-            smallSize: 10,
+            isLabelVisible: true,
+            smallSize: 8,
             child: Icon(
               Icons.local_taxi_outlined,
-              color: hasRide
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).disabledColor,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          label: Text(
+            l10n.currentRideTitle,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w700,
             ),
           ),
         );

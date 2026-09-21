@@ -9,9 +9,16 @@ import 'package:hilla_ride/l10n/app_localizations.dart';
 
 /// Customer home — rides-only when [CustomerFeatureFlags.storesTabEnabled] is false.
 class CustomerHomeShell extends StatefulWidget {
-  const CustomerHomeShell({super.key, required this.user});
+  const CustomerHomeShell({
+    super.key,
+    required this.user,
+    this.activeRideId,
+    this.onOpenCurrentRide,
+  });
 
   final AppUser user;
+  final String? activeRideId;
+  final VoidCallback? onOpenCurrentRide;
 
   @override
   State<CustomerHomeShell> createState() => _CustomerHomeShellState();
@@ -26,7 +33,13 @@ class _CustomerHomeShellState extends State<CustomerHomeShell> {
       return Column(
         children: [
           const AnnouncementBanner(audience: 'customers'),
-          Expanded(child: CustomerHomeMapScreen(user: widget.user)),
+          Expanded(
+            child: CustomerHomeMapScreen(
+              user: widget.user,
+              activeRideId: widget.activeRideId,
+              onOpenCurrentRide: widget.onOpenCurrentRide,
+            ),
+          ),
         ],
       );
     }
@@ -39,7 +52,11 @@ class _CustomerHomeShellState extends State<CustomerHomeShell> {
           child: IndexedStack(
             index: _index,
             children: [
-              CustomerHomeMapScreen(user: widget.user),
+              CustomerHomeMapScreen(
+                user: widget.user,
+                activeRideId: widget.activeRideId,
+                onOpenCurrentRide: widget.onOpenCurrentRide,
+              ),
               MarketplaceHomeScreen(user: widget.user),
             ],
           ),

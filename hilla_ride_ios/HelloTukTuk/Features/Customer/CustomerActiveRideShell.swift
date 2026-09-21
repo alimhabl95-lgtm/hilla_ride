@@ -8,6 +8,7 @@ struct CustomerActiveRideShell: View {
     @EnvironmentObject private var appState: AppState
     let rideId: String
     var onSessionEnded: (() -> Void)?
+    var onMinimize: (() -> Void)?
 
     @State private var ride: Ride?
     @State private var rideTask: Task<Void, Never>?
@@ -15,17 +16,37 @@ struct CustomerActiveRideShell: View {
     var body: some View {
         Group {
             if let ride {
-                switch ride.status {
-                case .searching:
-                    FindingDriverView(ride: ride, onSessionEnded: onSessionEnded)
-                case .matched:
-                    DriverAssignedView(ride: ride, onSessionEnded: onSessionEnded)
-                case .accepted, .inProgress, .awaitingCashPayment:
-                    ActiveRideMapView(ride: ride)
-                case .completed:
-                    TripCompletedView(rideId: ride.id, onFinished: onSessionEnded)
-                case .cancelled:
-                    sessionEndedView
+                ZStack(alignment: .topLeading) {
+                    Group {
+                        switch ride.status {
+                        case .searching:
+                            FindingDriverView(ride: ride, onSessionEnded: onSessionEnded)
+                        case .matched:
+                            DriverAssignedView(ride: ride, onSessionEnded: onSessionEnded)
+                        case .accepted, .inProgress, .awaitingCashPayment:
+                            ActiveRideMapView(ride: ride)
+                        case .completed:
+                            TripCompletedView(rideId: ride.id, onFinished: onSessionEnded)
+                        case .cancelled:
+                            sessionEndedView
+                        }
+                    }
+                    if let onMinimize,
+                       ride.status != .completed,
+                       ride.status != .cancelled {
+                        Button(action: onMinimize) {
+                            Image(systemName: "chevron.down.circle.fill")
+                                .font(.title2)
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, BrandColors.tealDark)
+                                .shadow(radius: 2)
+                        }
+                        .padding(.leading, AppSpacing.lg)
+                        .padding(.top, AppSpacing.sm)
+                        .accessibilityLabel(
+                            appState.language == .arabic ? "تصغير الرحلة" : "Minimize ride"
+                        )
+                    }
                 }
             } else {
                 ProgressView(L10n.string(.loading, language: appState.language))

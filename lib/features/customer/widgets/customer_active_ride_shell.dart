@@ -10,6 +10,7 @@ import 'package:hilla_ride/features/customer/screens/driver_assigned_screen.dart
 import 'package:hilla_ride/features/customer/screens/finding_driver_screen.dart';
 import 'package:hilla_ride/features/customer/screens/track_driver_screen.dart';
 import 'package:hilla_ride/features/customer/screens/trip_completed_screen.dart';
+import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 /// Restores the customer's in-progress trip after refresh or re-login.
@@ -18,10 +19,12 @@ class CustomerActiveRideShell extends StatefulWidget {
     super.key,
     required this.user,
     required this.rideId,
+    this.onMinimize,
   });
 
   final AppUser user;
   final String rideId;
+  final VoidCallback? onMinimize;
 
   @override
   State<CustomerActiveRideShell> createState() =>
@@ -66,19 +69,51 @@ class _CustomerActiveRideShellState extends State<CustomerActiveRideShell> {
 
         switch (ride.status) {
           case RideStatus.searching:
-            return FindingDriverScreen(rideId: widget.rideId, embedded: true);
+            return _wrapSession(
+              FindingDriverScreen(rideId: widget.rideId, embedded: true),
+            );
           case RideStatus.matched:
-            return DriverAssignedScreen(rideId: widget.rideId, embedded: true);
+            return _wrapSession(
+              DriverAssignedScreen(rideId: widget.rideId, embedded: true),
+            );
           case RideStatus.accepted:
           case RideStatus.inProgress:
           case RideStatus.awaitingCashPayment:
-            return TrackDriverScreen(rideId: widget.rideId, embedded: true);
+            return _wrapSession(
+              TrackDriverScreen(rideId: widget.rideId, embedded: true),
+            );
           case RideStatus.completed:
             return TripCompletedScreen(rideId: widget.rideId);
           case RideStatus.cancelled:
             return CustomerHomeMapScreen(user: widget.user);
         }
       },
+    );
+  }
+
+  Widget _wrapSession(Widget child) {
+    final onMinimize = widget.onMinimize;
+    if (onMinimize == null) return child;
+
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Material(
+          color: Colors.white,
+          elevation: 1,
+          child: SafeArea(
+            bottom: false,
+            child: IconButton(
+              alignment: Alignment.centerLeft,
+              icon: const Icon(Icons.arrow_back),
+              tooltip: l10n.currentRideTitle,
+              onPressed: onMinimize,
+            ),
+          ),
+        ),
+        Expanded(child: child),
+      ],
     );
   }
 }

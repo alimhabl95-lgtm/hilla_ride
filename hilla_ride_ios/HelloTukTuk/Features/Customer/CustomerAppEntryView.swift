@@ -4,6 +4,7 @@ struct CustomerAppEntryView: View {
     @EnvironmentObject private var appState: AppState
     @State private var activeRide: Ride?
     @State private var sessionRideId: String?
+    @State private var minimizedRideId: String?
     @State private var rideTask: Task<Void, Never>?
 
     var body: some View {
@@ -14,10 +15,25 @@ struct CustomerAppEntryView: View {
                 } else if let sessionRideId {
                     CustomerActiveRideShell(
                         rideId: sessionRideId,
-                        onSessionEnded: { self.sessionRideId = nil }
+                        onSessionEnded: {
+                            self.sessionRideId = nil
+                            self.minimizedRideId = nil
+                        },
+                        onMinimize: {
+                            self.minimizedRideId = sessionRideId
+                            self.sessionRideId = nil
+                        }
                     )
                 } else {
-                    CustomerHomeShellView(user: user)
+                    CustomerHomeShellView(
+                        user: user,
+                        activeRideId: activeRide?.id,
+                        onOpenCurrentRide: {
+                            guard let id = activeRide?.id else { return }
+                            sessionRideId = id
+                            minimizedRideId = nil
+                        }
+                    )
                 }
             }
         }
@@ -29,17 +45,22 @@ struct CustomerAppEntryView: View {
            .onChange(of: appState.currentUser?.uid) { _ in
             startWatchingActiveRide()
         }
-           .onChange(of: activeRide?.id) { newId in
-            if let newId {
-                sessionRideId = newId
-            } else {
-                // Ride ended/cancelled — return to home so the icon can reopen later.
+        .onChange(of: activeRide?.id) { newId in
+            if newId == nil {
                 sessionRideId = nil
+                minimizedRideId = nil
+                return
             }
+            guard let newId else { return }
+            if sessionRideId == newId { return }
+            if minimizedRideId == newId { return }
+            sessionRideId = newId
+            minimizedRideId = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToCurrentRide)) { _ in
             if let activeRide {
                 sessionRideId = activeRide.id
+                minimizedRideId = nil
             }
         }
     }
@@ -57,9 +78,6 @@ struct CustomerAppEntryView: View {
                 guard !Task.isCancelled else { break }
                 await MainActor.run {
                     activeRide = ride
-                    if let ride {
-                        sessionRideId = ride.id
-                    }
                 }
             }
         }
