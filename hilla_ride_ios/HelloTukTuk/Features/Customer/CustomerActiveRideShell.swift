@@ -666,15 +666,16 @@ struct ActiveRideMapView: View {
         let target = toPickup ? ride.pickupCoordinate : ride.destinationCoordinate
         let routeKey = "\(toPickup ? "pickup" : "dest")|\(target.latitude)|\(target.longitude)"
 
+        var shouldRefresh = force
         if routeKey != lastRouteKey {
             lastRouteKey = routeKey
             lastRouteOrigin = nil
             lastRouteRefresh = nil
-            force = true
+            shouldRefresh = true
         }
 
         let now = Date()
-        if !force {
+        if !shouldRefresh {
             if let lastRouteRefresh,
                now.timeIntervalSince(lastRouteRefresh) < MapPresenceConfig.routeRefreshInterval {
                 if let lastRouteOrigin {
