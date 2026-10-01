@@ -19,16 +19,17 @@ flutter build ios --release --config-only \
 echo "=== Generated.xcconfig ==="
 cat ios/Flutter/Generated.xcconfig
 
-BUILD_MODE="$(grep '^FLUTTER_BUILD_MODE=' ios/Flutter/Generated.xcconfig | cut -d= -f2- | tr -d '[:space:]')"
-if [ "$BUILD_MODE" != "release" ]; then
-  echo "ERROR: Generated.xcconfig FLUTTER_BUILD_MODE=$BUILD_MODE (expected release)"
-  exit 1
-fi
-
+# Flutter 3.47+ may omit FLUTTER_BUILD_MODE from Generated.xcconfig; Release.xcconfig is authoritative.
 if ! grep -q '^FLUTTER_BUILD_MODE=release' ios/Flutter/Release.xcconfig; then
   echo "ERROR: ios/Flutter/Release.xcconfig must force FLUTTER_BUILD_MODE=release"
   exit 1
 fi
+BUILD_MODE="$(grep '^FLUTTER_BUILD_MODE=' ios/Flutter/Generated.xcconfig 2>/dev/null | cut -d= -f2- | tr -d '[:space:]' || true)"
+if [ -n "$BUILD_MODE" ] && [ "$BUILD_MODE" != "release" ]; then
+  echo "ERROR: Generated.xcconfig FLUTTER_BUILD_MODE=$BUILD_MODE (expected release or unset)"
+  exit 1
+fi
+echo "Release build mode confirmed (Release.xcconfig)"
 
 cd ios
 pod install
