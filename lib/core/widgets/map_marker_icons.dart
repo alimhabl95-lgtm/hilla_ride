@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -16,8 +18,9 @@ class MapMarkerIcons {
   /// Official Hello Tuk-Tuk driver marker asset (no status labels).
   static const String driverAssetPath = 'assets/images/tuk_tuk_map_marker.png';
 
-  /// On-screen marker size in logical pixels (constant across zoom levels).
-  static const int driverMarkerPx = 96;
+  /// On-screen marker width in logical pixels. The source art is a large
+  /// RGB PNG, so it is cropped and keyed before being drawn at this size.
+  static const double driverMarkerLogicalWidth = 42;
 
   static Future<void> ensureLoaded() async {
     driver ??= await _buildDriverMarker();
@@ -150,39 +153,95 @@ class MapMarkerIcons {
     return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
-  /// Official attached tuk-tuk illustration — no status text/labels.
-  /// Soft shadow under the vehicle; flat + [Marker.rotation] for heading.
+  /// Small transparent tuk-tuk. The source file is an opaque RGB PNG, so the
+  /// white canvas is removed and the vehicle is cropped before it is drawn.
   static Future<BitmapDescriptor> _buildDriverMarker() async {
     final data = await rootBundle.load(driverAssetPath);
-    final codec = await ui.instantiateImageCodec(
-      data.buffer.asUint8List(),
-      targetWidth: driverMarkerPx * 2,
-    );
+    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
     final frame = await codec.getNextFrame();
     final src = frame.image;
+    final raw = await src.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final width = src.width;
+    final height = src.height;
+    src.dispose();
+    if (raw == null) {
+      return BitmapDescriptor.defaultMarker;
+    }
 
-    const pad = 10.0;
-    final width = src.width.toDouble() + pad * 2;
-    final height = src.height.toDouble() + pad * 2;
+    final pixels = raw.buffer.asUint8List();
+    var minX = width;
+    var minY = height;
+    var maxX = 0;
+    var maxY = 0;
+    for (var y = 0; y < height; y++) {
+      for (var x = 0; x < width; x++) {
+        final i = (y * width + x) * 4;
+        final r = pixels[i];
+        final g = pixels[i + 1];
+        final b = pixels[i + 2];
+        final maxC = math.max(r, math.max(g, b));
+        final minC = math.min(r, math.min(g, b));
+        final nearWhite = minC > 236 && (maxC - minC) < 22;
+        if (nearWhite) {
+          pixels[i + 3] = 0;
+          continue;
+        }
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+
+    if (maxX <= minX || maxY <= minY) {
+      minX = 0;
+      minY = 0;
+      maxX = width - 1;
+      maxY = height - 1;
+    }
+
+    final cropW = maxX - minX + 1;
+    final cropH = maxY - minY + 1;
+    const outW = 160;
+    final outH = math.max(1, (outW * cropH / cropW).round());
+    final keyed = await _imageFromRgba(pixels, width, height);
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-
-    // Extra soft ground shadow for map visibility (asset already has one).
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(width * 0.5, height * 0.88),
-        width: width * 0.55,
-        height: height * 0.12,
+    canvas.drawImageRect(
+      keyed,
+      Rect.fromLTWH(
+        minX.toDouble(),
+        minY.toDouble(),
+        cropW.toDouble(),
+        cropH.toDouble(),
       ),
-      Paint()..color = const Color(0x33000000),
+      Rect.fromLTWH(0, 0, outW.toDouble(), outH.toDouble()),
+      Paint()..filterQuality = FilterQuality.high,
     );
-
-    canvas.drawImage(src, const Offset(pad, pad), Paint());
-
     final picture = recorder.endRecording();
-    final image = await picture.toImage(width.ceil(), height.ceil());
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    src.dispose();
-    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+    final image = await picture.toImage(outW, outH);
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    keyed.dispose();
+    image.dispose();
+    return BitmapDescriptor.bytes(
+      png!.buffer.asUint8List(),
+      width: driverMarkerLogicalWidth,
+    );
+  }
+
+  static Future<ui.Image> _imageFromRgba(
+    Uint8List pixels,
+    int width,
+    int height,
+  ) {
+    final completer = Completer<ui.Image>();
+    ui.decodeImageFromPixels(
+      pixels,
+      width,
+      height,
+      ui.PixelFormat.rgba8888,
+      completer.complete,
+    );
+    return completer.future;
   }
 }

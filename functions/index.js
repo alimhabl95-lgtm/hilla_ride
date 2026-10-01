@@ -59,11 +59,22 @@ async function sendToToken(token, title, body, data = {}, soundName, options = {
   try {
     const isBroadcast = data.type === "admin_broadcast";
     const dataOnly = options.dataOnly === true;
+    const isDriverAlert =
+      soundName === "driver_ride_request" ||
+      soundName === "ride_alert_chord" ||
+      soundName === "ride_alert_loud";
+    const isCustomerAlert = soundName === "customer_ride_accepted";
     const channelId = isBroadcast
       ? "admin_announcements"
-      : soundName === "driver_ride_request"
-        ? "driver_ride_requests_v3"
-        : "customer_ride_updates_v3";
+      : isDriverAlert
+        ? "driver_ride_requests_v11_tone1"
+        : "customer_ride_updates_v4";
+    const androidSound =
+      isBroadcast
+        ? "default"
+        : isDriverAlert || isCustomerAlert
+          ? "ride_alert_loud"
+          : soundName;
     const payloadData = Object.fromEntries(
       Object.entries({ ...data, title, body }).map(([key, value]) => [
         key,
@@ -96,7 +107,7 @@ async function sendToToken(token, title, body, data = {}, soundName, options = {
       message.notification = { title, body };
       message.android.notification = {
         channelId,
-        sound: isBroadcast ? "default" : soundName,
+        sound: androidSound,
         defaultSound: isBroadcast,
         priority: "max",
       };
@@ -300,21 +311,32 @@ exports.onRideUpdated = functions.firestore
           : [];
         return !beforeIds.includes(String(id));
       });
-      if (rewardsRuntime.mod && newlyOffered.length > 0) {
+      const rejectedSet = new Set(
+        (Array.isArray(after.rejectedDriverIds) ? after.rejectedDriverIds : []).map(
+          String,
+        ),
+      );
+      const notifyTargets = newlyOffered.filter((id) => !rejectedSet.has(String(id)));
+      if (rewardsRuntime.mod && notifyTargets.length > 0) {
         try {
           await rewardsRuntime.mod.bumpOfferStats(
-            newlyOffered,
+            notifyTargets,
             "statsOffersReceived",
           );
         } catch (_) {}
       }
-      for (const offeredDriverId of after.offeredDriverIds) {
+      for (const offeredDriverId of notifyTargets) {
         const driverRef = admin
           .firestore()
           .collection("drivers")
           .doc(String(offeredDriverId));
         const driverDoc = await driverRef.get();
         const driverData = driverDoc.data() || {};
+        const rideSub = String(after.subDistrictId || "").trim();
+        const driverSub = String(driverData.assignedSubDistrictId || "").trim();
+        if (!rideSub || !driverSub || driverSub !== rideSub) {
+          continue;
+        }
         if (driverData.isFakeDriver && driverData.autoAcceptRides) {
           continue;
         }
@@ -330,6 +352,7 @@ exports.onRideUpdated = functions.firestore
           `${after.pickupLabel} → ${after.destinationLabel}`,
           { rideId, type: "ride_matched" },
           "driver_ride_request",
+          { dataOnly: true },
         );
       }
     }
@@ -399,6 +422,7 @@ exports.onRideUpdated = functions.firestore
           `${after.pickupLabel} → ${after.destinationLabel}`,
           { rideId, type: "ride_matched" },
           "driver_ride_request",
+          { dataOnly: true },
         );
       }
     }
@@ -1387,11 +1411,13 @@ exports.getDrivingRoute = functions.https.onCall(async (data) => {
   const destLat = parseCoord(data?.destLat, "destLat");
   const destLng = parseCoord(data?.destLng, "destLng");
 
+  const language = String(data?.language || "ar").trim() || "ar";
   const params = new URLSearchParams({
     origin: `${originLat},${originLng}`,
     destination: `${destLat},${destLng}`,
     mode: "driving",
     region: "iq",
+    language,
     key: GOOGLE_DIRECTIONS_KEY,
   });
 
@@ -1413,11 +1439,26 @@ exports.getDrivingRoute = functions.https.onCall(async (data) => {
   }
 
   const encodedPolyline = body.routes[0].overview_polyline?.points || "";
+  const steps = (Array.isArray(leg.steps) ? leg.steps : []).map((step) => ({
+    instruction: String(step.html_instructions || "").replace(/<[^>]*>/g, "").trim(),
+    maneuver: String(step.maneuver || ""),
+    distanceMeters: Number(step.distance?.value) || 0,
+    durationSeconds: Number(step.duration?.value) || 0,
+    start: {
+      lat: step.start_location?.lat,
+      lng: step.start_location?.lng,
+    },
+    end: {
+      lat: step.end_location?.lat,
+      lng: step.end_location?.lng,
+    },
+  })).filter((step) => Number.isFinite(step.start.lat) && Number.isFinite(step.end.lat));
 
   return {
     distanceKm: Math.round((leg.distance.value / 1000) * 100) / 100,
     durationMinutes: Math.max(1, Math.ceil(leg.duration.value / 60)),
     encodedPolyline,
+    steps,
   };
 });
 
@@ -1809,10 +1850,14 @@ exports.setDriverApprovalStatus = functions.https.onCall(async (data, context) =
     let districtId = String(existingData.assignedDistrictId || "").trim();
     let subDistrictId = String(existingData.assignedSubDistrictId || "").trim();
     if (!districtId || !subDistrictId) {
-      districtId = DEFAULT_DRIVER_DISTRICT.id;
-      subDistrictId = DEFAULT_DRIVER_DISTRICT.subDistrictId;
-      update.assignedDistrictId = districtId;
-      update.assignedSubDistrictId = subDistrictId;
+      const requestedDistrict = String(existingData.requestedDistrictId || "").trim();
+      const requestedSub = String(existingData.requestedSubDistrictId || "").trim();
+      if (requestedDistrict && requestedSub) {
+        districtId = requestedDistrict;
+        subDistrictId = requestedSub;
+        update.assignedDistrictId = districtId;
+        update.assignedSubDistrictId = subDistrictId;
+      }
     }
 
     if (existingData.latitude == null) {
@@ -2220,6 +2265,8 @@ exports.submitDriverRegistration = functions.https.onCall(async (data, context) 
   const licenseNumber = String(payload.licenseNumber || "").trim();
   const idPhotoUrl = String(payload.idPhotoUrl || "").trim();
   const profilePhotoUrl = String(payload.profilePhotoUrl || "").trim();
+  const requestedDistrictId = String(payload.requestedDistrictId || "").trim();
+  const requestedSubDistrictId = String(payload.requestedSubDistrictId || "").trim();
 
   if (!phone || phone === "+964") {
     throw new functions.https.HttpsError("invalid-argument", "Phone number required.");
@@ -2235,6 +2282,9 @@ exports.submitDriverRegistration = functions.https.onCall(async (data, context) 
   }
   if (!idPhotoUrl || !profilePhotoUrl) {
     throw new functions.https.HttpsError("invalid-argument", "Both photos are required.");
+  }
+  if (!requestedDistrictId || !requestedSubDistrictId) {
+    throw new functions.https.HttpsError("invalid-argument", "Service area is required.");
   }
 
   const driverRef = admin.firestore().collection("drivers").doc(uid);
@@ -2262,6 +2312,8 @@ exports.submitDriverRegistration = functions.https.onCall(async (data, context) 
       licenseNumber,
       idPhotoUrl,
       profilePhotoUrl,
+      requestedDistrictId,
+      requestedSubDistrictId,
       termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
       approvalStatus: "pending",
       isOnline: false,
@@ -4302,6 +4354,7 @@ exports.endRideAwaitingCash = ridesRuntime.endRideAwaitingCash;
 exports.confirmCashCollected = ridesRuntime.confirmCashCollected;
 exports.cancelRide = ridesRuntime.cancelRide;
 exports.assignNearestDriver = ridesRuntime.assignNearestDriver;
+exports.onRideDispatchSync = ridesRuntime.onRideDispatchSync;
 exports.submitDriverRating = ridesRuntime.submitDriverRating;
 exports.applyPendingRideEarnings = ridesRuntime.applyPendingRideEarnings;
 

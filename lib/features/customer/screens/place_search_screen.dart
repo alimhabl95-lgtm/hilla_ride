@@ -40,7 +40,9 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
   ];
 
   late final TextEditingController _controller;
+  late final FocusNode _focusNode;
   List<PlaceResult> _results = const [];
+  List<PlaceResult> _suggestedPlaces = const [];
   bool _isSearching = false;
   bool _showNoResults = false;
   Timer? _debounce;
@@ -71,10 +73,14 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
         ? ''
         : widget.initialQuery;
     _controller = TextEditingController(text: initial);
+    _focusNode = FocusNode();
     _controller.addListener(_onTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _subscribeSavedPlaces();
       _loadPlaces();
+      if (mounted) {
+        _focusNode.requestFocus();
+      }
     });
   }
 
@@ -139,12 +145,14 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
     _debounce?.cancel();
     _savedSub?.cancel();
     _controller.removeListener(_onTextChanged);
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   void _onTextChanged() {
     _activeFilter = '';
+    setState(() {});
     _scheduleFilter(_controller.text);
   }
 
@@ -160,6 +168,7 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
           );
       if (!mounted) return;
       setState(() {
+        _suggestedPlaces = places;
         _results = places;
         _isSearching = false;
         _placesBlocked =
@@ -246,8 +255,71 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
     final isArabic = l10n.localeName.startsWith('ar');
     final regionLabel = widget.region.label(isArabic: isArabic);
 
+    final query = _controller.text.trim();
+    final showingSuggestions = query.isEmpty;
+    final visiblePlaces =
+        showingSuggestions && _suggestedPlaces.isNotEmpty
+            ? _suggestedPlaces
+            : _results;
+
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(76),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Material(
+              elevation: 2,
+              shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+              child: TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                autofocus: true,
+                textDirection:
+                    isArabic ? TextDirection.rtl : TextDirection.ltr,
+                textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                textInputAction: TextInputAction.search,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppBrandAssets.brandNavy,
+                      fontWeight: FontWeight.w600,
+                    ),
+                decoration: InputDecoration(
+                  hintText: widget.hint.isNotEmpty
+                      ? widget.hint
+                      : l10n.searchFieldHint,
+                  hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppBrandAssets.brandMuted,
+                      ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: AppBrandAssets.brandTealDark,
+                  ),
+                  suffixIcon: _controller.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: _clearQuery,
+                        ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
+                ),
+                onSubmitted: _applyFilter,
+              ),
+            ),
+          ),
+        ),
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -270,43 +342,6 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
                           color: AppBrandAssets.brandNavy,
                         ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    textDirection:
-                        isArabic ? TextDirection.rtl : TextDirection.ltr,
-                    textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      hintText: l10n.searchFieldHint,
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: _clearQuery,
-                      ),
-                    ),
-                    onSubmitted: _applyFilter,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: () => _applyFilter(_controller.text),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppBrandAssets.brandTealDark,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                  ),
-                  child: Text(isArabic ? 'بحث' : 'Search'),
                 ),
               ],
             ),
@@ -396,12 +431,21 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
-              l10n.placesInRegionCount(_results.length, regionLabel),
-              style: Theme.of(context).textTheme.labelLarge,
+              showingSuggestions
+                  ? (isArabic
+                      ? 'اقتراحات في $regionLabel'
+                      : 'Suggested places in $regionLabel')
+                  : (isArabic
+                      ? 'نتائج البحث (${_results.length})'
+                      : 'Search results (${_results.length})'),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppBrandAssets.brandNavy,
+                  ),
             ),
           ),
           Expanded(
-            child: _results.isEmpty
+            child: visiblePlaces.isEmpty
                 ? Center(
                     child: Text(
                       _showNoResults ? l10n.noPlacesFound : l10n.searchPlaces,
@@ -410,10 +454,10 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    itemCount: _results.length,
+                    itemCount: visiblePlaces.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, index) {
-                      final place = _results[index];
+                      final place = visiblePlaces[index];
                       final isSaved = _matchSaved(place) != null;
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(

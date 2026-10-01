@@ -48,6 +48,12 @@
 	<string>Hello Tuk-Tuk uses the camera so drivers can upload ID and profile photos during registration.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hello Tuk-Tuk uses your photo library so drivers can upload ID and profile photos during registration.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>waze</string>
+		<string>comgooglemaps</string>
+		<string>maps</string>
+	</array>
 	<key>GMSApiKey</key>
 	<string>AIzaSyDD4PxDlgfhdKj-_Z7sCkWHZ0hrVRtD2aA</string>
 	<key>UIBackgroundModes</key>

@@ -6,6 +6,7 @@ import 'package:hilla_ride/core/models/region_search_context.dart';
 import 'package:hilla_ride/core/services/service_area_catalog.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/customer/screens/place_search_screen.dart';
+import 'package:hilla_ride/features/customer/widgets/android_customer_booking_sheet.dart';
 import 'package:hilla_ride/features/customer/widgets/saved_places_bar.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 
@@ -140,6 +141,71 @@ class RideSearchPanel extends StatelessWidget {
     }
 
     if (bottomSheetStyle) {
+      Future<void> openDestinationSearch() async {
+        _ensureSubDistrictSelected(context, l10n, warnOnly: true);
+        await _openSearch(
+          context,
+          title: l10n.whereTo,
+          hint: l10n.searchPlaces,
+          initialQuery: destinationLabel,
+          onSelected: onDestinationSelected,
+        );
+      }
+
+      VoidCallback? openPickupSearch = pickupLoading
+          ? null
+          : () {
+              _ensureSubDistrictSelected(context, l10n, warnOnly: true);
+              _openSearch(
+                context,
+                title: l10n.pickup,
+                hint: l10n.searchPlaces,
+                initialQuery: pickupLabel,
+                onSelected: onPickupSelected,
+              );
+            };
+
+      if (AndroidCustomerBookingSheet.isSupported) {
+        return AndroidCustomerBookingSheet(
+          l10n: l10n,
+          districtId: districtId,
+          subDistrictId: subDistrictId,
+          isArabic: isArabic,
+          pickupLabel: pickupLabel,
+          destinationLabel: destinationLabel,
+          pickupLoading: pickupLoading,
+          pickup: pickup,
+          destination: destination,
+          onDistrictChanged: onDistrictChanged,
+          onSubDistrictChanged: onSubDistrictChanged,
+          onOpenPickupSearch: openPickupSearch,
+          onOpenDestinationSearch: openDestinationSearch,
+          onPinPickup: () {
+            if (!_ensureSubDistrictSelected(context, l10n)) return;
+            onPinPickup();
+          },
+          onUseCurrentLocation: () {
+            if (!_ensureSubDistrictSelected(context, l10n)) return;
+            onUseCurrentLocation();
+          },
+          onPinDestination: () {
+            if (!_ensureSubDistrictSelected(context, l10n)) return;
+            onPinDestination();
+          },
+          onSavedPlaceSelected: (place) {
+            if (!_ensureSubDistrictSelected(context, l10n)) return;
+            onSavedPlaceSelected(place);
+          },
+          onBookRide: onBookRide == null
+              ? null
+              : () {
+                  if (!_ensureSubDistrictSelected(context, l10n)) return;
+                  onBookRide!();
+                },
+          bookRideLoading: bookRideLoading,
+        );
+      }
+
       return _BottomSheetSearch(
         l10n: l10n,
         districtId: districtId,
@@ -153,30 +219,8 @@ class RideSearchPanel extends StatelessWidget {
         destination: destination,
         onDistrictChanged: onDistrictChanged,
         onSubDistrictChanged: onSubDistrictChanged,
-        onOpenDestinationSearch: () {
-          if (!_ensureSubDistrictSelected(context, l10n, warnOnly: true)) {
-            return;
-          }
-          _openSearch(
-            context,
-            title: l10n.whereTo,
-            hint: l10n.searchPlaces,
-            initialQuery: destinationLabel,
-            onSelected: onDestinationSelected,
-          );
-        },
-        onOpenPickupSearch: pickupLoading
-            ? null
-            : () {
-                if (!_ensureSubDistrictSelected(context, l10n)) return;
-                _openSearch(
-                  context,
-                  title: l10n.pickup,
-                  hint: l10n.searchPlaces,
-                  initialQuery: pickupLabel,
-                  onSelected: onPickupSelected,
-                );
-              },
+        onOpenDestinationSearch: openDestinationSearch,
+        onOpenPickupSearch: openPickupSearch,
         onPinPickup: () {
           if (!_ensureSubDistrictSelected(context, l10n)) return;
           onPinPickup();

@@ -206,6 +206,107 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     return next;
   }
 
+  async function driverMatchingPoint(driverData) {
+    const d = driverData || {};
+    let lat = Number(d.latitude ?? d.lastLat ?? d.lat);
+    let lng = Number(d.longitude ?? d.lastLng ?? d.lng);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
+    }
+    const subId = String(d.assignedSubDistrictId || "").trim();
+    if (!subId) return null;
+    const subSnap = await db().collection("serviceSubDistricts").doc(subId).get();
+    if (!subSnap.exists) return null;
+    const sub = subSnap.data() || {};
+    lat = Number(sub.latitude);
+    lng = Number(sub.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  }
+
+  function baghdadKeys(date = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Baghdad",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const part = (type) => parts.find((item) => item.type === type).value;
+    const dayKey = `${part("year")}-${part("month")}-${part("day")}`;
+    return { dayKey, monthKey: dayKey.slice(0, 7) };
+  }
+
+  function rejectionDashboardPatch(driverData) {
+    const keys = baghdadKeys();
+    const data = driverData || {};
+    const dayCount =
+      data.rejectedDayKey === keys.dayKey ? Number(data.rejectedDayCount) || 0 : 0;
+    const monthCount =
+      data.rejectedMonthKey === keys.monthKey
+        ? Number(data.rejectedMonthCount) || 0
+        : 0;
+    return {
+      rejectedDayKey: keys.dayKey,
+      rejectedDayCount: dayCount + 1,
+      rejectedMonthKey: keys.monthKey,
+      rejectedMonthCount: monthCount + 1,
+    };
+  }
+
+  function dashboardCounterPatch(driverData, earningsIqd) {
+    const keys = baghdadKeys();
+    const data = driverData || {};
+    const dayCount =
+      data.completedDayKey === keys.dayKey ? Number(data.completedDayCount) || 0 : 0;
+    const monthCount =
+      data.completedMonthKey === keys.monthKey
+        ? Number(data.completedMonthCount) || 0
+        : 0;
+    const monthEarnings =
+      data.earningsMonthKey === keys.monthKey ? Number(data.earningsMonthIqd) || 0 : 0;
+    return {
+      completedDayKey: keys.dayKey,
+      completedDayCount: dayCount + 1,
+      completedMonthKey: keys.monthKey,
+      completedMonthCount: monthCount + 1,
+      monthlyRideCount: monthCount + 1,
+      earningsMonthKey: keys.monthKey,
+      earningsMonthIqd: monthEarnings + Math.max(0, Math.trunc(earningsIqd) || 0),
+    };
+  }
+
+  async function resolvePickupSubDistrictId(lat, lng, fallbackId) {
+    const snap = await db()
+      .collection("serviceSubDistricts")
+      .where("status", "==", "active")
+      .get();
+    let bestId = "";
+    let bestKm = Infinity;
+    for (const doc of snap.docs) {
+      const data = doc.data() || {};
+      const centerLat = Number(data.latitude);
+      const centerLng = Number(data.longitude);
+      if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) continue;
+      const km = haversineKm(lat, lng, centerLat, centerLng);
+      const radius = Math.max(Number(data.searchRadiusKm) || 22, 8);
+      if (km <= radius + 3 && km < bestKm) {
+        bestKm = km;
+        bestId = doc.id;
+      }
+    }
+    return bestId || String(fallbackId || "").trim();
+  }
+
+  async function driverStillBusy(driverId) {
+    const snap = await db()
+      .collection("rides")
+      .where("driverId", "==", driverId)
+      .where("status", "in", ["accepted", "inProgress", "awaitingCashPayment"])
+      .limit(1)
+      .get();
+    return !snap.empty;
+  }
+
   async function assignNearestDriverInternal(rideId, excludeDriverIds = []) {
     const rideRef = db().collection("rides").doc(rideId);
     const rideSnap = await rideRef.get();
@@ -222,17 +323,28 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     }
 
     const districtId = String(ride.districtId || "");
-    const subDistrictId = String(ride.subDistrictId || "");
     const pickupLat = Number(ride.pickupLat);
     const pickupLng = Number(ride.pickupLng);
+    let subDistrictId = await resolvePickupSubDistrictId(
+      pickupLat,
+      pickupLng,
+      ride.subDistrictId,
+    );
+    if (subDistrictId && subDistrictId !== String(ride.subDistrictId || "").trim()) {
+      await rideRef.set(
+        { subDistrictId },
+        { merge: true },
+      );
+    }
     const walletConfig = await getWalletConfig();
     const exclude = new Set(excludeDriverIds.map(String));
+    const rideRejected = Array.isArray(ride.rejectedDriverIds)
+      ? ride.rejectedDriverIds.map(String)
+      : [];
+    rideRejected.forEach((id) => exclude.add(id));
 
-    // Match within the selected قضاء (district). Prefer drivers in the same
-    // ناحية, but do not require an exact ناحية match — customers often pick
-    // a neighboring area (e.g. قاسم) while the online driver is assigned to
-    // another ناحية in the same district (e.g. الشوملي).
-    if (!districtId && !subDistrictId) {
+    // Only drivers approved for this exact ناحية (service area).
+    if (!subDistrictId) {
       await rideRef.set(
         {
           status: "searching",
@@ -241,44 +353,42 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
         },
         { merge: true },
       );
-      throw new functions.https.HttpsError("failed-precondition", "no_drivers");
+      throw new functions.https.HttpsError("failed-precondition", "no_service_area");
     }
 
-    let query = db()
+    const driversSnap = await db()
       .collection("drivers")
       .where("isOnline", "==", true)
-      .where("approvalStatus", "==", "approved");
-    if (districtId) {
-      query = query.where("assignedDistrictId", "==", districtId);
-    } else {
-      query = query.where("assignedSubDistrictId", "==", subDistrictId);
-    }
-    const driversSnap = await query.limit(40).get();
+      .where("approvalStatus", "==", "approved")
+      .where("assignedSubDistrictId", "==", subDistrictId)
+      .limit(40)
+      .get();
 
     const candidates = [];
     for (const doc of driversSnap.docs) {
       if (exclude.has(doc.id)) continue;
       const d = doc.data() || {};
-      if (d.hasActiveRide === true) continue;
       if (d.isBlocked === true) continue;
+      if (d.hasActiveRide === true) {
+        // Repair stale busy flag so eligible drivers are not skipped forever.
+        const stillBusy = await driverStillBusy(doc.id);
+        if (stillBusy) continue;
+        await doc.ref.set({ hasActiveRide: false }, { merge: true });
+      }
       const balance = Number(d.walletBalanceIqd) || 0;
       const walletStatus = String(d.walletStatus || "active");
       if (walletStatus === "blocked" || balance < walletConfig.minBalanceIqd) {
         continue;
       }
-      const lat = Number(d.latitude ?? d.lastLat ?? d.lat);
-      const lng = Number(d.longitude ?? d.lastLng ?? d.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      const km = haversineKm(pickupLat, pickupLng, lat, lng);
-      const sameSub =
-        !!subDistrictId &&
-        String(d.assignedSubDistrictId || "") === subDistrictId;
-      candidates.push({ id: doc.id, km, sameSub });
+      if (String(d.assignedSubDistrictId || "").trim() !== subDistrictId) {
+        continue;
+      }
+      const point = await driverMatchingPoint(d);
+      if (!point) continue;
+      const km = haversineKm(pickupLat, pickupLng, point.lat, point.lng);
+      candidates.push({ id: doc.id, km });
     }
-    candidates.sort((a, b) => {
-      if (a.sameSub !== b.sameSub) return a.sameSub ? -1 : 1;
-      return a.km - b.km;
-    });
+    candidates.sort((a, b) => a.km - b.km);
     if (candidates.length === 0) {
       functions.logger.info("assignNearestDriver no candidates", {
         rideId,
@@ -301,16 +411,44 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     }
 
     const offered = candidates.slice(0, 5).map((c) => c.id);
-    await rideRef.set(
-      {
-        status: "matched",
-        offeredDriverIds: offered,
-        rejectedDriverIds: Array.from(exclude),
-        notifyDrivers: true,
-        matchedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
+    await db().runTransaction(async (tx) => {
+      const freshSnap = await tx.get(rideRef);
+      if (!freshSnap.exists) return;
+      const fresh = freshSnap.data() || {};
+      if (String(fresh.driverId || "").trim()) return;
+      const freshStatus = String(fresh.status || "");
+      if (freshStatus !== "searching" && freshStatus !== "matched") return;
+      const rejected = new Set(exclude);
+      const freshRejected = Array.isArray(fresh.rejectedDriverIds)
+        ? fresh.rejectedDriverIds.map(String)
+        : [];
+      freshRejected.forEach((id) => rejected.add(id));
+      const safeOffered = offered.filter((id) => !rejected.has(id));
+      if (safeOffered.length === 0) {
+        tx.set(
+          rideRef,
+          {
+            status: "searching",
+            offeredDriverIds: [],
+            rejectedDriverIds: Array.from(rejected),
+            notifyDrivers: false,
+          },
+          { merge: true },
+        );
+        return;
+      }
+      tx.set(
+        rideRef,
+        {
+          status: "matched",
+          offeredDriverIds: safeOffered,
+          rejectedDriverIds: Array.from(rejected),
+          notifyDrivers: true,
+          matchedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    });
     return { rideId, status: "matched", offeredDriverIds: offered };
   }
 
@@ -420,6 +558,12 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
       loyaltyFreeRide,
     });
 
+    const matchedSubDistrictId = await resolvePickupSubDistrictId(
+      pickupLat,
+      pickupLng,
+      subDistrictId,
+    );
+
     const active = await db()
       .collection("rides")
       .where("customerId", "==", customerId)
@@ -455,7 +599,7 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
         paymentMethod: "cash",
         rideNumber,
         districtId,
-        subDistrictId,
+        subDistrictId: matchedSubDistrictId || subDistrictId,
         distanceKm,
         offeredDriverIds: [],
         notifyDrivers: false,
@@ -534,10 +678,31 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
         throw new functions.https.HttpsError("failed-precondition", "wallet_blocked");
       }
 
+      const rideSubDistrictId = String(ride.subDistrictId || "").trim();
+      const driverSubDistrictId = String(driver.assignedSubDistrictId || "").trim();
+      if (
+        !rideSubDistrictId ||
+        !driverSubDistrictId ||
+        driverSubDistrictId !== rideSubDistrictId
+      ) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "ride_unavailable",
+        );
+      }
+      const rejectedIds = Array.isArray(ride.rejectedDriverIds)
+        ? ride.rejectedDriverIds.map(String)
+        : [];
+      if (rejectedIds.includes(driverId)) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "ride_unavailable",
+        );
+      }
+
       if (status === "searching") {
         const rideDistrictId = String(ride.districtId || "");
         const driverDistrictId = String(driver.assignedDistrictId || "");
-        // Same قضاء is enough — ناحية may differ within the district.
         if (!rideDistrictId || driverDistrictId !== rideDistrictId) {
           throw new functions.https.HttpsError(
             "failed-precondition",
@@ -548,11 +713,7 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
         const offered = Array.isArray(ride.offeredDriverIds)
           ? ride.offeredDriverIds.map(String)
           : [];
-        if (
-          !assignedDriverId &&
-          offered.length > 0 &&
-          !offered.includes(driverId)
-        ) {
+        if (!assignedDriverId && !offered.includes(driverId)) {
           throw new functions.https.HttpsError(
             "failed-precondition",
             "ride_unavailable",
@@ -606,7 +767,9 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
       const offered = Array.isArray(ride.offeredDriverIds)
         ? ride.offeredDriverIds.map(String)
         : [];
-      if (!offered.includes(driverId)) {
+      // Allow reject when driver is in the offer list, OR when the offer was a
+      // district-wide matched ride (empty offeredDriverIds).
+      if (offered.length > 0 && !offered.includes(driverId)) {
         throw new functions.https.HttpsError("failed-precondition", "ride_unavailable");
       }
       const previousRejected = Array.isArray(ride.rejectedDriverIds)
@@ -630,12 +793,66 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
       }
     });
 
+    // Timestamped record so the driver dashboard can count rejections as
+    // "cancelled" rides for today / this month.
+    const rejection = {
+      rideId,
+      driverId,
+      rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      rejectedAtMillis: Date.now(),
+    };
+    try {
+      await db()
+        .collection("driverRideRejections")
+        .doc(`${rideId}_${driverId}`)
+        .set(rejection, { merge: true });
+    } catch (error) {
+      functions.logger.warn("rejectRide record failed", {
+        rideId,
+        driverId,
+        message: error && error.message ? error.message : String(error),
+      });
+    }
+    try {
+      await db()
+        .collection("drivers")
+        .doc(driverId)
+        .collection("rideRejections")
+        .doc(rideId)
+        .set(rejection, { merge: true });
+    } catch (error) {
+      functions.logger.warn("rejectRide driver record failed", {
+        rideId,
+        driverId,
+        message: error && error.message ? error.message : String(error),
+      });
+    }
+    try {
+      const driverRef = db().collection("drivers").doc(driverId);
+      const driverSnap = await driverRef.get();
+      await driverRef.set(
+        rejectionDashboardPatch(driverSnap.data() || {}),
+        { merge: true },
+      );
+    } catch (error) {
+      functions.logger.warn("rejectRide dashboard counters failed", {
+        rideId,
+        driverId,
+        message: error && error.message ? error.message : String(error),
+      });
+    }
+
     if (shouldReassign) {
       try {
         await assignNearestDriverInternal(rideId, Array.from(rejectedIds));
-      } catch (_) {}
+      } catch (error) {
+        functions.logger.warn("rejectRide reassign failed", {
+          rideId,
+          message: error && error.message ? error.message : String(error),
+        });
+      }
     }
-    return { ok: true };
+    return { ok: true, reassigned: shouldReassign };
   });
 
   const startRide = functions.https.onCall(async (data, context) => {
@@ -734,6 +951,10 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
       if (customerId) {
         customerSnap = await tx.get(db().collection("users").doc(customerId));
       }
+      let driverSnapForStats = null;
+      if (driverId) {
+        driverSnapForStats = await tx.get(db().collection("drivers").doc(driverId));
+      }
 
       if (subSnap && subSnap.exists) {
         const sub = subSnap.data() || {};
@@ -771,6 +992,10 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
           completedRidesCount: admin.firestore.FieldValue.increment(1),
           hasActiveRide: false,
           operationalStatus: "available",
+          ...dashboardCounterPatch(
+            driverSnapForStats ? driverSnapForStats.data() : {},
+            driverEarningsIqd,
+          ),
         });
       }
 
@@ -1012,6 +1237,10 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
         const driverId = String(ride.driverId || "");
         let commissionPercent = defaultCommissionPercent;
         const subId = String(ride.subDistrictId || "");
+        let driverSnapForStats = null;
+        if (driverId) {
+          driverSnapForStats = await tx.get(db().collection("drivers").doc(driverId));
+        }
         if (subId) {
           const subSnap = await tx.get(db().collection("serviceSubDistricts").doc(subId));
           const sub = subSnap.data() || {};
@@ -1046,6 +1275,10 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
             completedRidesCount: admin.firestore.FieldValue.increment(1),
             hasActiveRide: false,
             operationalStatus: "available",
+            ...dashboardCounterPatch(
+              driverSnapForStats ? driverSnapForStats.data() : {},
+              driverEarningsIqd,
+            ),
           });
         }
         didApply = true;
@@ -1056,6 +1289,44 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     return { ok: true, applied };
   });
 
+  const onRideDispatchSync = functions.firestore
+    .document("rides/{rideId}")
+    .onWrite(async (change, context) => {
+      if (!change.after.exists) return;
+      const before = change.before.exists ? change.before.data() || {} : null;
+      const ride = change.after.data() || {};
+      const status = String(ride.status || "");
+      if (String(ride.driverId || "").trim()) return;
+      const offered = Array.isArray(ride.offeredDriverIds)
+        ? ride.offeredDriverIds
+        : [];
+      if (offered.length > 0) return;
+
+      const beforeStatus = before ? String(before.status || "") : "";
+      const isNewRide = before == null;
+      const needsDispatch =
+        status === "searching" &&
+        (isNewRide || beforeStatus !== "searching");
+      const rematchedAfterReject =
+        status === "searching" && beforeStatus === "matched";
+      if (!needsDispatch && !rematchedAfterReject) return;
+
+      const rejectedExclude = Array.isArray(ride.rejectedDriverIds)
+        ? ride.rejectedDriverIds.map(String)
+        : [];
+
+      try {
+        await assignNearestDriverInternal(context.params.rideId, rejectedExclude);
+      } catch (error) {
+        if (error.code !== "failed-precondition") {
+          functions.logger.warn("onRideDispatchSync failed", {
+            rideId: context.params.rideId,
+            message: error.message,
+          });
+        }
+      }
+    });
+
   return {
     createRide,
     acceptRide,
@@ -1065,6 +1336,7 @@ function createRidesModule({ admin, functions, assertAdminPermissionAny }) {
     confirmCashCollected,
     cancelRide,
     assignNearestDriver,
+    onRideDispatchSync,
     submitDriverRating,
     applyPendingRideEarnings,
   };

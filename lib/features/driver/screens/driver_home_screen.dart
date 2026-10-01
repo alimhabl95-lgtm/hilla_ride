@@ -10,9 +10,15 @@ import 'package:hilla_ride/core/providers/app_mode_provider.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
+import 'package:hilla_ride/core/utils/android_waze_navigation.dart';
+import 'package:hilla_ride/core/utils/driver_accepted_ride_preview.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/driver/screens/driver_rewards_screen.dart';
 import 'package:hilla_ride/features/driver/screens/driver_wallet_screen.dart';
+import 'package:hilla_ride/features/driver/widgets/driver_android_side_menu.dart';
+import 'package:hilla_ride/features/driver/widgets/driver_dashboard_announcements_card.dart';
+import 'package:hilla_ride/features/driver/widgets/driver_dashboard_daily_stat_cards.dart';
+import 'package:hilla_ride/features/driver/widgets/driver_dashboard_monthly_stat_cards.dart';
 import 'package:hilla_ride/features/driver/widgets/driver_delivery_orders_panel.dart';
 import 'package:hilla_ride/features/driver/widgets/driver_ride_map_panel.dart';
 import 'package:hilla_ride/features/shared/widgets/announcement_banner.dart';
@@ -35,8 +41,12 @@ class DriverHomeScreen extends StatefulWidget {
 }
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isUpdatingOnline = false;
   final _pendingRideActions = <String>{};
+  final _arrivedAtPickupRideIds = <String>{};
+  Stream<Ride?>? _assignedRideStream;
+  StreamSubscription<Ride?>? _locationKickSubscription;
 
   String _actionKey(String rideId, String action) => '$rideId:$action';
 
@@ -62,15 +72,38 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   void initState() {
     super.initState();
+    final driverService = context.read<AppState>().driverService;
+    _assignedRideStream =
+        context.read<AppState>().rideService.watchAssignedRideForDriver(
+              widget.driver.uid,
+            );
     if (widget.driver.isOnline) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(NotificationService.unlockAudioIfNeeded());
-        context
-            .read<AppState>()
-            .driverService
-            .refreshOnlineMatchingProfile(widget.driver.uid);
+        unawaited(
+          driverService.refreshOnlineMatchingProfile(widget.driver.uid),
+        );
+        unawaited(driverService.ensureLocationUpdates(widget.driver.uid));
       });
     }
+    _locationKickSubscription = _assignedRideStream?.listen((ride) {
+      if (ride == null) return;
+      if (ride.status == RideStatus.accepted ||
+          ride.status == RideStatus.inProgress ||
+          ride.status == RideStatus.awaitingCashPayment) {
+        unawaited(driverService.ensureLocationUpdates(widget.driver.uid));
+      }
+      if (ride.status == RideStatus.completed ||
+          ride.status == RideStatus.cancelled) {
+        _arrivedAtPickupRideIds.remove(ride.id);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    unawaited(_locationKickSubscription?.cancel());
+    super.dispose();
   }
 
   Future<void> _toggleOnline(bool value) async {
@@ -78,6 +111,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     try {
       if (value) {
         unawaited(NotificationService.unlockAudioIfNeeded());
+        unawaited(NotificationService.ensureAndroidAlertPermissions());
       }
       await context.read<AppState>().driverService.setOnlineStatus(
             driverId: widget.driver.uid,
@@ -159,11 +193,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isAr = l10n.localeName.startsWith('ar');
-    final rideService = context.read<AppState>().rideService;
     const fareService = FareService();
 
+    final useAndroidSideMenu = DriverAndroidSideMenu.isSupported;
+
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppBrandAssets.brandSurface,
+      drawer: useAndroidSideMenu && !isAr
+          ? DriverAndroidSideMenu(driver: widget.driver)
+          : null,
+      endDrawer: useAndroidSideMenu && isAr
+          ? DriverAndroidSideMenu(driver: widget.driver)
+          : null,
       body: Column(
         children: [
           SafeArea(
@@ -177,50 +219,63 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
               child: Row(
                 children: [
-                  Material(
+                  if (useAndroidSideMenu)
+                    AppCircleIconButton(
+                      tooltip: isAr ? 'المحفظة' : 'Wallet',
+                      icon: Icons.account_balance_wallet_outlined,
+                      backgroundColor:
+                          AppBrandAssets.brandTeal.withValues(alpha: 0.15),
+                      foregroundColor: AppBrandAssets.brandTealDark,
+                      onPressed: () => _openWallet(widget.driver),
+                    )
+                  else
+                    Material(
                     color: AppBrandAssets.brandTeal.withValues(alpha: 0.15),
                     shape: const CircleBorder(),
                     child: PopupMenuButton<String>(
-                      tooltip: isAr ? 'القائمة' : 'Menu',
-                      offset: const Offset(0, 48),
-                      icon: const Icon(
-                        Icons.menu,
-                        color: AppBrandAssets.brandTealDark,
-                      ),
-                      onSelected: (value) async {
-                        switch (value) {
-                          case 'wallet':
-                            _openWallet(widget.driver);
-                          case 'rewards':
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => DriverRewardsScreen(
-                                  driver: widget.driver,
-                                ),
+                            tooltip: isAr ? 'القائمة' : 'Menu',
+                            offset: const Offset(0, 48),
+                            icon: const Icon(
+                              Icons.menu,
+                              color: AppBrandAssets.brandTealDark,
+                            ),
+                            onSelected: (value) async {
+                              switch (value) {
+                                case 'wallet':
+                                  _openWallet(widget.driver);
+                                case 'rewards':
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => DriverRewardsScreen(
+                                        driver: widget.driver,
+                                      ),
+                                    ),
+                                  );
+                                case 'logout':
+                                  await context
+                                      .read<AppState>()
+                                      .authService
+                                      .signOut();
+                                  if (context.mounted) {
+                                    context.read<AppModeProvider>().clearMode();
+                                  }
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'wallet',
+                                child: Text(isAr ? 'المحفظة' : 'Wallet'),
                               ),
-                            );
-                          case 'logout':
-                            await context.read<AppState>().authService.signOut();
-                            if (context.mounted) {
-                              context.read<AppModeProvider>().clearMode();
-                            }
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'wallet',
-                          child: Text(isAr ? 'المحفظة' : 'Wallet'),
-                        ),
-                        PopupMenuItem(
-                          value: 'rewards',
-                          child: Text(isAr ? 'المكافآت' : 'Rewards'),
-                        ),
-                        PopupMenuItem(
-                          value: 'logout',
-                          child: Text(l10n.logout),
-                        ),
-                      ],
-                    ),
+                              PopupMenuItem(
+                                value: 'rewards',
+                                child: Text(isAr ? 'المكافآت' : 'Rewards'),
+                              ),
+                              PopupMenuItem(
+                                value: 'logout',
+                                child: Text(l10n.logout),
+                              ),
+                            ],
+                          ),
                   ),
                   Expanded(
                     child: Text(
@@ -232,35 +287,79 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           ),
                     ),
                   ),
-                  AppCircleIconButton(
-                    tooltip: isAr ? 'المحفظة' : 'Wallet',
-                    icon: Icons.account_balance_wallet_outlined,
-                    backgroundColor:
-                        AppBrandAssets.brandTeal.withValues(alpha: 0.15),
-                    foregroundColor: AppBrandAssets.brandTealDark,
-                    onPressed: () => _openWallet(widget.driver),
-                  ),
+                  if (useAndroidSideMenu)
+                    Material(
+                      color: AppBrandAssets.brandTeal.withValues(alpha: 0.15),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        tooltip: isAr ? 'القائمة' : 'Menu',
+                        icon: const Icon(
+                          Icons.menu,
+                          color: AppBrandAssets.brandTealDark,
+                        ),
+                        onPressed: () {
+                          final state = _scaffoldKey.currentState;
+                          if (isAr) {
+                            state?.openEndDrawer();
+                          } else {
+                            state?.openDrawer();
+                          }
+                        },
+                      ),
+                    )
+                  else
+                    AppCircleIconButton(
+                      tooltip: isAr ? 'المحفظة' : 'Wallet',
+                      icon: Icons.account_balance_wallet_outlined,
+                      backgroundColor:
+                          AppBrandAssets.brandTeal.withValues(alpha: 0.15),
+                      foregroundColor: AppBrandAssets.brandTealDark,
+                      onPressed: () => _openWallet(widget.driver),
+                    ),
                 ],
               ),
             ),
           ),
-          const AnnouncementBanner(audience: 'drivers'),
+          if (!useAndroidSideMenu)
+            const AnnouncementBanner(audience: 'drivers'),
           Expanded(
             child: StreamBuilder<DriverProfile?>(
         stream: context.read<AppState>().driverService.watchDriver(widget.driver.uid),
         builder: (context, driverSnapshot) {
           final driver = driverSnapshot.data ?? widget.driver;
 
+          return ValueListenableBuilder<String?>(
+            valueListenable: NotificationService.pendingDriverOfferId,
+            builder: (context, pendingOfferId, _) {
+          return ValueListenableBuilder<String?>(
+            valueListenable: NotificationService.androidOptimisticActiveRideId,
+            builder: (context, optimisticActiveId, _) {
           return StreamBuilder<Ride?>(
-            stream: rideService.watchAssignedRideForDriver(driver.uid),
+            stream: _assignedRideStream,
             builder: (context, snapshot) {
               final ride = snapshot.data;
-              final activeRide = ride != null &&
-                      ride.status != RideStatus.cancelled &&
-                      ride.status != RideStatus.completed
+              NotificationService.syncAndroidOptimisticActiveRide(ride);
+              final optimisticActive =
+                  NotificationService.isAndroidOptimisticActive(ride?.id);
+              final isAssignedTrip = ride != null &&
+                  ride.driverId == driver.uid &&
+                  (ride.status == RideStatus.accepted ||
+                      ride.status == RideStatus.inProgress ||
+                      ride.status == RideStatus.awaitingCashPayment);
+              var activeRide = isAssignedTrip ||
+                      (optimisticActive &&
+                          ride != null &&
+                          ride.status != RideStatus.cancelled &&
+                          ride.status != RideStatus.completed)
                   ? ride
                   : null;
-
+              if (activeRide != null &&
+                  optimisticActive &&
+                  (activeRide.status == RideStatus.matched ||
+                      activeRide.status == RideStatus.searching)) {
+                activeRide =
+                    driverAcceptedRidePreview(activeRide, driver.uid);
+              }
               return Column(
                 children: [
                   if (!driver.hasAssignedWorkArea)
@@ -316,33 +415,45 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   Expanded(
                     child: Builder(
                       builder: (context) {
-                        if (activeRide == null) {
-                          return _IdleDriverPanel(
+                        if (activeRide != null) {
+                          final panelRide = activeRide;
+                          return _ActiveRidePanel(
+                            ride: panelRide,
                             driver: driver,
                             l10n: l10n,
                             fareService: fareService,
-                            isUpdatingOnline: _isUpdatingOnline,
-                            onToggleOnline: _toggleOnline,
-                            onOpenWallet: () => _openWallet(driver),
-                            availabilityHint: _availabilityHint(driver, l10n),
+                            isActionPending: _isActionPending,
+                            runRideAction: _runRideAction,
+                            actionButton: _actionButton,
+                            onConfirmCash: _confirmCashCollected,
+                            arrivedAtPickup: _arrivedAtPickupRideIds
+                                .contains(panelRide.id),
+                            onArrivedAtPickup: () {
+                              setState(() {
+                                _arrivedAtPickupRideIds.add(panelRide.id);
+                              });
+                            },
                           );
                         }
 
-                        return _ActiveRidePanel(
-                          ride: activeRide,
+                        return _IdleDriverPanel(
                           driver: driver,
                           l10n: l10n,
                           fareService: fareService,
-                          isActionPending: _isActionPending,
-                          runRideAction: _runRideAction,
-                          actionButton: _actionButton,
-                          onConfirmCash: _confirmCashCollected,
+                          isUpdatingOnline: _isUpdatingOnline,
+                          onToggleOnline: _toggleOnline,
+                          onOpenWallet: () => _openWallet(driver),
+                          availabilityHint: _availabilityHint(driver, l10n),
                         );
                       },
                     ),
                   ),
                 ],
               );
+            },
+          );
+            },
+          );
             },
           );
         },
@@ -376,6 +487,7 @@ class _IdleDriverPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAr = l10n.localeName.startsWith('ar');
+    final androidDashboard = DriverDashboardDailyStatCards.isSupported;
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -402,7 +514,7 @@ class _IdleDriverPanel extends StatelessWidget {
                   ),
                   Text(
                     driver.name.isEmpty
-                        ? (isAr ? 'حساب السائق' : 'Driver')
+                        ? (isAr ? 'حساب السائق' : 'Driver account')
                         : driver.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -414,15 +526,18 @@ class _IdleDriverPanel extends StatelessWidget {
                 ],
               ),
             ),
-            IconButton.filledTonal(
-              onPressed: onOpenWallet,
-              style: IconButton.styleFrom(
-                foregroundColor: AppBrandAssets.brandTealDark,
-                backgroundColor:
-                    AppBrandAssets.brandTeal.withValues(alpha: 0.12),
+            if (androidDashboard)
+              _DriverOnlinePill(isOnline: driver.isOnline, isAr: isAr)
+            else
+              IconButton.filledTonal(
+                onPressed: onOpenWallet,
+                style: IconButton.styleFrom(
+                  foregroundColor: AppBrandAssets.brandTealDark,
+                  backgroundColor:
+                      AppBrandAssets.brandTeal.withValues(alpha: 0.12),
+                ),
+                icon: const Icon(Icons.account_balance_wallet_outlined),
               ),
-              icon: const Icon(Icons.account_balance_wallet_outlined),
-            ),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -518,156 +633,200 @@ class _IdleDriverPanel extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.lg),
-        AppWalletCard(
-          title: isAr ? 'رصيد المحفظة' : 'Wallet balance',
-          balanceLabel: fareService.formatIqd(
-            driver.walletBalanceIqd,
-            locale: l10n.localeName,
+        if (androidDashboard) ...[
+          const SizedBox(height: AppSpacing.lg),
+          const DriverDashboardAnnouncementsCard(),
+          const SizedBox(height: AppSpacing.lg),
+          DriverDashboardDailyStatCards(driver: driver),
+          const SizedBox(height: AppSpacing.md),
+          DriverDashboardMonthlyStatCards(driver: driver),
+        ] else ...[
+          const SizedBox(height: AppSpacing.lg),
+          AppWalletCard(
+            title: isAr ? 'رصيد المحفظة' : 'Wallet balance',
+            balanceLabel: fareService.formatIqd(
+              driver.walletBalanceIqd,
+              locale: l10n.localeName,
+            ),
+            subtitle: driver.isOnline
+                ? (isAr
+                    ? 'متصل — بانتظار الطلبات'
+                    : 'Online — waiting for trips')
+                : (isAr ? 'غير متصل' : 'Offline'),
+            actionLabel: isAr ? 'فتح المحفظة / شحن' : 'Open wallet / recharge',
+            onAction: onOpenWallet,
           ),
-          subtitle: driver.isOnline
-              ? (isAr ? 'متصل — بانتظار الطلبات' : 'Online — waiting for trips')
-              : (isAr ? 'غير متصل' : 'Offline'),
-          actionLabel: isAr ? 'فتح المحفظة / شحن' : 'Open wallet / recharge',
-          onAction: onOpenWallet,
-        ),
-        const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.lg),
+          DriverDashboardMonthlyStatCards(driver: driver),
+          const SizedBox(height: AppSpacing.md),
+          StreamBuilder<DriverMonthlyStats>(
+            stream: context
+                .read<AppState>()
+                .monthlyPrizeService
+                .watchDriverStats(driver.uid),
+            builder: (context, statsSnapshot) {
+              final stats = statsSnapshot.data;
+              if (stats == null) {
+                return const SizedBox.shrink();
+              }
+
+              return AppCard(
+                color: AppBrandAssets.brandTeal.withValues(alpha: 0.08),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color:
+                                AppBrandAssets.brandGold.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(AppRadii.sm),
+                          ),
+                          child: const Icon(
+                            Icons.emoji_events_outlined,
+                            color: AppBrandAssets.brandGoldDark,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            l10n.driverMonthlyPrizeTitle,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      l10n.driverMonthlyRideCount(stats.rideCount),
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppBrandAssets.brandNavy,
+                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(l10n.driverMonthlyRank(stats.rank, stats.rideCount)),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      l10n.driverMonthlyPrizeAmount(
+                        fareService.formatIqd(
+                          stats.prizeAmountIqd,
+                          locale: l10n.localeName,
+                        ),
+                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppBrandAssets.brandGoldDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+        const SizedBox(height: AppSpacing.md),
         DriverDeliveryOrdersPanel(driverId: driver.uid),
         const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            Expanded(
-              child: AppStatCard(
-                label: l10n.completedRidesCount,
-                value: '${driver.completedRidesCount}',
-                icon: Icons.check_circle_outline,
-                accent: AppBrandAssets.brandTealDark,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: AppStatCard(
-                label: l10n.cancelledRidesCount,
-                value: '${driver.cancelledRidesCount}',
-                icon: Icons.cancel_outlined,
-                accent: AppBrandAssets.brandDanger,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        StreamBuilder<DriverMonthlyStats>(
-          stream: context
-              .read<AppState>()
-              .monthlyPrizeService
-              .watchDriverStats(driver.uid),
-          builder: (context, statsSnapshot) {
-            final stats = statsSnapshot.data;
-            if (stats == null) {
-              return const SizedBox.shrink();
-            }
-
-            return AppCard(
-              color: AppBrandAssets.brandTeal.withValues(alpha: 0.08),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppBrandAssets.brandGold.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(AppRadii.sm),
-                        ),
-                        child: const Icon(
-                          Icons.emoji_events_outlined,
-                          color: AppBrandAssets.brandGoldDark,
-                        ),
+        if (androidDashboard)
+          DriverDashboardEarningsSummary(driver: driver)
+        else
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.yourEarningsTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppBrandAssets.brandNavy,
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          l10n.driverMonthlyPrizeTitle,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    l10n.driverMonthlyRideCount(stats.rideCount),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: AppBrandAssets.brandNavy,
-                        ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(l10n.driverMonthlyRank(stats.rank, stats.rideCount)),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    l10n.driverMonthlyPrizeAmount(
-                      fareService.formatIqd(
-                        stats.prizeAmountIqd,
-                        locale: l10n.localeName,
-                      ),
-                    ),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppBrandAssets.brandGoldDark,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: AppSpacing.md),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.yourEarningsTitle,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppBrandAssets.brandNavy,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _EarningsRow(
-                label: l10n.monthlyRidesCount,
-                value: '${driver.monthlyRideCount}',
-              ),
-              _EarningsRow(
-                label: l10n.completedRidesCount,
-                value: '${driver.completedRidesCount}',
-              ),
-              if (driver.pendingBonusIqd > 0)
+                ),
+                const SizedBox(height: AppSpacing.md),
                 _EarningsRow(
-                  label: l10n.pendingBonusLabel,
-                  value: fareService.formatIqd(
-                    driver.pendingBonusIqd,
-                    locale: l10n.localeName,
+                  label: l10n.monthlyRidesCount,
+                  value: '${driver.monthlyRideCount}',
+                ),
+                _EarningsRow(
+                  label: l10n.completedRidesCount,
+                  value: '${driver.completedRidesCount}',
+                ),
+                if (driver.pendingBonusIqd > 0)
+                  _EarningsRow(
+                    label: l10n.pendingBonusLabel,
+                    value: fareService.formatIqd(
+                      driver.pendingBonusIqd,
+                      locale: l10n.localeName,
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.xxl),
-        Center(
-          child: Text(
-            driver.isOnline ? l10n.waitingForRides : l10n.goOnline,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppBrandAssets.brandMuted,
-                  fontWeight: FontWeight.w500,
-                ),
+        if (!androidDashboard) ...[
+          const SizedBox(height: AppSpacing.xxl),
+          Center(
+            child: Text(
+              driver.isOnline ? l10n.waitingForRides : l10n.goOnline,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: AppBrandAssets.brandMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
           ),
-        ),
+        ],
       ],
+    );
+  }
+}
+
+class _DriverOnlinePill extends StatelessWidget {
+  const _DriverOnlinePill({required this.isOnline, required this.isAr});
+
+  final bool isOnline;
+  final bool isAr;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: (isOnline
+                ? AppBrandAssets.brandSuccess
+                : AppBrandAssets.brandMuted)
+            .withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: isOnline
+                  ? AppBrandAssets.brandSuccess
+                  : AppBrandAssets.brandMuted,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isOnline ? (isAr ? 'متصل' : 'Online') : (isAr ? 'غير متصل' : 'Offline'),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              color: isOnline
+                  ? AppBrandAssets.brandSuccess
+                  : AppBrandAssets.brandMuted,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -722,6 +881,8 @@ class _ActiveRidePanel extends StatelessWidget {
     required this.runRideAction,
     required this.actionButton,
     required this.onConfirmCash,
+    required this.arrivedAtPickup,
+    required this.onArrivedAtPickup,
   });
 
   final Ride ride;
@@ -742,6 +903,8 @@ class _ActiveRidePanel extends StatelessWidget {
     IconData? icon,
   }) actionButton;
   final Future<void> Function(Ride ride) onConfirmCash;
+  final bool arrivedAtPickup;
+  final VoidCallback onArrivedAtPickup;
 
   @override
   Widget build(BuildContext context) {
@@ -792,10 +955,23 @@ class _ActiveRidePanel extends StatelessWidget {
                                 : () => runRideAction(
                                       rideId: ride.id,
                                       action: 'reject',
-                                      task: () => rideService.rejectRide(
-                                        rideId: ride.id,
-                                        driverId: driver.uid,
-                                      ),
+                                      task: () async {
+                                        final stats = context
+                                            .read<AppState>()
+                                            .driverMonthlyRideStatsService;
+                                        final saveRejection =
+                                            stats.recordRejection(
+                                          driverId: driver.uid,
+                                          rideId: ride.id,
+                                        );
+                                        await rideService.rejectRide(
+                                          rideId: ride.id,
+                                          driverId: driver.uid,
+                                        );
+                                        await saveRejection;
+                                        NotificationService
+                                            .suppressDriverRideOffer(ride.id);
+                                      },
                                     ),
                           ),
                         ),
@@ -811,6 +987,9 @@ class _ActiveRidePanel extends StatelessWidget {
                                 await rideService.acceptRide(
                                   rideId: ride.id,
                                   driverId: driver.uid,
+                                );
+                                NotificationService.markAndroidDriverAccepted(
+                                  ride.id,
                                 );
                               } catch (error) {
                                 if (!context.mounted) return;
@@ -927,23 +1106,60 @@ class _ActiveRidePanel extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: AppSpacing.lg),
-                  if (ride.status == RideStatus.accepted)
-                    actionButton(
-                      rideId: ride.id,
-                      action: 'start',
-                      label: l10n.startRide,
-                      icon: Icons.play_arrow_rounded,
-                      onPressed: () => rideService.startRide(ride.id),
-                    ),
-                  if (ride.status == RideStatus.inProgress)
+                  if (ride.status == RideStatus.accepted) ...[
+                    if (AndroidWazeNavigation.isSupported) ...[
+                      AppPrimaryButton(
+                        label: l10n.navigateToCustomer,
+                        icon: Icons.navigation_outlined,
+                        onPressed: () => _openAndroidNavigation(
+                          context,
+                          latitude: ride.pickupLat,
+                          longitude: ride.pickupLng,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (!arrivedAtPickup)
+                      AppPrimaryButton(
+                        label: l10n.localeName.startsWith('ar')
+                            ? 'وصلت إلى نقطة الانطلاق'
+                            : 'Arrived at pickup',
+                        icon: Icons.place_outlined,
+                        onPressed: onArrivedAtPickup,
+                      )
+                    else
+                      actionButton(
+                        rideId: ride.id,
+                        action: 'start',
+                        label: l10n.startRide,
+                        icon: Icons.play_arrow_rounded,
+                        onPressed: () => rideService.startRide(ride.id),
+                      ),
+                  ],
+                  if (ride.status == RideStatus.inProgress) ...[
+                    if (AndroidWazeNavigation.isSupported) ...[
+                      AppPrimaryButton(
+                        label: l10n.navigateToDestination,
+                        icon: Icons.navigation_outlined,
+                        onPressed: () => _openAndroidNavigation(
+                          context,
+                          latitude: ride.destinationLat,
+                          longitude: ride.destinationLng,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
                     actionButton(
                       rideId: ride.id,
                       action: 'end',
-                      label: l10n.endRide,
+                      label: l10n.localeName.startsWith('ar')
+                          ? 'إكمال الرحلة'
+                          : 'Complete trip',
                       icon: Icons.flag_circle_outlined,
                       onPressed: () =>
                           rideService.endRideAwaitingCash(ride.id),
                     ),
+                  ],
                   if (ride.status == RideStatus.awaitingCashPayment &&
                       !ride.cashCollectedByDriver)
                     actionButton(
@@ -976,6 +1192,21 @@ class _ActiveRidePanel extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _openAndroidNavigation(
+    BuildContext context, {
+    required double latitude,
+    required double longitude,
+  }) async {
+    final opened = await AndroidWazeNavigation.start(
+      latitude: latitude,
+      longitude: longitude,
+    );
+    if (opened || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.navigationAppUnavailable)),
     );
   }
 }

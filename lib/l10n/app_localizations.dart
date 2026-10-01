@@ -668,6 +668,96 @@ abstract class AppLocalizations {
   /// **'Start ride'**
   String get startRide;
 
+  /// No description provided for @navigateToCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate to Customer'**
+  String get navigateToCustomer;
+
+  /// No description provided for @navigateToDestination.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate to Destination'**
+  String get navigateToDestination;
+
+  /// No description provided for @navigationAppUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open Waze or Google Maps'**
+  String get navigationAppUnavailable;
+
+  /// No description provided for @confirmRideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm ride'**
+  String get confirmRideTitle;
+
+  /// No description provided for @yourCityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your city'**
+  String get yourCityLabel;
+
+  /// No description provided for @areaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Area'**
+  String get areaLabel;
+
+  /// No description provided for @searchPickupHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to search pickup'**
+  String get searchPickupHint;
+
+  /// No description provided for @searchDestinationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to search or tap the map'**
+  String get searchDestinationHint;
+
+  /// No description provided for @useMyLocationButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Use my location'**
+  String get useMyLocationButton;
+
+  /// No description provided for @bookRideConfirmButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Book ride'**
+  String get bookRideConfirmButton;
+
+  /// No description provided for @viewDriverOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver location'**
+  String get viewDriverOnMap;
+
+  /// No description provided for @openInGoogleMaps.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Maps'**
+  String get openInGoogleMaps;
+
+  /// No description provided for @openInWaze.
+  ///
+  /// In en, this message translates to:
+  /// **'Waze'**
+  String get openInWaze;
+
+  /// No description provided for @driverOnWaze.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver on Waze'**
+  String get driverOnWaze;
+
+  /// No description provided for @destinationOnWaze.
+  ///
+  /// In en, this message translates to:
+  /// **'Destination on Waze'**
+  String get destinationOnWaze;
+
   /// No description provided for @endRide.
   ///
   /// In en, this message translates to:
@@ -2839,6 +2929,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Monthly prize leaderboard'**
   String get permMonthlyLeaderboard;
+
+  /// No description provided for @driverAdminAnnouncementsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin announcements'**
+  String get driverAdminAnnouncementsTitle;
 
   /// No description provided for @driverMonthlyPrizeTitle.
   ///

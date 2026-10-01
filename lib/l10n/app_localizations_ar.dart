@@ -307,6 +307,51 @@ class AppLocalizationsAr extends AppLocalizations {
   String get startRide => 'بدء الرحلة';
 
   @override
+  String get navigateToCustomer => 'التوجه إلى الزبون';
+
+  @override
+  String get navigateToDestination => 'التوجه إلى الوجهة';
+
+  @override
+  String get navigationAppUnavailable => 'تعذّر فتح Waze أو خرائط Google';
+
+  @override
+  String get confirmRideTitle => 'تأكيد المشوار';
+
+  @override
+  String get yourCityLabel => 'مدينتك';
+
+  @override
+  String get areaLabel => 'المنطقة';
+
+  @override
+  String get searchPickupHint => 'اضغط للبحث عن نقطة الانطلاق';
+
+  @override
+  String get searchDestinationHint => 'اضغط للبحث أو اضغط على الخريطة';
+
+  @override
+  String get useMyLocationButton => 'استخدم موقعي';
+
+  @override
+  String get bookRideConfirmButton => 'احجز مشوار';
+
+  @override
+  String get viewDriverOnMap => 'موقع السائق';
+
+  @override
+  String get openInGoogleMaps => 'خرائط Google';
+
+  @override
+  String get openInWaze => 'Waze';
+
+  @override
+  String get driverOnWaze => 'السائق على Waze';
+
+  @override
+  String get destinationOnWaze => 'الوجهة على Waze';
+
+  @override
   String get endRide => 'إنهاء الرحلة';
 
   @override
@@ -1492,6 +1537,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get permMonthlyLeaderboard => 'لوحة الجائزة الشهرية';
+
+  @override
+  String get driverAdminAnnouncementsTitle => 'إعلانات الإدارة';
 
   @override
   String get driverMonthlyPrizeTitle => 'تحدي الجائزة الشهرية';

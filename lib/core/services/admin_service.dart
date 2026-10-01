@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/constants/hilla_constants.dart';
 import 'package:hilla_ride/core/models/announcement.dart';
@@ -132,6 +133,103 @@ class AdminService {
       });
       return items;
     });
+  }
+
+  Stream<List<Announcement>> watchDriverDashboardAnnouncementsAdmin() {
+    return _firestore.collection('announcements').limit(100).snapshots().map(
+      (snapshot) {
+        final items = snapshot.docs
+            .map((doc) => Announcement.fromMap(doc.id, doc.data()))
+            .where(
+              (item) =>
+                  item.showOnDriverDashboard &&
+                  (item.audience == 'drivers' ||
+                      item.audience == 'allDrivers'),
+            )
+            .toList();
+        items.sort((a, b) {
+          final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bTime.compareTo(aTime);
+        });
+        return items;
+      },
+    );
+  }
+
+  Future<String> createDriverDashboardAnnouncement({
+    required String title,
+    required String body,
+    required bool isActive,
+    DateTime? startsAt,
+    DateTime? expiresAt,
+    String? imageUrl,
+    String? iconKey,
+  }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) throw StateError('Sign in required.');
+
+    final doc = await _firestore.collection('announcements').add({
+      'audience': 'drivers',
+      'title': title.trim(),
+      'body': body.trim(),
+      'showOnDriverDashboard': true,
+      'isActive': isActive,
+      'createdBy': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+      if (startsAt != null) 'startsAt': Timestamp.fromDate(startsAt),
+      if (expiresAt != null) 'expiresAt': Timestamp.fromDate(expiresAt),
+      if (imageUrl != null && imageUrl.trim().isNotEmpty)
+        'imageUrl': imageUrl.trim(),
+      if (iconKey != null && iconKey.isNotEmpty) 'iconKey': iconKey,
+    });
+    return doc.id;
+  }
+
+  Future<void> updateDriverDashboardAnnouncement({
+    required String id,
+    required String title,
+    required String body,
+    required bool isActive,
+    DateTime? startsAt,
+    DateTime? expiresAt,
+    String? imageUrl,
+    String? iconKey,
+    bool clearStartsAt = false,
+    bool clearExpiresAt = false,
+  }) async {
+    final payload = <String, dynamic>{
+      'title': title.trim(),
+      'body': body.trim(),
+      'isActive': isActive,
+      'showOnDriverDashboard': true,
+      'audience': 'drivers',
+    };
+    if (clearStartsAt) {
+      payload['startsAt'] = FieldValue.delete();
+    } else if (startsAt != null) {
+      payload['startsAt'] = Timestamp.fromDate(startsAt);
+    }
+    if (clearExpiresAt) {
+      payload['expiresAt'] = FieldValue.delete();
+    } else if (expiresAt != null) {
+      payload['expiresAt'] = Timestamp.fromDate(expiresAt);
+    }
+    if (imageUrl == null || imageUrl.trim().isEmpty) {
+      payload['imageUrl'] = FieldValue.delete();
+    } else {
+      payload['imageUrl'] = imageUrl.trim();
+    }
+    if (iconKey == null || iconKey.isEmpty) {
+      payload['iconKey'] = FieldValue.delete();
+    } else {
+      payload['iconKey'] = iconKey;
+    }
+    await _firestore.collection('announcements').doc(id).update(payload);
+  }
+
+  Future<void> deleteDriverDashboardAnnouncement(String id) async {
+    await _firestore.collection('announcements').doc(id).delete();
   }
 
   Stream<List<Ride>> watchRidesByStatus(

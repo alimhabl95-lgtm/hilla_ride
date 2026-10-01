@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hilla_ride/core/auth/auth_error_messages.dart';
 import 'package:hilla_ride/core/auth/phone_auth_credentials.dart';
+import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
@@ -37,6 +38,7 @@ class _SignupScreenState extends State<SignupScreen> {
   PickedImage? _profilePhoto;
   var _acceptedTerms = false;
   var _isLoading = false;
+  String? _serviceAreaKey;
 
   bool get _isDriver => widget.selectedMode == UserRole.driver;
 
@@ -131,6 +133,18 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_colorController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.vehicleColorRequired)),
+      );
+      return false;
+    }
+    if (_serviceAreaKey == null || !_serviceAreaKey!.contains('|')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.localeName.startsWith('ar')
+                ? 'اختر منطقة العمل'
+                : 'Choose your service area',
+          ),
+        ),
       );
       return false;
     }
@@ -264,6 +278,7 @@ class _SignupScreenState extends State<SignupScreen> {
         fileName: 'profile_photo.jpg',
       );
 
+      final areaParts = _serviceAreaKey!.split('|');
       await appState.driverService.submitRegistration(
         uid: uid,
         phone: phone,
@@ -273,6 +288,8 @@ class _SignupScreenState extends State<SignupScreen> {
         vehicleColor: _colorController.text.trim(),
         idPhotoUrl: idPhotoUrl,
         profilePhotoUrl: profilePhotoUrl,
+        requestedDistrictId: areaParts.first,
+        requestedSubDistrictId: areaParts.sublist(1).join('|'),
       );
       applicationSaved = true;
 
@@ -419,6 +436,32 @@ class _SignupScreenState extends State<SignupScreen> {
                     labelText: l10n.vehicleColor,
                     prefixIcon: const Icon(Icons.palette_outlined),
                   ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: _serviceAreaKey,
+                  decoration: InputDecoration(
+                    labelText: l10n.localeName.startsWith('ar')
+                        ? 'منطقة العمل'
+                        : 'Service area',
+                    prefixIcon: const Icon(Icons.map_outlined),
+                  ),
+                  items: [
+                    for (final district in BabilRegions.districts)
+                      for (final sub in district.subDistricts)
+                        DropdownMenuItem(
+                          value: '${district.id}|${sub.id}',
+                          child: Text(
+                            l10n.localeName.startsWith('ar')
+                                ? sub.nameAr
+                                : sub.nameEn,
+                          ),
+                        ),
+                  ],
+                  onChanged: _isLoading
+                      ? null
+                      : (value) => setState(() => _serviceAreaKey = value),
                 ),
                 const SizedBox(height: 20),
                 PhotoUploadTile(

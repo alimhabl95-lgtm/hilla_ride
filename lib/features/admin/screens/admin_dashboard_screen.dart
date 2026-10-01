@@ -17,7 +17,7 @@ import 'package:hilla_ride/features/admin/widgets/admin_promo_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_driver_ratings_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_support_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_complaints_panel.dart';
-import 'package:hilla_ride/features/admin/widgets/admin_notifications_center_panel.dart';
+import 'package:hilla_ride/features/admin/widgets/admin_notifications_hub_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_driver_performance_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_reports_panel.dart';
 import 'package:hilla_ride/features/admin/widgets/admin_audit_log_panel.dart';
@@ -272,7 +272,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         icon: Icons.notifications_outlined,
         selectedIcon: Icons.notifications,
         label: isAr ? 'الإشعارات' : 'Notifications',
-        builder: const AdminNotificationsCenterPanel(),
+        builder: const AdminNotificationsHubPanel(),
       ),
       _AdminTabDefinition(
         permission: AdminPermissions.appSettings,

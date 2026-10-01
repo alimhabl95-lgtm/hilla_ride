@@ -64,8 +64,10 @@ class AppConfigService {
         .limit(20)
         .snapshots()
         .map((snapshot) {
+      final now = DateTime.now();
       final items = snapshot.docs
           .map((doc) => Announcement.fromMap(doc.id, doc.data()))
+          .where((item) => item.isLiveAt(now))
           .toList();
       items.sort((a, b) {
         final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);

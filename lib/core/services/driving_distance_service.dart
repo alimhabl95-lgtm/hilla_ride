@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hilla_ride/core/config/maps_config.dart';
 import 'package:hilla_ride/core/services/web_driving_route_stub.dart'
     if (dart.library.js_interop) 'package:hilla_ride/core/services/web_driving_route_web.dart';
+import 'package:hilla_ride/core/services/turn_by_turn_guide.dart';
 import 'package:hilla_ride/core/utils/polyline_codec.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -14,6 +15,8 @@ class DrivingRouteInfo {
     required this.distanceKm,
     required this.durationMinutes,
     this.isEstimated = false,
+    this.polylinePoints = const [],
+    this.steps = const [],
   });
 
   final double distanceKm;
@@ -21,6 +24,12 @@ class DrivingRouteInfo {
 
   /// True when Google route APIs were unavailable and distance was estimated.
   final bool isEstimated;
+
+  /// Decoded road geometry when available (empty for estimate-only results).
+  final List<LatLng> polylinePoints;
+
+  /// Turn-by-turn steps when the route came from Directions.
+  final List<NavigationStep> steps;
 }
 
 /// Driving distance via Firebase Cloud Function / Google APIs, with fallback.
@@ -33,8 +42,8 @@ class DrivingDistanceService {
 
   final http.Client _client;
   final FirebaseFunctions _functions;
-  static const Duration _timeout = Duration(seconds: 6);
-  static const Duration _cloudTimeout = Duration(seconds: 4);
+  static const Duration _timeout = Duration(seconds: 8);
+  static const Duration _cloudTimeout = Duration(seconds: 8);
   static const _routesUrl =
       'https://routes.googleapis.com/directions/v2:computeRoutes';
   static const _roadFactor = 1.3;
@@ -43,20 +52,43 @@ class DrivingDistanceService {
     LatLng origin,
     LatLng destination,
   ) async {
+    final detailed = await getDrivingRouteDetails(origin, destination);
+    return detailed;
+  }
+
+  /// Single call that returns ETA/distance plus road polyline when possible.
+  Future<DrivingRouteInfo> getDrivingRouteDetails(
+    LatLng origin,
+    LatLng destination, {
+    String languageCode = 'ar',
+  }) async {
     if (!MapsConfig.useGooglePlacesHttp) {
       return _estimateFromStraightLine(origin, destination);
     }
 
-    final cloudRoute = kIsWeb
-        ? null
-        : await _tryCloudFunctionRoute(origin, destination);
-    if (cloudRoute != null) return cloudRoute;
+    DrivingRouteInfo? cloudRoute;
+    if (!kIsWeb) {
+      cloudRoute = await _tryCloudFunctionRouteDetails(
+        origin,
+        destination,
+        languageCode: languageCode,
+      );
+      if (cloudRoute != null && cloudRoute.steps.isNotEmpty) return cloudRoute;
+    }
 
     if (kIsWeb) {
       try {
         final webRoute = await fetchWebDrivingRoute(origin, destination)
             .timeout(_timeout, onTimeout: () => null);
-        if (webRoute != null) return webRoute;
+        if (webRoute != null) {
+          final points = await fetchWebDrivingPolyline(origin, destination);
+          return DrivingRouteInfo(
+            distanceKm: webRoute.distanceKm,
+            durationMinutes: webRoute.durationMinutes,
+            isEstimated: webRoute.isEstimated,
+            polylinePoints: points ?? _straightLinePoints(origin, destination),
+          );
+        }
       } catch (error) {
         if (kDebugMode) debugPrint('Web driving route failed: $error');
       }
@@ -65,6 +97,18 @@ class DrivingDistanceService {
 
     final key = MapsConfig.placesWebApiKey;
 
+    try {
+      final directions = await _tryDirectionsRouteDetails(
+        origin,
+        destination,
+        key,
+        languageCode: languageCode,
+      );
+      if (directions != null) return directions;
+    } catch (error) {
+      if (kDebugMode) debugPrint('Directions route details failed: $error');
+    }
+
     for (final attempt in [
       () => _tryDistanceMatrix(origin, destination, key),
       () => _tryDirectionsApi(origin, destination, key),
@@ -72,13 +116,38 @@ class DrivingDistanceService {
     ]) {
       try {
         final result = await attempt();
-        if (result != null) return result;
+        if (result != null) {
+          List<LatLng> points = const [];
+          try {
+            final fromDirections =
+                await _tryDirectionsPolyline(origin, destination, key);
+            if (fromDirections != null && fromDirections.length >= 2) {
+              points = fromDirections;
+            } else {
+              final fromRoutes =
+                  await _tryRoutesPolyline(origin, destination, key);
+              if (fromRoutes != null && fromRoutes.length >= 2) {
+                points = fromRoutes;
+              }
+            }
+          } catch (_) {}
+          return DrivingRouteInfo(
+            distanceKm: result.distanceKm,
+            durationMinutes: result.durationMinutes,
+            isEstimated: result.isEstimated,
+            polylinePoints: points.length >= 2
+                ? points
+                : _straightLinePoints(origin, destination),
+          );
+        }
       } catch (error) {
         if (kDebugMode) {
           debugPrint('Driving distance attempt failed: $error');
         }
       }
     }
+
+    if (cloudRoute != null) return cloudRoute;
 
     if (kDebugMode) {
       debugPrint(
@@ -92,42 +161,18 @@ class DrivingDistanceService {
     LatLng origin,
     LatLng destination,
   ) async {
-    if (!MapsConfig.useGooglePlacesHttp) {
-      return _straightLinePoints(origin, destination);
+    final detailed = await getDrivingRouteDetails(origin, destination);
+    if (detailed.polylinePoints.length >= 2) {
+      return detailed.polylinePoints;
     }
-
-    final cloudPolyline = kIsWeb
-        ? null
-        : await _tryCloudFunctionPolyline(origin, destination);
-    if (cloudPolyline != null && cloudPolyline.length >= 2) {
-      return cloudPolyline;
-    }
-
-    if (kIsWeb) {
-      final points = await fetchWebDrivingPolyline(origin, destination);
-      if (points != null) return points;
-    } else {
-      final key = MapsConfig.placesWebApiKey;
-      for (final attempt in [
-        () => _tryDirectionsPolyline(origin, destination, key),
-        () => _tryRoutesPolyline(origin, destination, key),
-      ]) {
-        try {
-          final points = await attempt();
-          if (points != null && points.length >= 2) return points;
-        } catch (error) {
-          if (kDebugMode) debugPrint('Route polyline attempt failed: $error');
-        }
-      }
-    }
-
     return _straightLinePoints(origin, destination);
   }
 
-  Future<DrivingRouteInfo?> _tryCloudFunctionRoute(
+  Future<DrivingRouteInfo?> _tryCloudFunctionRouteDetails(
     LatLng origin,
-    LatLng destination,
-  ) async {
+    LatLng destination, {
+    String languageCode = 'ar',
+  }) async {
     try {
       final callable = _functions.httpsCallable('getDrivingRoute');
       final result = await callable
@@ -136,6 +181,7 @@ class DrivingDistanceService {
             'originLng': origin.longitude,
             'destLat': destination.latitude,
             'destLng': destination.longitude,
+            'language': languageCode,
           })
           .timeout(_cloudTimeout);
       final data = Map<String, dynamic>.from(result.data as Map);
@@ -143,10 +189,22 @@ class DrivingDistanceService {
       final durationMinutes = (data['durationMinutes'] as num?)?.toInt();
       if (distanceKm == null || durationMinutes == null) return null;
 
+      final encoded = data['encodedPolyline'] as String? ?? '';
+      final points = encoded.isEmpty
+          ? _straightLinePoints(origin, destination)
+          : decodePolyline(encoded);
+      final steps = TurnByTurnGuide.parseDirectionSteps(
+        data['steps'] as List<dynamic>?,
+      );
+
       return DrivingRouteInfo(
         distanceKm: distanceKm,
         durationMinutes: durationMinutes,
         isEstimated: false,
+        polylinePoints: points.length >= 2
+            ? points
+            : _straightLinePoints(origin, destination),
+        steps: steps,
       );
     } catch (error) {
       if (kDebugMode) debugPrint('Cloud driving route failed: $error');
@@ -154,41 +212,19 @@ class DrivingDistanceService {
     }
   }
 
-  Future<List<LatLng>?> _tryCloudFunctionPolyline(
+  Future<DrivingRouteInfo?> _tryDirectionsRouteDetails(
     LatLng origin,
     LatLng destination,
-  ) async {
-    try {
-      final callable = _functions.httpsCallable('getDrivingRoute');
-      final result = await callable
-          .call({
-            'originLat': origin.latitude,
-            'originLng': origin.longitude,
-            'destLat': destination.latitude,
-            'destLng': destination.longitude,
-          })
-          .timeout(_cloudTimeout);
-      final data = Map<String, dynamic>.from(result.data as Map);
-      final encoded = data['encodedPolyline'] as String? ?? '';
-      if (encoded.isEmpty) return null;
-      return decodePolyline(encoded);
-    } catch (error) {
-      if (kDebugMode) debugPrint('Cloud route polyline failed: $error');
-      return null;
-    }
-  }
-
-  Future<List<LatLng>?> _tryDirectionsPolyline(
-    LatLng origin,
-    LatLng destination,
-    String key,
-  ) async {
+    String key, {
+    String languageCode = 'ar',
+  }) async {
     final uri = Uri.https('maps.googleapis.com', '/maps/api/directions/json', {
       'origin': '${origin.latitude},${origin.longitude}',
       'destination': '${destination.latitude},${destination.longitude}',
       'mode': 'driving',
       'key': key,
       'region': 'iq',
+      'language': languageCode,
     });
 
     final response = await _client.get(uri).timeout(_timeout);
@@ -200,12 +236,43 @@ class DrivingDistanceService {
     final routes = data['routes'] as List<dynamic>? ?? const [];
     if (routes.isEmpty) return null;
 
-    final polyline = (routes.first as Map<String, dynamic>)['overview_polyline']
-        as Map<String, dynamic>?;
-    final encoded = polyline?['points'] as String?;
-    if (encoded == null || encoded.isEmpty) return null;
+    final route = routes.first as Map<String, dynamic>;
+    final legs = route['legs'] as List<dynamic>? ?? const [];
+    if (legs.isEmpty) return null;
+    final leg = legs.first as Map<String, dynamic>;
+    final distanceMeters = (leg['distance'] as Map?)?['value'] as num?;
+    final durationSeconds = (leg['duration'] as Map?)?['value'] as num?;
+    if (distanceMeters == null || durationSeconds == null) return null;
 
-    return decodePolyline(encoded);
+    final polyline = route['overview_polyline'] as Map<String, dynamic>?;
+    final encoded = polyline?['points'] as String?;
+    final points = (encoded == null || encoded.isEmpty)
+        ? _straightLinePoints(origin, destination)
+        : decodePolyline(encoded);
+    final steps = TurnByTurnGuide.parseDirectionSteps(
+      leg['steps'] as List<dynamic>?,
+    );
+
+    return DrivingRouteInfo(
+      distanceKm: distanceMeters / 1000.0,
+      durationMinutes: (durationSeconds / 60).ceil().clamp(1, 9999),
+      isEstimated: false,
+      polylinePoints: points.length >= 2
+          ? points
+          : _straightLinePoints(origin, destination),
+      steps: steps,
+    );
+  }
+
+  Future<List<LatLng>?> _tryDirectionsPolyline(
+    LatLng origin,
+    LatLng destination,
+    String key,
+  ) async {
+    final detailed =
+        await _tryDirectionsRouteDetails(origin, destination, key);
+    if (detailed == null || detailed.polylinePoints.length < 2) return null;
+    return detailed.polylinePoints;
   }
 
   Future<List<LatLng>?> _tryRoutesPolyline(
@@ -429,6 +496,7 @@ class DrivingDistanceService {
       distanceKm: estimatedKm,
       durationMinutes: durationMinutes,
       isEstimated: true,
+      polylinePoints: _straightLinePoints(origin, destination),
     );
   }
 

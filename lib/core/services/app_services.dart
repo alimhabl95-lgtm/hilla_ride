@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -549,6 +550,8 @@ class DriverService {
     String licenseNumber = '',
     required String idPhotoUrl,
     required String profilePhotoUrl,
+    required String requestedDistrictId,
+    required String requestedSubDistrictId,
   }) async {
     await _functions.httpsCallable('submitDriverRegistration').call({
       'phone': phone,
@@ -559,6 +562,8 @@ class DriverService {
       'licenseNumber': licenseNumber,
       'idPhotoUrl': idPhotoUrl,
       'profilePhotoUrl': profilePhotoUrl,
+      'requestedDistrictId': requestedDistrictId,
+      'requestedSubDistrictId': requestedSubDistrictId,
     });
   }
 
@@ -760,6 +765,11 @@ class DriverService {
             : DriverOperationalStatus.offline.value,
       });
     }
+  }
+
+  Future<void> ensureLocationUpdates(String driverId) async {
+    if (_locationSubscription != null) return;
+    await _startLocationUpdates(driverId);
   }
 
   Future<void> _startLocationUpdates(String driverId) async {
@@ -1231,25 +1241,26 @@ class RideService {
     required LatLng pickup,
     required LatLng destination,
   }) async {
+    final pickupRegion = BabilRegions.resolveFromPoint(pickup);
     final pricing = PricingService();
     final quote = await pricing.quoteRide(
       pickup: pickup,
       destination: destination,
-      districtId: BabilRegions.customerDistrictId,
+      districtId: pickupRegion.districtId,
+      subDistrictId: pickupRegion.subDistrictId,
     );
     if (!quote.canBook || quote.fareIqd == null) {
       throw StateError('out_of_service');
     }
 
-    final customerDistrict = BabilRegions.customerDistrict;
     final ride = await bookRide(
       customerId: customerId,
       pickupLabel: pickupLabel,
       destinationLabel: destinationLabel,
       pickup: pickup,
       destination: destination,
-      districtId: customerDistrict.id,
-      subDistrictId: customerDistrict.subDistricts.first.id,
+      districtId: pickupRegion.districtId,
+      subDistrictId: pickupRegion.subDistrictId,
       fareAmountIqd: quote.fareIqd!,
       distanceKm: quote.distanceKm,
     );
@@ -1336,11 +1347,13 @@ class RideService {
     Ride? arrayOfferedRide;
     Ride? districtOfferedRide;
     var walletEligible = true;
-    var minBalanceIqd = 1;
+    var driverSubId = '';
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? assignedSubscription;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? offeredSubscription;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? subDistrictSubscription;
     StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? driverSubscription;
+    QuerySnapshot<Map<String, dynamic>>? latestOfferedSnap;
+    QuerySnapshot<Map<String, dynamic>>? latestDistrictSnap;
 
     controller = StreamController<Ride?>.broadcast(
       onListen: () {
@@ -1364,6 +1377,58 @@ class RideService {
           controller.add(next);
         }
 
+        void applyOffered(QuerySnapshot<Map<String, dynamic>> snapshot) {
+          Ride? nextOffer;
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            final assigned = data['driverId'];
+            if (assigned is String && assigned.trim().isNotEmpty) continue;
+            final rejected = (data['rejectedDriverIds'] as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                const <String>[];
+            if (rejected.contains(driverId)) continue;
+            final ride = Ride.fromMap(doc.id, data);
+            if (!ride.offeredDriverIds.contains(driverId)) continue;
+            if (driverSubId.isEmpty ||
+                ride.subDistrictId.isEmpty ||
+                ride.subDistrictId != driverSubId) {
+              continue;
+            }
+            if (NotificationService.wasDriverOfferSuppressed(ride.id)) continue;
+            nextOffer = ride;
+            break;
+          }
+          arrayOfferedRide = nextOffer;
+          publish();
+        }
+
+        void applyDistrict(QuerySnapshot<Map<String, dynamic>> snapshot) {
+          Ride? matchedInDistrict;
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            final assigned = data['driverId'];
+            if (assigned is String && assigned.trim().isNotEmpty) continue;
+            final rejected = (data['rejectedDriverIds'] as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                const <String>[];
+            if (rejected.contains(driverId)) continue;
+            final ride = Ride.fromMap(doc.id, data);
+            if (ride.status == RideStatus.matched &&
+                ride.offeredDriverIds.contains(driverId) &&
+                ride.subDistrictId.isNotEmpty &&
+                ride.subDistrictId == driverSubId) {
+              if (NotificationService.wasDriverOfferSuppressed(ride.id)) {
+                continue;
+              }
+              matchedInDistrict ??= ride;
+            }
+          }
+          districtOfferedRide = matchedInDistrict;
+          publish();
+        }
+
         void bindDistrictListeners({required String districtId}) {
           subDistrictSubscription?.cancel();
           subDistrictSubscription = _firestore
@@ -1375,22 +1440,15 @@ class RideService {
               )
               .limit(20)
               .snapshots()
-              .listen((snapshot) {
-            Ride? matchedInDistrict;
-            for (final doc in snapshot.docs) {
-              final data = doc.data();
-              final assigned = data['driverId'];
-              if (assigned is String && assigned.trim().isNotEmpty) continue;
-              final ride = Ride.fromMap(doc.id, data);
-              if (ride.status == RideStatus.matched &&
-                  (ride.offeredDriverIds.isEmpty ||
-                      ride.offeredDriverIds.contains(driverId))) {
-                matchedInDistrict ??= ride;
-              }
-            }
-            districtOfferedRide = matchedInDistrict;
-            publish();
-          });
+              .listen(
+            (snapshot) {
+              latestDistrictSnap = snapshot;
+              applyDistrict(snapshot);
+            },
+            onError: (Object error, StackTrace stackTrace) {
+              debugPrint('driver district ride listen error: $error');
+            },
+          );
         }
 
         assignedSubscription = _firestore
@@ -1403,7 +1461,8 @@ class RideService {
             ])
             .limit(1)
             .snapshots()
-            .listen((snapshot) {
+            .listen(
+          (snapshot) {
           if (snapshot.docs.isEmpty) {
             assignedRide = null;
           } else {
@@ -1411,7 +1470,11 @@ class RideService {
             assignedRide = Ride.fromMap(doc.id, doc.data());
           }
           publish();
-        });
+        },
+          onError: (Object error, StackTrace stackTrace) {
+            debugPrint('driver assigned ride listen error: $error');
+          },
+        );
 
         offeredSubscription = _firestore
             .collection('rides')
@@ -1419,61 +1482,40 @@ class RideService {
             .where('status', isEqualTo: RideStatus.matched.value)
             .limit(5)
             .snapshots()
-            .listen((snapshot) {
-          Ride? nextOffer;
-          for (final doc in snapshot.docs) {
-            final data = doc.data();
-            final assigned = data['driverId'];
-            if (assigned is String && assigned.trim().isNotEmpty) continue;
-            nextOffer = Ride.fromMap(doc.id, data);
-            break;
-          }
-          arrayOfferedRide = nextOffer;
-          publish();
-        });
+            .listen(
+          (snapshot) {
+          latestOfferedSnap = snapshot;
+          applyOffered(snapshot);
+        },
+          onError: (Object error, StackTrace stackTrace) {
+            debugPrint('driver offered ride listen error: $error');
+          },
+        );
 
         driverSubscription = _firestore
             .collection('drivers')
             .doc(driverId)
             .snapshots()
-            .listen((driverSnap) async {
+            .listen((driverSnap) {
           if (controller.isClosed || !driverSnap.exists) return;
           final driverData = driverSnap.data();
           if (driverData == null) return;
 
-          try {
-            final config = await _driverService.fetchWalletConfig();
-            minBalanceIqd = config.minBalanceIqd < 1 ? 1 : config.minBalanceIqd;
-          } catch (_) {
-            minBalanceIqd = 1;
-          }
-          final walletStatus = driverData['walletStatus'] as String? ?? 'active';
-          final walletBalance =
-              (driverData['walletBalanceIqd'] as num?)?.toInt() ?? 0;
-          walletEligible = walletStatus != 'blocked' &&
-              walletBalance > 0 &&
-              walletBalance >= minBalanceIqd;
-          if (!walletEligible) {
-            arrayOfferedRide = null;
-            districtOfferedRide = null;
-            subDistrictSubscription?.cancel();
-            subDistrictSubscription = null;
-            publish();
-            return;
-          }
+          // Always surface offers. acceptRide enforces wallet on the server.
+          walletEligible = true;
 
+          driverSubId =
+              (driverData['assignedSubDistrictId'] as String?)?.trim() ?? '';
           final districtId = driverData['assignedDistrictId'] as String? ?? '';
-          final subDistrictId =
-              driverData['assignedSubDistrictId'] as String? ?? '';
-          if (districtId.isEmpty) {
+          final offeredSnap = latestOfferedSnap;
+          if (offeredSnap != null) applyOffered(offeredSnap);
+          final districtSnap = latestDistrictSnap;
+          if (districtSnap != null) applyDistrict(districtSnap);
+          if (districtId.isEmpty || driverSubId.isEmpty) {
             subDistrictSubscription?.cancel();
             subDistrictSubscription = null;
             publish();
             return;
-          }
-          // Keep subDistrictId for future UI; matching is district-wide.
-          if (subDistrictId.isEmpty) {
-            // Still allow district-level listening when ناحية is missing.
           }
           bindDistrictListeners(districtId: districtId);
           publish();
@@ -1574,6 +1616,8 @@ class RideService {
       await _functions.httpsCallable('rejectRide').call({'rideId': rideId});
       NotificationService.clearDriverRideOffer(rideId);
     } catch (error) {
+      // Still clear local offer so the driver is not stuck on a dead request.
+      NotificationService.clearDriverRideOffer(rideId);
       _rethrowRideCallable(error);
     }
   }

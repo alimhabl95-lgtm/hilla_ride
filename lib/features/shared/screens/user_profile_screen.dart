@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
+import 'package:hilla_ride/features/driver/widgets/driver_ride_notification_settings_card.dart';
 import 'package:hilla_ride/features/shared/screens/edit_profile_screen.dart';
 import 'package:hilla_ride/features/shared/screens/help_support_screen.dart';
 import 'package:hilla_ride/features/shared/widgets/firebase_driver_photo_image.dart';
@@ -156,6 +157,10 @@ class _ProfileBody extends StatelessWidget {
                   value: driver!.vehicleType,
                 ),
                 _InfoRow(
+                  label: l10n.vehicleColor,
+                  value: driver!.vehicleColor,
+                ),
+                _InfoRow(
                   label: l10n.vehiclePlate,
                   value: driver!.vehiclePlate,
                 ),
@@ -174,6 +179,8 @@ class _ProfileBody extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          const DriverRideNotificationSettingsCard(),
         ],
         if (role == UserRole.customer) ...[
           const SizedBox(height: 16),

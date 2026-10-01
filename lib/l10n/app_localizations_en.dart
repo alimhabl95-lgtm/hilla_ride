@@ -309,6 +309,51 @@ class AppLocalizationsEn extends AppLocalizations {
   String get startRide => 'Start ride';
 
   @override
+  String get navigateToCustomer => 'Navigate to Customer';
+
+  @override
+  String get navigateToDestination => 'Navigate to Destination';
+
+  @override
+  String get navigationAppUnavailable => 'Could not open Waze or Google Maps';
+
+  @override
+  String get confirmRideTitle => 'Confirm ride';
+
+  @override
+  String get yourCityLabel => 'Your city';
+
+  @override
+  String get areaLabel => 'Area';
+
+  @override
+  String get searchPickupHint => 'Tap to search pickup';
+
+  @override
+  String get searchDestinationHint => 'Tap to search or tap the map';
+
+  @override
+  String get useMyLocationButton => 'Use my location';
+
+  @override
+  String get bookRideConfirmButton => 'Book ride';
+
+  @override
+  String get viewDriverOnMap => 'Driver location';
+
+  @override
+  String get openInGoogleMaps => 'Google Maps';
+
+  @override
+  String get openInWaze => 'Waze';
+
+  @override
+  String get driverOnWaze => 'Driver on Waze';
+
+  @override
+  String get destinationOnWaze => 'Destination on Waze';
+
+  @override
   String get endRide => 'End ride';
 
   @override
@@ -1509,6 +1554,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get permMonthlyLeaderboard => 'Monthly prize leaderboard';
+
+  @override
+  String get driverAdminAnnouncementsTitle => 'Admin announcements';
 
   @override
   String get driverMonthlyPrizeTitle => 'Monthly prize challenge';

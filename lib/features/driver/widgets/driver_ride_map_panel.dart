@@ -1,29 +1,30 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:hilla_ride/core/models/app_models.dart';
-import 'package:hilla_ride/core/constants/map_presence_config.dart';
-import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/driving_distance_service.dart';
 import 'package:hilla_ride/core/services/nearby_providers_service.dart';
+import 'package:hilla_ride/core/services/turn_by_turn_guide.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
+import 'package:hilla_ride/core/widgets/hilla_map_commands.dart';
 import 'package:hilla_ride/core/widgets/map_camera_follow.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
+import 'package:hilla_ride/core/widgets/marker_animator.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:latlong2/latlong.dart' as latlng;
-import 'package:provider/provider.dart';
 
 class DriverRideMapPanel extends StatefulWidget {
   const DriverRideMapPanel({
     super.key,
     required this.ride,
-    required this.driver,
+    this.driver,
   });
 
   final Ride ride;
-  final DriverProfile driver;
+  final DriverProfile? driver;
 
   @override
   State<DriverRideMapPanel> createState() => _DriverRideMapPanelState();
@@ -32,6 +33,7 @@ class DriverRideMapPanel extends StatefulWidget {
 class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
   final _routeService = DrivingDistanceService();
   final _cameraFollow = MapCameraFollowController();
+  final _mapCommands = HillaMapCommands();
   gmaps.GoogleMapController? _mapController;
   var _markersReady = false;
   var _didInitialCameraFit = false;
@@ -40,46 +42,78 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
   String? _loadedMarkerKey;
 
   List<gmaps.LatLng> _activeRoute = const [];
-  var _loadingRoutes = true;
+  List<latlng.LatLng> _routeLatLng = const [];
+  List<NavigationStep> _steps = const [];
+  var _routeIsEstimated = false;
+  TurnCue? _cue;
+  var _loadingRoutes = false;
   String? _loadedRouteKey;
   RideStatus? _lastRideStatus;
   int? _etaMinutes;
   double? _distanceKm;
-  DateTime? _lastRouteRefreshAt;
-  latlng.LatLng? _lastRouteOrigin;
-  AppUser? _customer;
-  StreamSubscription<AppUser?>? _customerSub;
+  DateTime? _lastRerouteAt;
+  var _routeRequestId = 0;
+  latlng.LatLng? _liveFix;
+  StreamSubscription<Position>? _gpsSub;
+  final _markerAnimator = MarkerAnimator();
 
   @override
   void initState() {
     super.initState();
+    _markerAnimator.onTick = () {
+      if (mounted) setState(() {});
+    };
     MapMarkerIcons.ensureLoaded().then((_) {
       if (mounted) setState(() => _markersReady = true);
-      _loadTripMarkers();
+      unawaited(_loadTripMarkers());
     });
-    _loadRoutes();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _watchCustomer());
+    unawaited(_loadRoutes(force: true));
+    _gpsSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.best,
+        distanceFilter: 5,
+      ),
+    ).listen((position) {
+      if (!mounted) return;
+      final fix = latlng.LatLng(position.latitude, position.longitude);
+      setState(() => _liveFix = fix);
+      _syncDriverMarker(fix, position.heading);
+      _updateCue(fix);
+    }, onError: (_) {});
   }
 
   @override
   void dispose() {
-    _customerSub?.cancel();
+    unawaited(_gpsSub?.cancel());
+    _markerAnimator.dispose();
     super.dispose();
   }
 
-  void _watchCustomer() {
-    if (!mounted) return;
-    final customerId = widget.ride.customerId;
-    if (customerId.isEmpty) return;
-    _customerSub?.cancel();
-    _customerSub = context
-        .read<AppState>()
-        .authService
-        .watchUser(customerId)
-        .listen((user) {
-      if (!mounted) return;
-      setState(() => _customer = user);
-    });
+  @override
+  void didUpdateWidget(covariant DriverRideMapPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.ride.pickupLabel != widget.ride.pickupLabel ||
+        oldWidget.ride.destinationLabel != widget.ride.destinationLabel) {
+      _loadedMarkerKey = null;
+      unawaited(_loadTripMarkers());
+    }
+
+    final statusChanged = oldWidget.ride.status != widget.ride.status;
+    if (statusChanged) {
+      _loadedRouteKey = null;
+      _didInitialCameraFit = false;
+      _cue = null;
+      unawaited(_loadRoutes(force: true));
+      return;
+    }
+
+    final profile = _profilePosition;
+    if (_liveFix == null && profile != null) {
+      _syncDriverMarker(profile, widget.driver?.heading ?? 0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _updateCue(profile);
+      });
+    }
   }
 
   Future<void> _loadTripMarkers() async {
@@ -108,22 +142,6 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
     });
   }
 
-  @override
-  void didUpdateWidget(covariant DriverRideMapPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.ride.pickupLabel != widget.ride.pickupLabel ||
-        oldWidget.ride.destinationLabel != widget.ride.destinationLabel) {
-      _loadedMarkerKey = null;
-      unawaited(_loadTripMarkers());
-    }
-    if (oldWidget.ride.status != widget.ride.status) {
-      _loadedRouteKey = null;
-      _lastRouteOrigin = null;
-      _lastRouteRefreshAt = null;
-    }
-    unawaited(_loadRoutes());
-  }
-
   bool get _enRouteToPickup {
     final status = widget.ride.status;
     return status == RideStatus.accepted || status == RideStatus.matched;
@@ -135,23 +153,53 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
         status == RideStatus.awaitingCashPayment;
   }
 
-  latlng.LatLng get _pickup {
-    final lat = _customer?.latitude;
-    final lng = _customer?.longitude;
-    if (lat != null && lng != null) {
-      return latlng.LatLng(lat, lng);
-    }
-    return latlng.LatLng(widget.ride.pickupLat, widget.ride.pickupLng);
-  }
+  latlng.LatLng get _pickup =>
+      latlng.LatLng(widget.ride.pickupLat, widget.ride.pickupLng);
 
   latlng.LatLng get _destination =>
       latlng.LatLng(widget.ride.destinationLat, widget.ride.destinationLng);
 
-  latlng.LatLng? get _driverPosition {
-    final lat = widget.driver.latitude;
-    final lng = widget.driver.longitude;
+  latlng.LatLng? get _profilePosition {
+    final lat = widget.driver?.latitude;
+    final lng = widget.driver?.longitude;
     if (lat == null || lng == null) return null;
     return latlng.LatLng(lat, lng);
+  }
+
+  latlng.LatLng? get _driverPosition => _liveFix ?? _profilePosition;
+
+  void _syncDriverMarker(latlng.LatLng position, double heading) {
+    _markerAnimator.syncTargets({
+      'driver': (
+        position: gmaps.LatLng(position.latitude, position.longitude),
+        heading: heading.isFinite && heading >= 0 ? heading : 0,
+      ),
+    });
+  }
+
+  void _updateCue(latlng.LatLng driverPos) {
+    final cue = TurnByTurnGuide.evaluate(
+      steps: _steps,
+      polyline: _routeLatLng,
+      driver: driverPos,
+      isEstimated: _routeIsEstimated,
+    );
+    if (!mounted) return;
+    setState(() {
+      _cue = cue;
+      if (cue != null && !cue.offRoute) {
+        _distanceKm = cue.remainingMeters / 1000;
+        _etaMinutes = cue.remainingMinutes;
+      }
+    });
+    if (cue != null && cue.offRoute) {
+      final now = DateTime.now();
+      if (_lastRerouteAt == null ||
+          now.difference(_lastRerouteAt!) >= const Duration(seconds: 8)) {
+        _lastRerouteAt = now;
+        unawaited(_loadRoutes(force: true));
+      }
+    }
   }
 
   latlng.LatLng? get _routeDestination {
@@ -160,7 +208,7 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
     return null;
   }
 
-  Future<void> _loadRoutes() async {
+  Future<void> _loadRoutes({bool force = false}) async {
     final driverPos = _driverPosition;
     final dest = _routeDestination;
     if (driverPos == null || dest == null) {
@@ -179,51 +227,64 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
     final routeKey =
         '$legKey|${dest.latitude.toStringAsFixed(5)}|${dest.longitude.toStringAsFixed(5)}';
 
-    final now = DateTime.now();
     final statusChanged = _lastRideStatus != widget.ride.status;
-    final movedEnough = _lastRouteOrigin == null ||
-        NearbyProvidersService.straightLineKm(_lastRouteOrigin!, driverPos) *
-                1000 >=
-            MapPresenceConfig.routeRefreshMinMoveMeters;
-    final timedOut = _lastRouteRefreshAt == null ||
-        now.difference(_lastRouteRefreshAt!) >=
-            MapPresenceConfig.routeRefreshInterval;
 
-    if (!statusChanged &&
-        _loadedRouteKey == routeKey &&
-        !movedEnough &&
-        !timedOut) {
+    if (!force && !statusChanged && _loadedRouteKey == routeKey) {
       return;
     }
 
-    if (statusChanged || _loadedRouteKey != routeKey) {
-      _loadedRouteKey = routeKey;
-      _lastRouteOrigin = null;
-      _lastRouteRefreshAt = null;
-    }
-
+    final requestId = ++_routeRequestId;
     if (mounted) setState(() => _loadingRoutes = true);
+    final languageCode =
+        Localizations.maybeLocaleOf(context)?.languageCode ?? 'ar';
 
     try {
-      final info = await _routeService.getDrivingRoute(driverPos, dest);
-      final points = await _routeService.getRoutePolylinePoints(driverPos, dest);
-      if (!mounted) return;
+      final info = await _routeService.getDrivingRouteDetails(
+        driverPos,
+        dest,
+        languageCode: languageCode,
+      );
+      if (!mounted || requestId != _routeRequestId) return;
+
+      final points = info.polylinePoints.length >= 2
+          ? info.polylinePoints
+          : [driverPos, dest];
+
       setState(() {
+        _routeLatLng = points;
+        _steps = info.steps;
+        _routeIsEstimated = info.isEstimated;
         _activeRoute = _toGooglePoints(points);
         _etaMinutes = info.durationMinutes;
         _distanceKm = info.distanceKm;
-        _lastRouteRefreshAt = now;
-        _lastRouteOrigin = driverPos;
         _lastRideStatus = widget.ride.status;
+        _loadedRouteKey = routeKey;
+        _loadingRoutes = false;
       });
-    } finally {
-      if (mounted) {
-        setState(() => _loadingRoutes = false);
-        if (!_didInitialCameraFit && _mapController != null) {
-          _didInitialCameraFit = true;
-          unawaited(_fitCamera(force: true));
-        }
+      _updateCue(driverPos);
+
+      if (!_didInitialCameraFit &&
+          (_mapController != null || _mapCommands.canFit)) {
+        _didInitialCameraFit = true;
+        unawaited(_fitCamera(force: true));
+      } else if (_cameraFollow.followEnabled) {
+        unawaited(_fitCamera());
       }
+    } catch (_) {
+      if (!mounted || requestId != _routeRequestId) return;
+      setState(() {
+        _routeLatLng = [driverPos, dest];
+        _steps = const [];
+        _routeIsEstimated = true;
+        _activeRoute = _toGooglePoints([driverPos, dest]);
+        final km =
+            NearbyProvidersService.straightLineKm(driverPos, dest);
+        _distanceKm = km;
+        _etaMinutes = NearbyProvidersService.estimateMinutes(km);
+        _lastRideStatus = widget.ride.status;
+        _loadedRouteKey = routeKey;
+        _loadingRoutes = false;
+      });
     }
   }
 
@@ -234,22 +295,30 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
   }
 
   Future<void> _fitCamera({bool force = false}) async {
-    final controller = _mapController;
-    if (controller == null) return;
     if (!force && !_cameraFollow.followEnabled) return;
+    final controller = _mapController;
+    if (controller == null) {
+      await _mapCommands.fit();
+      return;
+    }
 
-    final points = <gmaps.LatLng>[
-      gmaps.LatLng(widget.ride.pickupLat, widget.ride.pickupLng),
-      gmaps.LatLng(widget.ride.destinationLat, widget.ride.destinationLng),
-      ..._activeRoute,
-    ];
-
+    final points = <gmaps.LatLng>[..._activeRoute];
     final driverPos = _driverPosition;
+    final dest = _routeDestination;
     if (driverPos != null) {
       points.add(gmaps.LatLng(driverPos.latitude, driverPos.longitude));
     }
+    if (dest != null) {
+      points.add(gmaps.LatLng(dest.latitude, dest.longitude));
+    }
 
-    if (points.isEmpty) return;
+    if (points.isEmpty) {
+      points.add(gmaps.LatLng(widget.ride.pickupLat, widget.ride.pickupLng));
+      points.add(
+        gmaps.LatLng(widget.ride.destinationLat, widget.ride.destinationLng),
+      );
+    }
+
     await _cameraFollow.fitPoints(controller, points);
   }
 
@@ -260,8 +329,7 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
       return const {};
     }
 
-    final pickupPoint = _pickup;
-    final pickup = gmaps.LatLng(pickupPoint.latitude, pickupPoint.longitude);
+    final pickup = gmaps.LatLng(widget.ride.pickupLat, widget.ride.pickupLng);
     final destination = gmaps.LatLng(
       widget.ride.destinationLat,
       widget.ride.destinationLng,
@@ -274,11 +342,7 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
         icon: _pickupMarkerIcon!,
         anchor: const Offset(0.5, 0.72),
         zIndexInt: 2,
-        infoWindow: gmaps.InfoWindow(
-          title: _customer?.latitude != null
-              ? l10n.roleCustomer
-              : l10n.pickup,
-        ),
+        infoWindow: gmaps.InfoWindow(title: l10n.pickup),
       ),
       gmaps.Marker(
         markerId: const gmaps.MarkerId('destination'),
@@ -286,18 +350,22 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
         icon: _destinationMarkerIcon!,
         anchor: const Offset(0.5, 0.72),
         zIndexInt: 2,
+        infoWindow: gmaps.InfoWindow(title: l10n.destination),
       ),
     };
 
-    final driverPos = _driverPosition;
-    if (driverPos != null) {
+    final animated = _markerAnimator.markers['driver'];
+    final driverIcon = MapMarkerIcons.driver;
+    if (animated != null && driverIcon != null) {
       markers.add(
         gmaps.Marker(
           markerId: const gmaps.MarkerId('driver'),
-          position: gmaps.LatLng(driverPos.latitude, driverPos.longitude),
-          icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(
-            gmaps.BitmapDescriptor.hueAzure,
-          ),
+          position: animated.position,
+          icon: driverIcon,
+          rotation: animated.heading,
+          flat: true,
+          anchor: const Offset(0.5, 0.5),
+          zIndexInt: 3,
           infoWindow: gmaps.InfoWindow(title: l10n.roleDriver),
         ),
       );
@@ -337,6 +405,7 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
             markers: _buildMarkers(l10n),
             polylines: _buildPolylines(),
             zoom: 14,
+            commands: _mapCommands,
             onCameraMove: (_) => _cameraFollow.onUserCameraInteraction(),
             onMapCreated: (controller) {
               _mapController = controller;
@@ -384,9 +453,62 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
               ),
             ),
           ),
-        if (_etaMinutes != null && _distanceKm != null)
+        if (_cue != null && _cue!.instruction.isNotEmpty)
           Positioned(
             top: 12,
+            left: 12,
+            right: 72,
+            child: Card(
+              color: const Color(0xFF0F766E),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(
+                      _maneuverIcon(_cue!.maneuver),
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _cue!.offRoute
+                                ? (l10n.localeName.startsWith('ar')
+                                    ? 'إعادة حساب المسار'
+                                    : 'Recalculating route')
+                                : _cue!.instruction,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            l10n.localeName.startsWith('ar')
+                                ? 'بعد ${TurnByTurnGuide.formatDistance(_cue!.metersToManeuver, arabic: true)}'
+                                : 'in ${TurnByTurnGuide.formatDistance(_cue!.metersToManeuver, arabic: false)}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (_etaMinutes != null && _distanceKm != null)
+          Positioned(
+            top: _cue != null && _cue!.instruction.isNotEmpty ? 92 : 12,
             left: 12,
             child: Card(
               child: Padding(
@@ -394,7 +516,7 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.schedule,
                       size: 18,
                       color: AppBrandAssets.brandTealDark,
@@ -407,7 +529,7 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
                           ),
                     ),
                     const SizedBox(width: 12),
-                    Icon(
+                    const Icon(
                       Icons.route,
                       size: 18,
                       color: AppBrandAssets.brandGold,
@@ -457,6 +579,31 @@ class _DriverRideMapPanelState extends State<DriverRideMapPanel> {
         ),
       ],
     );
+  }
+
+  IconData _maneuverIcon(String maneuver) {
+    switch (maneuver) {
+      case 'turn-right':
+      case 'turn-slight-right':
+      case 'turn-sharp-right':
+        return Icons.turn_right;
+      case 'turn-left':
+      case 'turn-slight-left':
+      case 'turn-sharp-left':
+        return Icons.turn_left;
+      case 'uturn-left':
+      case 'uturn-right':
+        return Icons.u_turn_left;
+      case 'roundabout-left':
+      case 'roundabout-right':
+        return Icons.roundabout_right;
+      case 'merge':
+      case 'fork-left':
+      case 'fork-right':
+        return Icons.fork_right;
+      default:
+        return Icons.straight;
+    }
   }
 }
 

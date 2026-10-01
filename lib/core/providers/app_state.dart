@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/services/announcement_service.dart';
 import 'package:hilla_ride/core/services/broadcast_service.dart';
@@ -6,6 +8,7 @@ import 'package:hilla_ride/core/services/admin_service.dart';
 import 'package:hilla_ride/core/services/app_services.dart';
 import 'package:hilla_ride/core/services/chat_service.dart';
 import 'package:hilla_ride/core/services/commission_service.dart';
+import 'package:hilla_ride/core/services/driver_monthly_ride_stats_service.dart';
 import 'package:hilla_ride/core/services/geocoding_service.dart';
 import 'package:hilla_ride/core/services/monthly_prize_service.dart';
 import 'package:hilla_ride/core/services/pricing_service.dart';
@@ -23,6 +26,7 @@ import 'package:hilla_ride/core/services/referral_service.dart';
 import 'package:hilla_ride/core/services/reward_service.dart';
 import 'package:hilla_ride/core/services/service_area_service.dart';
 import 'package:hilla_ride/core/services/wallet_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppState extends ChangeNotifier {
   AppState({
@@ -52,6 +56,7 @@ class AppState extends ChangeNotifier {
     AdminAuditService? adminAuditService,
     AdminReportService? adminReportService,
     AppConfigService? appConfigService,
+    DriverMonthlyRideStatsService? driverMonthlyRideStatsService,
   })  : sessionService = sessionService ?? SessionService(),
         authService = authService ??
             AuthService(sessionService: sessionService ?? SessionService()),
@@ -78,6 +83,8 @@ class AppState extends ChangeNotifier {
         adminAuditService = adminAuditService ?? AdminAuditService(),
         adminReportService = adminReportService ?? AdminReportService(),
         appConfigService = appConfigService ?? AppConfigService(),
+        driverMonthlyRideStatsService =
+            driverMonthlyRideStatsService ?? DriverMonthlyRideStatsService(),
         rideService = rideService ??
             RideService(
               driverService: driverService ?? DriverService(),
@@ -113,6 +120,7 @@ class AppState extends ChangeNotifier {
   final AdminAuditService adminAuditService;
   final AdminReportService adminReportService;
   final AppConfigService appConfigService;
+  final DriverMonthlyRideStatsService driverMonthlyRideStatsService;
 
   factory AppState.create() {
     final sessionService = SessionService();
@@ -146,10 +154,32 @@ class AppState extends ChangeNotifier {
 class LocaleProvider extends ChangeNotifier {
   Locale? _locale = const Locale('ar');
 
+  static const _prefsKey = 'app_locale_code';
+
   Locale? get locale => _locale;
+
+  /// Restores the last chosen language (defaults to Arabic).
+  Future<void> loadSaved() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final code = prefs.getString(_prefsKey);
+      if (code != null && code.isNotEmpty && code != _locale?.languageCode) {
+        _locale = Locale(code);
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
 
   void setLocale(Locale locale) {
     _locale = locale;
     notifyListeners();
+    unawaited(_persist(locale));
+  }
+
+  Future<void> _persist(Locale locale) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKey, locale.languageCode);
+    } catch (_) {}
   }
 }

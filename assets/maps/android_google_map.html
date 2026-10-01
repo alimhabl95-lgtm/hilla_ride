@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; background: #f7f7f7; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map = null;
+    var overlays = { markers: {}, lines: [] };
+    var suppressIdle = false;
+
+    function post(payload) {
+      if (window.HillaMapBridge) {
+        HillaMapBridge.postMessage(typeof payload === 'string' ? payload : JSON.stringify(payload));
+      }
+    }
+
+    window.gm_authFailure = function () {
+      post('auth_failure');
+    };
+
+    function initHillaMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: 32.477, lng: 44.425 },
+        zoom: 14,
+        mapTypeId: 'roadmap',
+        disableDefaultUI: true,
+        gestureHandling: 'greedy',
+        clickableIcons: true,
+        keyboardShortcuts: false
+      });
+      map.addListener('dragstart', function () {
+        post({ type: 'dragstart' });
+      });
+      map.addListener('idle', function () {
+        if (suppressIdle || !map) return;
+        var c = map.getCenter();
+        if (!c) return;
+        post({
+          type: 'idle',
+          lat: c.lat(),
+          lng: c.lng(),
+          zoom: map.getZoom() || 14
+        });
+      });
+      post('ready');
+    }
+
+    function moveTo(lat, lng, zoom) {
+      if (!map) return;
+      suppressIdle = true;
+      map.panTo({ lat: lat, lng: lng });
+      if (zoom) map.setZoom(zoom);
+      setTimeout(function () { suppressIdle = false; }, 400);
+    }
+
+    function applyState(raw) {
+      if (!map) return;
+      var state = {};
+      try { state = JSON.parse(raw); } catch (e) { return; }
+
+      suppressIdle = true;
+
+      if (state.center && !(state.fit && state.fit.length)) {
+        map.setCenter(state.center);
+        if (state.zoom) map.setZoom(state.zoom);
+      }
+
+      Object.keys(overlays.markers).forEach(function (id) {
+        overlays.markers[id].setMap(null);
+      });
+      overlays.markers = {};
+      overlays.lines.forEach(function (line) { line.setMap(null); });
+      overlays.lines = [];
+
+      (state.lines || []).forEach(function (line) {
+        if (!line.points || line.points.length < 2) return;
+        overlays.lines.push(new google.maps.Polyline({
+          map: map,
+          path: line.points,
+          strokeColor: line.color || '#0F766E',
+          strokeOpacity: 1,
+          strokeWeight: line.width || 5
+        }));
+      });
+
+      (state.markers || []).forEach(function (item) {
+        var icon = {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: item.color || '#16A34A',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2
+        };
+        if (item.kind === 'driver') {
+          icon = {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 6,
+            fillColor: '#0F766E',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 1,
+            rotation: item.rotation || 0
+          };
+        }
+        overlays.markers[item.id] = new google.maps.Marker({
+          map: map,
+          position: { lat: item.lat, lng: item.lng },
+          icon: icon,
+          title: item.title || '',
+          zIndex: item.kind === 'driver' ? 3 : 2
+        });
+      });
+
+      if (state.fit && state.fit.length >= 1) {
+        if (state.fit.length === 1) {
+          map.panTo(state.fit[0]);
+          if (state.zoom) map.setZoom(state.zoom);
+        } else {
+          var bounds = new google.maps.LatLngBounds();
+          state.fit.forEach(function (p) { bounds.extend(p); });
+          map.fitBounds(bounds, 56);
+        }
+      }
+
+      setTimeout(function () { suppressIdle = false; }, 400);
+    }
+
+    window.applyState = applyState;
+    window.moveTo = moveTo;
+    window.initHillaMap = initHillaMap;
+  </script>
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=__MAPS_JS_KEY__&callback=initHillaMap"></script>
+</body>
+</html>

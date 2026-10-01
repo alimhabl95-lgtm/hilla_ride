@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hilla_ride/core/config/app_variant.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
@@ -684,6 +685,13 @@ class MobileFloatingChrome extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
+                    if (role == UserRole.customer)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: CustomerCurrentRideMenuTile(customerId: uid),
+                      ),
+                    if (role == UserRole.customer)
+                      const SizedBox(height: 4),
                     item(
                       icon: Icons.person_outline,
                       label: l10n.myProfileTitle,
@@ -798,6 +806,52 @@ class MobileFloatingChrome extends StatelessWidget {
       );
     }
 
+    Widget languageButton() {
+      return Material(
+        color: Colors.white,
+        shape: const CircleBorder(),
+        elevation: 2,
+        shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.12),
+        child: PopupMenuButton<Locale>(
+          tooltip: isAr ? 'اللغة' : 'Language',
+          offset: const Offset(0, 48),
+          icon: const Icon(
+            Icons.language,
+            color: AppBrandAssets.brandTealDark,
+          ),
+          onSelected: context.read<LocaleProvider>().setLocale,
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: const Locale('en'),
+              child: Text(l10n.english),
+            ),
+            PopupMenuItem(
+              value: const Locale('ar'),
+              child: Text(l10n.arabic),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+    if (role == UserRole.customer && isAndroid) {
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          children: [
+            AppCircleIconButton(
+              tooltip: isAr ? 'القائمة' : 'Menu',
+              icon: Icons.menu,
+              onPressed: openCustomerMenu,
+            ),
+            const Spacer(),
+            languageButton(),
+          ],
+        ),
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: Theme(
@@ -810,33 +864,9 @@ class MobileFloatingChrome extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _circleWrap(CurrentRideIconButton(role: role)),
+            _circleWrap(CurrentRideFloatingButton(role: role)),
             const SizedBox(width: 8),
-            Material(
-              color: Colors.white,
-              shape: const CircleBorder(),
-              elevation: 2,
-              shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.12),
-              child: PopupMenuButton<Locale>(
-                tooltip: isAr ? 'اللغة' : 'Language',
-                offset: const Offset(0, 48),
-                icon: const Icon(
-                  Icons.language,
-                  color: AppBrandAssets.brandTealDark,
-                ),
-                onSelected: context.read<LocaleProvider>().setLocale,
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: const Locale('en'),
-                    child: Text(l10n.english),
-                  ),
-                  PopupMenuItem(
-                    value: const Locale('ar'),
-                    child: Text(l10n.arabic),
-                  ),
-                ],
-              ),
-            ),
+            languageButton(),
             if (role == UserRole.customer) ...[
               const SizedBox(width: 8),
               AppCircleIconButton(

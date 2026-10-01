@@ -272,6 +272,33 @@ service cloud.firestore {
 
     }
 
+    // Driver ride rejections (counted as cancelled on the driver dashboard).
+    match /driverRideRejections/{rejectionId} {
+      allow read: if signedIn()
+        && (resource.data.driverId == request.auth.uid || isAdminUser());
+      allow create, update: if signedIn()
+        && request.resource.data.driverId == request.auth.uid
+        && request.resource.data.rideId is string
+        && rejectionId == request.resource.data.rideId + '_' + request.auth.uid;
+      allow delete: if isManager();
+    }
+
+    match /drivers/{driverId}/rideRejections/{rideId} {
+      allow read: if signedIn()
+        && (isSelf(driverId) || isAdminUser());
+      allow create, update: if signedIn()
+        && isSelf(driverId)
+        && request.resource.data.driverId == request.auth.uid
+        && request.resource.data.rideId is string;
+      allow delete: if isManager();
+    }
+
+    match /drivers/{driverId}/statsRollups/{rollupId} {
+      allow read: if signedIn() && (isSelf(driverId) || isAdminUser());
+      allow create, update: if signedIn() && isSelf(driverId);
+      allow delete: if isManager();
+    }
+
     match /drivers/{driverId}/profit_settlements/{settlementId} {
       allow read: if signedIn();
       allow create: if isAdminUser();
@@ -291,12 +318,19 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    function isOfferedDriverForRide() {
+      return signedIn()
+        && resource.data.offeredDriverIds is list
+        && request.auth.uid in resource.data.offeredDriverIds;
+    }
+
     match /rides/{rideId} {
       // Lifecycle writes are Cloud Functions only (createRide/acceptRide/...).
       allow read: if signedIn() && (
         isAdminUser()
         || resource.data.customerId == request.auth.uid
         || resource.data.driverId == request.auth.uid
+        || isOfferedDriverForRide()
         || (
           resource.data.status in ['searching', 'matched']
           && isDriver()
@@ -600,7 +634,13 @@ service cloud.firestore {
 
         && request.resource.data.createdBy == request.auth.uid;
 
-      allow update, delete: if false;
+      allow update: if isAdminUser()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0;
+
+      allow delete: if isAdminUser();
 
     }
 

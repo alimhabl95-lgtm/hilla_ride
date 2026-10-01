@@ -569,20 +569,32 @@ class Ride {
   bool get isCashPaymentComplete => cashCollectedByDriver;
 
   factory Ride.fromMap(String id, Map<String, dynamic> data) {
+    String asText(dynamic value, [String fallback = '']) {
+      if (value == null) return fallback;
+      return value.toString();
+    }
+
+    String? asNullableText(dynamic value) {
+      if (value == null) return null;
+      final text = value.toString();
+      return text.isEmpty ? null : text;
+    }
+
     return Ride(
       id: id,
-      customerId: data['customerId'] as String? ?? '',
-      driverId: data['driverId'] as String?,
-      pickupLabel: data['pickupLabel'] as String? ?? '',
-      destinationLabel: data['destinationLabel'] as String? ?? '',
+      customerId: asText(data['customerId']),
+      driverId: asNullableText(data['driverId']),
+      pickupLabel: asText(data['pickupLabel']),
+      destinationLabel: asText(data['destinationLabel']),
       pickupLat: (data['pickupLat'] as num?)?.toDouble() ?? 0,
       pickupLng: (data['pickupLng'] as num?)?.toDouble() ?? 0,
       destinationLat: (data['destinationLat'] as num?)?.toDouble() ?? 0,
       destinationLng: (data['destinationLng'] as num?)?.toDouble() ?? 0,
-      status: RideStatusX.fromString(data['status'] as String?),
+      status: RideStatusX.fromString(asNullableText(data['status'])),
       createdAt: (data['createdAt'] as dynamic)?.toDate() as DateTime?,
       fareAmountIqd: (data['fareAmountIqd'] as num?)?.toInt() ?? 0,
-      paymentMethod: PaymentMethodX.fromString(data['paymentMethod'] as String?),
+      paymentMethod:
+          PaymentMethodX.fromString(asNullableText(data['paymentMethod'])),
       cashCollectedByDriver: data['cashCollectedByDriver'] as bool? ?? false,
       cashConfirmedByCustomer:
           data['cashConfirmedByCustomer'] as bool? ?? false,
@@ -592,19 +604,20 @@ class Ride {
       driverEarningsIqd: (data['driverEarningsIqd'] as num?)?.toInt() ?? 0,
       completedAt: (data['completedAt'] as dynamic)?.toDate() as DateTime?,
       driverRating: (data['driverRating'] as num?)?.toInt(),
-      driverFeedback: data['driverFeedback'] as String?,
+      driverFeedback: asNullableText(data['driverFeedback']),
       ratedAt: (data['ratedAt'] as dynamic)?.toDate() as DateTime?,
-      districtId: data['districtId'] as String? ?? '',
-      subDistrictId: data['subDistrictId'] as String? ?? '',
+      districtId: asText(data['districtId']),
+      subDistrictId: asText(data['subDistrictId']),
       originalFareIqd: (data['originalFareIqd'] as num?)?.toInt() ?? 0,
       promoDiscountIqd: (data['promoDiscountIqd'] as num?)?.toInt() ?? 0,
-      promoCode: data['promoCode'] as String? ?? '',
+      promoCode: asText(data['promoCode']),
       offeredDriverIds: (data['offeredDriverIds'] as List<dynamic>?)
               ?.map((value) => value.toString())
               .where((value) => value.isNotEmpty)
               .toList() ??
           const [],
-      rideNumber: data['rideNumber'] as String? ?? '',
+      // Server stores rideNumber as int; older docs may use String.
+      rideNumber: asText(data['rideNumber']),
     );
   }
 

@@ -92,6 +92,64 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
   }
 
+  /// Drivers can only change their photo; identity/vehicle data is locked.
+  Future<void> _saveDriverPhoto() async {
+    final l10n = AppLocalizations.of(context)!;
+    final isAr = l10n.localeName.startsWith('ar');
+    if (_profilePhoto == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isAr ? 'اختر صورة أولاً' : 'Choose a photo first'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final appState = context.read<AppState>();
+      final uid = appState.authService.currentUser?.uid ?? widget.user.uid;
+      final profilePhotoUrl =
+          await appState.storageService.uploadDriverDocument(
+        uid: uid,
+        bytes: _profilePhoto!.bytes,
+        fileName: 'profile_photo.jpg',
+      );
+      await appState.driverService.updateProfile(
+        uid: uid,
+        name: widget.driver?.name.isNotEmpty == true
+            ? widget.driver!.name
+            : widget.user.name,
+        profilePhotoUrl: profilePhotoUrl,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.profileUpdated)),
+      );
+      Navigator.of(context).pop(true);
+    } on FirebaseException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.code == 'unauthorized'
+                ? l10n.registrationStorageRulesHint
+                : (error.message?.isNotEmpty == true
+                    ? error.message!
+                    : l10n.photoPickFailed),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$error')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _saveProfile() async {
     final l10n = AppLocalizations.of(context)!;
     final name = _nameController.text.trim();
@@ -238,10 +296,137 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Widget _passwordSection(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l10n.changePasswordTitle,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 12),
+        PasswordTextField(
+          controller: _currentPasswordController,
+          label: l10n.currentPassword,
+        ),
+        const SizedBox(height: 12),
+        PasswordTextField(
+          controller: _newPasswordController,
+          label: l10n.newPassword,
+        ),
+        const SizedBox(height: 12),
+        PasswordTextField(
+          controller: _confirmPasswordController,
+          label: l10n.confirmNewPassword,
+        ),
+        const SizedBox(height: 12),
+        AppSecondaryButton(
+          label: l10n.changePasswordButton,
+          onPressed: _changePassword,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDriverBody(AppLocalizations l10n) {
+    final isAr = l10n.localeName.startsWith('ar');
+    final driver = widget.driver;
+    final user = widget.user;
+
+    Widget lockedRow(String label, String value) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 120,
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                value.isEmpty ? '—' : value,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+            Icon(
+              Icons.lock_outline,
+              size: 16,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        PhotoUploadTile(
+          label: l10n.profilePhotoLabel,
+          image: _profilePhoto,
+          onPickGallery: () => _pickPhoto(ImageSource.gallery),
+          onPickCamera: () => _pickPhoto(ImageSource.camera),
+        ),
+        const SizedBox(height: 16),
+        AppPrimaryButton(
+          label: isAr ? 'حفظ الصورة' : 'Save photo',
+          icon: Icons.save_outlined,
+          onPressed: _saveDriverPhoto,
+          isLoading: _saving,
+        ),
+        const SizedBox(height: 24),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.accountInformation,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                isAr
+                    ? 'هذه البيانات لا يمكن تعديلها من التطبيق. تواصل مع الإدارة لأي تغيير.'
+                    : 'These details cannot be edited in the app. Contact management for changes.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              lockedRow(l10n.fullName, driver?.name ?? user.name),
+              lockedRow(l10n.phoneHint, user.phone),
+              if (driver != null) ...[
+                lockedRow(l10n.vehicleType, driver.vehicleType),
+                lockedRow(l10n.vehicleColor, driver.vehicleColor),
+                lockedRow(l10n.vehiclePlate, driver.vehiclePlate),
+                lockedRow(l10n.licenseNumber, driver.licenseNumber),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+        _passwordSection(l10n),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isCustomer = widget.role == UserRole.customer;
+
+    if (widget.role == UserRole.driver) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.editProfileTitle)),
+        body: _buildDriverBody(l10n),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.editProfileTitle)),
@@ -324,30 +509,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             isLoading: _saving,
           ),
           const SizedBox(height: 32),
-          Text(
-            l10n.changePasswordTitle,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 12),
-          PasswordTextField(
-            controller: _currentPasswordController,
-            label: l10n.currentPassword,
-          ),
-          const SizedBox(height: 12),
-          PasswordTextField(
-            controller: _newPasswordController,
-            label: l10n.newPassword,
-          ),
-          const SizedBox(height: 12),
-          PasswordTextField(
-            controller: _confirmPasswordController,
-            label: l10n.confirmNewPassword,
-          ),
-          const SizedBox(height: 12),
-          AppSecondaryButton(
-            label: l10n.changePasswordButton,
-            onPressed: _changePassword,
-          ),
+          _passwordSection(l10n),
         ],
       ),
     );

@@ -21,22 +21,8 @@ class DriverWalletScreen extends StatefulWidget {
   State<DriverWalletScreen> createState() => _DriverWalletScreenState();
 }
 
-class _DriverWalletScreenState extends State<DriverWalletScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
+class _DriverWalletScreenState extends State<DriverWalletScreen> {
   static const _fare = FareService();
-
-  @override
-  void initState() {
-    super.initState();
-    _tabs = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
 
   String _statusSubtitle({
     required bool blocked,
@@ -65,17 +51,6 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
       backgroundColor: AppBrandAssets.brandSurface,
       appBar: AppBar(
         title: Text(isAr ? 'المحفظة' : 'Wallet'),
-        bottom: TabBar(
-          controller: _tabs,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: [
-            Tab(text: isAr ? 'الرصيد' : 'Balance'),
-            Tab(text: isAr ? 'السحب' : 'Withdraw'),
-            Tab(text: isAr ? 'السجل' : 'History'),
-          ],
-        ),
       ),
       body: StreamBuilder<DriverProfile?>(
         stream: driverService.watchDriver(widget.driver.uid),
@@ -90,195 +65,253 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
               final blocked = driver.walletStatus == 'blocked' ||
                   driver.walletBalanceIqd < config.minBalanceIqd;
 
-              return TabBarView(
-                controller: _tabs,
-                children: [
-                  ListView(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    children: [
-                      AppWalletCard(
-                        title: isAr ? 'الرصيد الحالي' : 'Current balance',
-                        balanceLabel: _fare.formatIqd(
-                          driver.walletBalanceIqd,
-                          locale: l10n.localeName,
-                        ),
-                        subtitle: _statusSubtitle(
-                          blocked: blocked,
-                          low: low,
-                          isAr: isAr,
-                        ),
-                      ),
-                      if (low || blocked) ...[
-                        const SizedBox(height: AppSpacing.md),
-                        AppBanner(
-                          message: isAr
-                              ? 'رصيد المحفظة منخفض. اشحن عبر سوبر كي لمتابعة استقبال الرحلات.'
-                              : 'Wallet balance is low. Recharge via SuperQi to keep receiving trips.',
-                          icon: Icons.warning_amber_rounded,
-                          tone: blocked
-                              ? AppBannerTone.danger
-                              : AppBannerTone.warning,
-                        ),
-                      ],
-                      const SizedBox(height: AppSpacing.lg),
-                      AppPrimaryButton(
-                        label: isAr ? 'شحن المحفظة' : 'Recharge wallet',
-                        icon: Icons.add_card,
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => DriverWalletRechargeScreen(
-                                driver: driver,
-                                config: config,
+              return StreamBuilder<List<WalletWithdrawalRequest>>(
+                stream: wallet.watchMyWithdrawalRequests(driver.uid),
+                builder: (context, withdrawalSnap) {
+                  final withdrawals =
+                      withdrawalSnap.data ?? const <WalletWithdrawalRequest>[];
+
+                  return StreamBuilder<List<WalletLedgerEntry>>(
+                    stream: wallet.watchLedger(driver.uid),
+                    builder: (context, ledgerSnap) {
+                      final entries = ledgerSnap.data ?? const [];
+
+                      return ListView(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        children: [
+                          AppWalletCard(
+                            title: isAr ? 'الرصيد الحالي' : 'Current balance',
+                            balanceLabel: _fare.formatIqd(
+                              driver.walletBalanceIqd,
+                              locale: l10n.localeName,
+                            ),
+                            subtitle: _statusSubtitle(
+                              blocked: blocked,
+                              low: low,
+                              isAr: isAr,
+                            ),
+                            actionLabel:
+                                isAr ? 'شحن المحفظة' : 'Recharge wallet',
+                            onAction: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => DriverWalletRechargeScreen(
+                                    driver: driver,
+                                    config: config,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          if (low || blocked) ...[
+                            const SizedBox(height: AppSpacing.md),
+                            AppBanner(
+                              message: isAr
+                                  ? 'رصيد المحفظة منخفض. اشحن عبر سوبر كي لمتابعة استقبال الرحلات.'
+                                  : 'Wallet balance is low. Recharge via SuperQi to keep receiving trips.',
+                              icon: Icons.warning_amber_rounded,
+                              tone: blocked
+                                  ? AppBannerTone.danger
+                                  : AppBannerTone.warning,
+                            ),
+                          ],
+                          if (config.withdrawalsEnabled) ...[
+                            const SizedBox(height: AppSpacing.lg),
+                            AppPrimaryButton(
+                              label: isAr ? 'طلب سحب' : 'Request withdrawal',
+                              icon: Icons.account_balance,
+                              onPressed: blocked
+                                  ? null
+                                  : () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              DriverWalletWithdrawScreen(
+                                            driver: driver,
+                                            config: config,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                            ),
+                          ],
+                          const SizedBox(height: AppSpacing.xl),
+                          _WalletSectionTitle(
+                            isAr ? 'طلبات السحب' : 'Withdrawal requests',
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          _DriverWithdrawalsSection(
+                            driverId: driver.uid,
+                            isAr: isAr,
+                            items: withdrawals,
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
+                          _WalletSectionTitle(isAr ? 'السجل' : 'History'),
+                          const SizedBox(height: AppSpacing.sm),
+                          if (entries.isEmpty)
+                            AppCard(
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              child: AppEmptyState(
+                                title: isAr
+                                    ? 'لا توجد عمليات بعد'
+                                    : 'No ledger entries yet',
+                                message: isAr
+                                    ? 'ستظهر عمليات الشحن والعمولة هنا'
+                                    : 'Recharges and commissions will appear here',
+                                icon: Icons.receipt_long_outlined,
+                              ),
+                            )
+                          else
+                            ...entries.map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: AppSpacing.sm,
+                                ),
+                                child: _WalletLedgerTile(
+                                  entry: e,
+                                  isAr: isAr,
+                                  locale: l10n.localeName,
+                                ),
                               ),
                             ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      if (config.withdrawalsEnabled)
-                        AppPrimaryButton(
-                          label: isAr ? 'طلب سحب' : 'Request withdrawal',
-                          icon: Icons.account_balance,
-                          onPressed: blocked
-                              ? null
-                              : () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => DriverWalletWithdrawScreen(
-                                        driver: driver,
-                                        config: config,
-                                      ),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            isAr
+                                ? 'هذه محفظة داخلية لعمولة الشركة فقط وليست محفظة سوبر كي.'
+                                : 'This is an internal Hello Tuk-Tuk wallet for company commission only — not a SuperQi wallet.',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppBrandAssets.brandMuted,
                                     ),
-                                  );
-                                },
-                        ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        isAr
-                            ? 'هذه محفظة داخلية لعمولة الشركة فقط وليست محفظة سوبر كي.'
-                            : 'This is an internal Hello Tuk-Tuk wallet for company commission only — not a SuperQi wallet.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppBrandAssets.brandMuted,
-                            ),
-                      ),
-                    ],
-                  ),
-                  _DriverWithdrawalsList(driverId: driver.uid, isAr: isAr),
-                  StreamBuilder<List<WalletLedgerEntry>>(
-                    stream: wallet.watchLedger(driver.uid),
-                    builder: (context, snap) {
-                      final entries = snap.data ?? const [];
-                      if (entries.isEmpty) {
-                        return AppEmptyState(
-                          title: isAr
-                              ? 'لا توجد عمليات بعد'
-                              : 'No ledger entries yet',
-                          message: isAr
-                              ? 'ستظهر عمليات الشحن والعمولة هنا'
-                              : 'Recharges and commissions will appear here',
-                          icon: Icons.receipt_long_outlined,
-                        );
-                      }
-                      return ListView.separated(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        itemCount: entries.length,
-                        separatorBuilder: (_, _index) =>
-                            const SizedBox(height: AppSpacing.sm),
-                        itemBuilder: (context, index) {
-                          final e = entries[index];
-                          final credit = e.amountIqd >= 0;
-                          return AppCard(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: (credit
-                                            ? AppBrandAssets.brandSuccess
-                                            : AppBrandAssets.brandDanger)
-                                        .withValues(alpha: 0.12),
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.sm),
-                                  ),
-                                  child: Icon(
-                                    credit
-                                        ? Icons.arrow_downward
-                                        : Icons.arrow_upward,
-                                    color: credit
-                                        ? AppBrandAssets.brandSuccess
-                                        : AppBrandAssets.brandDanger,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.md),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _ledgerTypeLabel(e.type, isAr),
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              color: AppBrandAssets.brandNavy,
-                                            ),
-                                      ),
-                                      if (e.displayDescription.isNotEmpty ||
-                                          e.referenceId.isNotEmpty ||
-                                          e.createdAt != null) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          [
-                                            if (e.displayDescription.isNotEmpty)
-                                              e.displayDescription,
-                                            if (e.referenceId.isNotEmpty)
-                                              '${isAr ? 'مرجع' : 'Ref'}: ${e.referenceId}',
-                                            if (e.createdAt != null)
-                                              e.createdAt!
-                                                  .toLocal()
-                                                  .toString()
-                                                  .substring(0, 16),
-                                          ].join('\n'),
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.copyWith(
-                                                color:
-                                                    AppBrandAssets.brandMuted,
-                                              ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                Text(
-                                  '${credit ? '+' : ''}${_fare.formatIqd(e.amountIqd, locale: l10n.localeName)}',
-                                  style: TextStyle(
-                                    color: credit
-                                        ? AppBrandAssets.brandSuccess
-                                        : AppBrandAssets.brandDanger,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                          ),
+                        ],
                       );
                     },
-                  ),
-                ],
+                  );
+                },
               );
             },
           );
         },
       ),
     );
+  }
+}
+
+class _WalletSectionTitle extends StatelessWidget {
+  const _WalletSectionTitle(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: AppBrandAssets.brandNavy,
+          ),
+    );
+  }
+}
+
+class _WalletLedgerTile extends StatelessWidget {
+  const _WalletLedgerTile({
+    required this.entry,
+    required this.isAr,
+    required this.locale,
+  });
+
+  final WalletLedgerEntry entry;
+  final bool isAr;
+  final String locale;
+
+  static const _fare = FareService();
+
+  @override
+  Widget build(BuildContext context) {
+    final credit = entry.amountIqd >= 0;
+    final icon = switch (entry.type) {
+      WalletLedgerType.commission => Icons.percent,
+      WalletLedgerType.recharge => Icons.add_card,
+      WalletLedgerType.withdrawal => Icons.account_balance,
+      _ => credit ? Icons.arrow_downward : Icons.arrow_upward,
+    };
+
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: (credit
+                      ? AppBrandAssets.brandSuccess
+                      : AppBrandAssets.brandDanger)
+                  .withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+            ),
+            child: Icon(
+              icon,
+              color: credit
+                  ? AppBrandAssets.brandSuccess
+                  : AppBrandAssets.brandDanger,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _ledgerTypeLabel(entry.type, isAr),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppBrandAssets.brandNavy,
+                      ),
+                ),
+                if (entry.displayDescription.isNotEmpty ||
+                    entry.referenceId.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if (entry.displayDescription.isNotEmpty)
+                        entry.displayDescription,
+                      if (entry.referenceId.isNotEmpty)
+                        '${isAr ? 'مرجع' : 'Ref'}: ${entry.referenceId}',
+                    ].join('\n'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppBrandAssets.brandMuted,
+                        ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Text(
+            _formatLedgerAmount(entry.amountIqd, locale),
+            style: TextStyle(
+              color: credit
+                  ? AppBrandAssets.brandSuccess
+                  : AppBrandAssets.brandDanger,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatLedgerAmount(int amountIqd, String locale) {
+    if (amountIqd < 0) {
+      return '-${_fare.formatIqd(-amountIqd, locale: locale)}';
+    }
+    if (amountIqd > 0) {
+      return '+${_fare.formatIqd(amountIqd, locale: locale)}';
+    }
+    return _fare.formatIqd(0, locale: locale);
   }
 }
 
@@ -306,86 +339,86 @@ String _withdrawalStatusLabel(WalletWithdrawalStatus status, bool isAr) {
   };
 }
 
-class _DriverWithdrawalsList extends StatelessWidget {
-  const _DriverWithdrawalsList({
+class _DriverWithdrawalsSection extends StatelessWidget {
+  const _DriverWithdrawalsSection({
     required this.driverId,
     required this.isAr,
+    required this.items,
   });
 
   final String driverId;
   final bool isAr;
+  final List<WalletWithdrawalRequest> items;
 
   @override
   Widget build(BuildContext context) {
     final wallet = context.watch<AppState>().walletService;
     const fare = FareService();
-    return StreamBuilder<List<WalletWithdrawalRequest>>(
-      stream: wallet.watchMyWithdrawalRequests(driverId),
-      builder: (context, snap) {
-        final items = snap.data ?? const <WalletWithdrawalRequest>[];
-        if (items.isEmpty) {
-          return AppEmptyState(
-            title: isAr ? 'لا طلبات سحب' : 'No withdrawals yet',
-            message: isAr
-                ? 'اطلب سحباً إلى بطاقة ماستركارد من تبويب الرصيد'
-                : 'Request a Mastercard withdrawal from the Balance tab',
-            icon: Icons.account_balance_outlined,
-          );
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-          itemBuilder: (context, index) {
-            final req = items[index];
-            return AppCard(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          fare.formatIqd(req.amountIqd),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      Text(_withdrawalStatusLabel(req.status, isAr)),
-                    ],
-                  ),
-                  Text('**** ${req.cardLast4} • ${req.cardholderName}'),
-                  if (req.referenceId.isNotEmpty)
-                    Text('${isAr ? 'مرجع' : 'Ref'}: ${req.referenceId}'),
-                  if (req.rejectionReason.isNotEmpty)
-                    Text(
-                      req.rejectionReason,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+
+    if (items.isEmpty) {
+      return AppCard(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: AppEmptyState(
+          title: isAr ? 'لا طلبات سحب' : 'No withdrawals yet',
+          message: isAr
+              ? 'اطلب سحبًا إلى بطاقة ماستركارد من الزر أعلاه'
+              : 'Request a Mastercard withdrawal using the button above',
+          icon: Icons.account_balance_outlined,
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        for (final req in items) ...[
+          AppCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        fare.formatIqd(req.amountIqd),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
-                  if (req.status == WalletWithdrawalStatus.pending) ...[
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () async {
-                        try {
-                          await wallet.cancelWithdrawalRequest(req.id);
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('$e')),
-                          );
-                        }
-                      },
-                      child: Text(isAr ? 'إلغاء الطلب' : 'Cancel request'),
-                    ),
+                    Text(_withdrawalStatusLabel(req.status, isAr)),
                   ],
+                ),
+                Text('**** ${req.cardLast4} • ${req.cardholderName}'),
+                if (req.referenceId.isNotEmpty)
+                  Text('${isAr ? 'مرجع' : 'Ref'}: ${req.referenceId}'),
+                if (req.rejectionReason.isNotEmpty)
+                  Text(
+                    req.rejectionReason,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                if (req.status == WalletWithdrawalStatus.pending) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () async {
+                      try {
+                        await wallet.cancelWithdrawalRequest(req.id);
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('$e')),
+                        );
+                      }
+                    },
+                    child: Text(isAr ? 'إلغاء الطلب' : 'Cancel request'),
+                  ),
                 ],
-              ),
-            );
-          },
-        );
-      },
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
     );
   }
 }

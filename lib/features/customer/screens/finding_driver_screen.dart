@@ -6,6 +6,7 @@ import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/customer/customer_ride_actions.dart';
+import 'package:hilla_ride/features/customer/widgets/customer_ride_waiting_map_view.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -146,37 +147,58 @@ class _FindingDriverScreenState extends State<FindingDriverScreen>
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppBrandAssets.brandSurface,
-      appBar: AppBar(title: Text(l10n.findingDriverTitle)),
-      body: StreamBuilder<Ride?>(
-        stream: rideService.watchRide(widget.rideId),
-        builder: (context, snapshot) {
-          final ride = snapshot.data;
-          if (ride != null &&
-              ride.status == RideStatus.cancelled &&
-              !_waitingForDrivers &&
-              !widget.embedded) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!context.mounted) return;
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            });
-          }
+    return StreamBuilder<Ride?>(
+      stream: rideService.watchRide(widget.rideId),
+      builder: (context, snapshot) {
+        final ride = snapshot.data;
+        if (ride != null &&
+            ride.status == RideStatus.cancelled &&
+            !_waitingForDrivers &&
+            !widget.embedded) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          });
+        }
 
-          if (ride != null &&
-              ride.status == RideStatus.searching &&
-              !_started &&
-              !_waitingForDrivers) {
-            WidgetsBinding.instance.addPostFrameCallback((_) => _findDriver());
-          }
+        if (ride != null &&
+            ride.status == RideStatus.searching &&
+            !_started &&
+            !_waitingForDrivers) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _findDriver());
+        }
 
-          return Center(
+        if (ride == null) {
+          return Scaffold(
+            backgroundColor: AppBrandAssets.brandSurface,
+            appBar: AppBar(title: Text(l10n.findingDriverTitle)),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final bottomPanel = Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadii.xl),
+            ),
+            boxShadow: AppShadows.card,
+          ),
+          child: SafeArea(
+            top: false,
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.xxl),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.lg,
+              ),
               child: AppFloatingPanel(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    const AppSheetHandle(),
+                    const SizedBox(height: AppSpacing.md),
                     _PulsingSearchIndicator(controller: _pulseController),
                     const SizedBox(height: AppSpacing.xxl),
                     Text(
@@ -212,7 +234,7 @@ class _FindingDriverScreenState extends State<FindingDriverScreen>
                               },
                       ),
                     ],
-                    if (ride != null && customerCanCancelRide(ride.status)) ...[
+                    if (customerCanCancelRide(ride.status)) ...[
                       const SizedBox(height: AppSpacing.md),
                       AppSecondaryButton(
                         label: l10n.cancel,
@@ -231,9 +253,15 @@ class _FindingDriverScreenState extends State<FindingDriverScreen>
                 ),
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+
+        return CustomerRideWaitingMapView(
+          ride: ride,
+          appBarTitle: widget.embedded ? null : l10n.findingDriverTitle,
+          bottomPanel: bottomPanel,
+        );
+      },
     );
   }
 }

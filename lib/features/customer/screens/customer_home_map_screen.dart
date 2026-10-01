@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,7 +15,7 @@ import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/nearby_providers_service.dart';
 import 'package:hilla_ride/core/utils/ride_location_utils.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
-import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
+import 'package:hilla_ride/core/widgets/hilla_map_commands.dart';
 import 'package:hilla_ride/core/widgets/map_camera_follow.dart';
 import 'package:hilla_ride/core/widgets/driver_marker_cluster.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
@@ -22,6 +23,7 @@ import 'package:hilla_ride/core/widgets/marker_animator.dart';
 import 'package:hilla_ride/features/auth/screens/app_shell.dart';
 import 'package:hilla_ride/features/customer/screens/book_ride_screen.dart';
 import 'package:hilla_ride/features/customer/screens/google_map_pin_picker_screen.dart';
+import 'package:hilla_ride/features/customer/widgets/android_customer_booking_sheet.dart';
 import 'package:hilla_ride/features/customer/widgets/ride_search_panel.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:latlong2/latlong.dart' as ll;
@@ -45,6 +47,7 @@ class CustomerHomeMapScreen extends StatefulWidget {
 
 class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
   GoogleMapController? _mapController;
+  final _mapCommands = HillaMapCommands();
   PlaceResult? _pickup;
   PlaceResult? _destination;
   late String _districtId = BabilRegions.customerDistrict.id;
@@ -480,7 +483,10 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
 
   void _fitTripOnMap() {
     final controller = _mapController;
-    if (controller == null) return;
+    if (controller == null) {
+      unawaited(_mapCommands.fit());
+      return;
+    }
 
     final points = <LatLng>[];
     if (_pickup != null) {
@@ -501,14 +507,16 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
 
   Future<void> _moveMap(LatLng target) async {
     final controller = _mapController;
-    if (controller == null) return;
+    if (controller == null) {
+      await _mapCommands.moveTo(target);
+      return;
+    }
     await _cameraFollow.moveTo(controller, target);
   }
 
   /// Recenter camera only — does not change pickup/destination.
   Future<void> _recenterToMyLocation() async {
     final controller = _mapController;
-    if (controller == null) return;
 
     LatLng? target = _lastKnownDeviceLocation;
     try {
@@ -526,6 +534,10 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
           : _cameraTarget;
     }
     if (target == null) return;
+    if (controller == null) {
+      await _mapCommands.moveTo(target);
+      return;
+    }
     await _cameraFollow.moveTo(controller, target);
   }
 
@@ -669,6 +681,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
         ? l10n.locatingCurrentPosition
         : _pickup?.label;
     final markers = _buildMarkers();
+    final useMobileBookingSheet = AndroidCustomerBookingSheet.isSupported;
 
     return Scaffold(
       body: Stack(
@@ -676,6 +689,7 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
           GoogleMapView(
             initialPosition: mapCenter,
             zoom: 14,
+            commands: _mapCommands,
             onMapCreated: (c) => _mapController = c,
             markers: markers,
             onCameraMove: (pos) {
@@ -760,32 +774,33 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
                 ),
               ),
             ),
-          Positioned(
-            right: AppSpacing.lg,
-            bottom: 340,
-            child: SafeArea(
-              top: false,
-              child: Material(
-                elevation: 4,
-                shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.15),
-                shape: const CircleBorder(),
-                color: Colors.white,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => unawaited(_recenterToMyLocation()),
-                  child: const SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Icon(
-                      Icons.my_location,
-                      color: AppBrandAssets.brandTealDark,
-                      size: 22,
+          if (!useMobileBookingSheet)
+            Positioned(
+              right: AppSpacing.lg,
+              bottom: 340,
+              child: SafeArea(
+                top: false,
+                child: Material(
+                  elevation: 4,
+                  shadowColor: AppBrandAssets.brandNavy.withValues(alpha: 0.15),
+                  shape: const CircleBorder(),
+                  color: Colors.white,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => unawaited(_recenterToMyLocation()),
+                    child: const SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Icon(
+                        Icons.my_location,
+                        color: AppBrandAssets.brandTealDark,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -808,24 +823,6 @@ class _CustomerHomeMapScreenState extends State<CustomerHomeMapScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (widget.user.hasActivePromo)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.lg,
-                          AppSpacing.md,
-                          AppSpacing.lg,
-                          0,
-                        ),
-                        child: AppBanner(
-                          message: l10n.customerPromoBanner(
-                            widget.user.promoCode,
-                            widget.user.promoRidesLimit -
-                                widget.user.promoRidesUsed,
-                          ),
-                          icon: Icons.local_offer_outlined,
-                          tone: AppBannerTone.warning,
-                        ),
-                      ),
                     RideSearchPanel(
                   bottomSheetStyle: true,
                   customerOnly: true,

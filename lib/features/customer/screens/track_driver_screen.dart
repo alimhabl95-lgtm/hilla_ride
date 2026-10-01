@@ -11,10 +11,12 @@ import 'package:hilla_ride/core/services/driving_distance_service.dart';
 import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/nearby_providers_service.dart';
 import 'package:hilla_ride/core/widgets/google_map_view.dart';
+import 'package:hilla_ride/core/widgets/hilla_map_commands.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/core/widgets/map_camera_follow.dart';
 import 'package:hilla_ride/core/widgets/map_marker_icons.dart';
 import 'package:hilla_ride/core/widgets/marker_animator.dart';
+import 'package:hilla_ride/core/utils/android_waze_navigation.dart';
 import 'package:hilla_ride/features/customer/customer_ride_actions.dart';
 import 'package:hilla_ride/features/customer/screens/trip_completed_screen.dart';
 import 'package:hilla_ride/features/shared/screens/ride_chat_screen.dart';
@@ -22,7 +24,6 @@ import 'package:hilla_ride/features/shared/widgets/profile_avatar_circle.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class TrackDriverScreen extends StatefulWidget {
   const TrackDriverScreen({
@@ -40,6 +41,7 @@ class TrackDriverScreen extends StatefulWidget {
 
 class _TrackDriverScreenState extends State<TrackDriverScreen> {
   GoogleMapController? _mapController;
+  final _mapCommands = HillaMapCommands();
   static const _fareService = FareService();
   final _routeService = DrivingDistanceService();
   final _markerAnimator = MarkerAnimator();
@@ -104,11 +106,39 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
 
   Future<void> _recenterCamera(Iterable<LatLng> points) async {
     final controller = _mapController;
-    if (controller == null) return;
+    if (controller == null) {
+      await _mapCommands.fit();
+      return;
+    }
     final list = points.toList();
     if (list.isEmpty) return;
     _lastCameraPoints = list;
     await _cameraFollow.fitPoints(controller, list);
+  }
+
+  Future<void> _refreshStaticTripRoute({required Ride ride}) async {
+    if (_lastRouteKey == 'static_trip') return;
+    _lastRouteKey = 'static_trip';
+    final pickup = LatLng(ride.pickupLat, ride.pickupLng);
+    final destination = LatLng(ride.destinationLat, ride.destinationLng);
+    try {
+      final origin = ll.LatLng(pickup.latitude, pickup.longitude);
+      final dest = ll.LatLng(destination.latitude, destination.longitude);
+      final info = await _routeService.getDrivingRouteDetails(origin, dest);
+      if (!mounted) return;
+      setState(() {
+        _etaMinutes = info.durationMinutes;
+        _distanceKm = info.distanceKm;
+        _routePoints = info.polylinePoints
+            .map((p) => LatLng(p.latitude, p.longitude))
+            .toList(growable: false);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _routePoints = [pickup, destination];
+      });
+    }
   }
 
   Future<void> _refreshRoute({
@@ -130,7 +160,11 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
     final timedOut = _lastRouteRefreshAt == null ||
         now.difference(_lastRouteRefreshAt!) >=
             MapPresenceConfig.routeRefreshInterval;
-    if (_lastRouteKey == routeKey && !movedEnough && !timedOut) return;
+    final statusChanged = _lastRouteKey != null &&
+        !_lastRouteKey!.startsWith(toPickup ? 'pickup' : 'dest');
+    if (_lastRouteKey == routeKey && !movedEnough && !timedOut && !statusChanged) {
+      return;
+    }
 
     _lastRouteKey = routeKey;
     _lastRouteRefreshAt = now;
@@ -139,16 +173,28 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
     try {
       final origin = ll.LatLng(driverPos.latitude, driverPos.longitude);
       final dest = ll.LatLng(destination.latitude, destination.longitude);
-      final info = await _routeService.getDrivingRoute(origin, dest);
-      final points = await _routeService.getRoutePolylinePoints(origin, dest);
+      final info = await _routeService.getDrivingRouteDetails(origin, dest);
       if (!mounted) return;
       setState(() {
         _etaMinutes = info.durationMinutes;
         _distanceKm = info.distanceKm;
-        _routePoints = points
+        _routePoints = info.polylinePoints
             .map((p) => LatLng(p.latitude, p.longitude))
             .toList(growable: false);
       });
+      if (!_didInitialCameraFit || statusChanged) {
+        final fitPoints = <LatLng>[
+          driverPos,
+          destination,
+          ..._routePoints,
+        ];
+        _lastCameraPoints = fitPoints;
+        if (_mapController != null &&
+            (_cameraFollow.followEnabled || statusChanged)) {
+          _didInitialCameraFit = true;
+          unawaited(_recenterCamera(fitPoints));
+        }
+      }
     } catch (_) {
       final km = NearbyProvidersService.straightLineKm(
         ll.LatLng(driverPos.latitude, driverPos.longitude),
@@ -209,13 +255,17 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
     return markers;
   }
 
-  Future<void> _callDriver(String? phone) async {
-    final raw = (phone ?? '').trim();
-    if (raw.isEmpty) return;
-    final uri = Uri(scheme: 'tel', path: raw);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+  Future<void> _openWaze(double latitude, double longitude) async {
+    if (!AndroidWazeNavigation.isSupported) return;
+    final opened = await AndroidWazeNavigation.openWaze(
+      latitude: latitude,
+      longitude: longitude,
+    );
+    if (opened || !mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.navigationAppUnavailable)),
+    );
   }
 
   @override
@@ -256,8 +306,8 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
             });
           }
 
-          final driverId = ride.driverId;
-          if (driverId == null) {
+          final driverId = ride.driverId?.trim();
+          if (driverId == null || driverId.isEmpty) {
             return Center(child: Text(l10n.searchingDriver));
           }
 
@@ -280,6 +330,7 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
                 unawaited(_refreshRoute(ride: ride, driverPos: driverPos));
               } else {
                 _markerAnimator.syncTargets({});
+                unawaited(_refreshStaticTripRoute(ride: ride));
               }
 
               unawaited(_loadTripMarkers(
@@ -289,8 +340,19 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
 
               final animatedPos =
                   _markerAnimator.markers['driver']?.position ?? driverPos;
-              final cameraPoints = <LatLng>[pickup, destination];
-              if (animatedPos != null) cameraPoints.add(animatedPos);
+              final toPickup = ride.status == RideStatus.accepted ||
+                  ride.status == RideStatus.matched;
+              final focusDest = toPickup ? pickup : destination;
+              final cameraPoints = <LatLng>[
+                if (animatedPos != null) animatedPos,
+                focusDest,
+                ..._routePoints,
+              ];
+              if (cameraPoints.isEmpty) {
+                cameraPoints
+                  ..add(pickup)
+                  ..add(destination);
+              }
               _lastCameraPoints = cameraPoints;
 
               final markers = _buildMarkers(
@@ -318,6 +380,7 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
                           zoom: 14,
                           markers: markers,
                           polylines: polylines,
+                          commands: _mapCommands,
                           onCameraMove: (_) =>
                               _cameraFollow.onUserCameraInteraction(),
                           onMapCreated: (c) {
@@ -487,52 +550,63 @@ class _TrackDriverScreenState extends State<TrackDriverScreen> {
                               tone: AppBannerTone.info,
                             ),
                             const SizedBox(height: AppSpacing.md),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: AppSecondaryButton(
-                                    label: isArabic ? 'اتصال' : 'Call',
-                                    icon: Icons.phone,
-                                    onPressed: () =>
-                                        _callDriver(driver?.phone),
+                            if (AndroidWazeNavigation.isSupported) ...[
+                              if (driverPos != null)
+                                AppPrimaryButton(
+                                  label: l10n.driverOnWaze,
+                                  icon: Icons.navigation_outlined,
+                                  onPressed: () {
+                                    final livePos = driverPos;
+                                    if (livePos == null) return;
+                                    unawaited(
+                                      _openWaze(
+                                        livePos.latitude,
+                                        livePos.longitude,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              const SizedBox(height: AppSpacing.sm),
+                              AppSecondaryButton(
+                                label: l10n.destinationOnWaze,
+                                icon: Icons.flag_outlined,
+                                onPressed: () => unawaited(
+                                  _openWaze(
+                                    ride.destinationLat,
+                                    ride.destinationLng,
                                   ),
                                 ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(
-                                  child: AppSecondaryButton(
-                                    label: l10n.openChat,
-                                    icon: Icons.chat_bubble_outline,
-                                    onPressed: currentUser == null
-                                        ? null
-                                        : () {
-                                            HapticFeedback.lightImpact();
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (_) => RideChatScreen(
-                                                  rideId: widget.rideId,
-                                                  currentUserId:
-                                                      currentUser.uid,
-                                                  currentUserRole:
-                                                      UserRole.customer,
-                                                  currentUserName:
-                                                      authService
-                                                              .currentUser
-                                                              ?.displayName
-                                                              ?.trim()
-                                                              .isNotEmpty ==
-                                                          true
-                                                      ? authService
-                                                          .currentUser!
-                                                          .displayName!
-                                                          .trim()
-                                                      : l10n.roleCustomer,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                  ),
-                                ),
-                              ],
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                            ],
+                            AppSecondaryButton(
+                              label: l10n.openChat,
+                              icon: Icons.chat_bubble_outline,
+                              onPressed: currentUser == null
+                                  ? null
+                                  : () {
+                                      HapticFeedback.lightImpact();
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => RideChatScreen(
+                                            rideId: widget.rideId,
+                                            currentUserId: currentUser.uid,
+                                            currentUserRole: UserRole.customer,
+                                            currentUserName: authService
+                                                        .currentUser
+                                                        ?.displayName
+                                                        ?.trim()
+                                                        .isNotEmpty ==
+                                                    true
+                                                ? authService
+                                                    .currentUser!
+                                                    .displayName!
+                                                    .trim()
+                                                : l10n.roleCustomer,
+                                          ),
+                                        ),
+                                      );
+                                    },
                             ),
                             if (customerCanCancelRide(ride.status)) ...[
                               const SizedBox(height: AppSpacing.sm),

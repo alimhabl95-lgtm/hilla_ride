@@ -73,6 +73,11 @@ class _CustomerActiveRideShellState extends State<CustomerActiveRideShell> {
               FindingDriverScreen(rideId: widget.rideId, embedded: true),
             );
           case RideStatus.matched:
+            if (ride.driverId != null && ride.driverId!.trim().isNotEmpty) {
+              return _wrapSession(
+                TrackDriverScreen(rideId: widget.rideId, embedded: true),
+              );
+            }
             return _wrapSession(
               DriverAssignedScreen(rideId: widget.rideId, embedded: true),
             );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/features/customer/widgets/android_customer_booking_sheet.dart';
 import 'package:hilla_ride/core/config/customer_feature_flags.dart';
 import 'package:hilla_ride/core/constants/brand_assets.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
@@ -29,10 +30,12 @@ class _CustomerHomeShellState extends State<CustomerHomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final useMobileBookingSheet = AndroidCustomerBookingSheet.isSupported;
     if (!CustomerFeatureFlags.storesTabEnabled) {
       return Column(
         children: [
-          const AnnouncementBanner(audience: 'customers'),
+          if (!useMobileBookingSheet)
+            const AnnouncementBanner(audience: 'customers'),
           Expanded(
             child: CustomerHomeMapScreen(
               user: widget.user,

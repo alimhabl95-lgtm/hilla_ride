@@ -1,18 +1,45 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
+import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:hilla_ride/app.dart';
 import 'package:hilla_ride/core/config/app_variant.dart';
 import 'package:hilla_ride/core/config/firebase_config.dart';
 import 'package:hilla_ride/core/providers/app_mode_provider.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
+import 'package:image_picker_android/image_picker_android.dart';
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:provider/provider.dart';
+
+Future<void> _initAndroidMapsRenderer() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+  final impl = GoogleMapsFlutterPlatform.instance;
+  if (impl is! GoogleMapsFlutterAndroid) return;
+  impl.useAndroidViewSurface = true;
+  try {
+    await impl.initializeWithRenderer(AndroidMapRenderer.latest);
+  } catch (error) {
+    debugPrint('Android Maps renderer init failed: $error');
+  }
+}
+
+Future<void> _useAndroidSystemPhotoPicker() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+  final picker = ImagePickerPlatform.instance;
+  if (picker is ImagePickerAndroid) {
+    picker.useAndroidPhotoPicker = true;
+  }
+}
 
 Future<void> bootstrapApp(AppVariant variant) async {
   WidgetsFlutterBinding.ensureInitialized();
   AppConfig.variant = variant;
+  await _initAndroidMapsRenderer();
+  await _useAndroidSystemPhotoPicker();
 
   var firebaseReady = false;
   var firebaseError = '';
@@ -41,7 +68,7 @@ Future<void> bootstrapApp(AppVariant variant) async {
       providers: [
         ChangeNotifierProvider(create: (_) => AppState.create()),
         ChangeNotifierProvider(create: (_) => AppModeProvider()),
-        ChangeNotifierProvider(create: (_) => LocaleProvider()),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()..loadSaved()),
       ],
       child: HillaRideApp(
         variant: variant,

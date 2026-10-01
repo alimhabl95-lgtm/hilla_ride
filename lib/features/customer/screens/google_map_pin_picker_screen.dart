@@ -35,6 +35,7 @@ class _GoogleMapPinPickerScreenState extends State<GoogleMapPinPickerScreen> {
   static const _bottomPanelHeight = 172.0;
 
   GoogleMapController? _mapController;
+  LatLng? _cameraTarget;
   late ll.LatLng _selectedPoint;
   String _label = '';
   var _isLoadingLabel = false;
@@ -148,18 +149,26 @@ class _GoogleMapPinPickerScreenState extends State<GoogleMapPinPickerScreen> {
   }
 
   Future<void> _updateCenterFromMap() async {
+    if (!mounted) return;
     final controller = _mapController;
-    if (controller == null || !mounted || !_pinOffsetReady) return;
-
-    final center = await controller.getLatLng(
-      ScreenCoordinate(
-        x: _pinScreenOffset.dx.round(),
-        y: _pinScreenOffset.dy.round(),
-      ),
-    );
-
+    if (controller != null && _pinOffsetReady) {
+      final center = await controller.getLatLng(
+        ScreenCoordinate(
+          x: _pinScreenOffset.dx.round(),
+          y: _pinScreenOffset.dy.round(),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _selectedPoint = ll.LatLng(center.latitude, center.longitude);
+      });
+      _scheduleLabelRefresh();
+      return;
+    }
+    final target = _cameraTarget;
+    if (target == null) return;
     setState(() {
-      _selectedPoint = ll.LatLng(center.latitude, center.longitude);
+      _selectedPoint = ll.LatLng(target.latitude, target.longitude);
     });
     _scheduleLabelRefresh();
   }
@@ -185,6 +194,7 @@ class _GoogleMapPinPickerScreenState extends State<GoogleMapPinPickerScreen> {
             ),
             zoom: 16,
             onMapCreated: (controller) => _mapController = controller,
+            onCameraMove: (pos) => _cameraTarget = pos.target,
             onCameraIdle: _updateCenterFromMap,
           ),
           Positioned(

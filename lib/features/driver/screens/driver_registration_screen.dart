@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:hilla_ride/core/constants/babil_regions.dart';
 import 'package:hilla_ride/core/models/app_models.dart';
 import 'package:hilla_ride/core/providers/app_state.dart';
 import 'package:hilla_ride/features/shared/screens/legal_content_screen.dart';
@@ -32,6 +33,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   var _acceptedTerms = false;
   var _isSaving = false;
   String? _errorMessage;
+  String? _serviceAreaKey;
 
   @override
   void dispose() {
@@ -106,6 +108,18 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       setState(() => _errorMessage = l10n.registrationTermsRequired);
       return;
     }
+    final areaKey = _serviceAreaKey;
+    if (areaKey == null || !areaKey.contains('|')) {
+      setState(() {
+        _errorMessage = l10n.localeName.startsWith('ar')
+            ? 'اختر منطقة العمل'
+            : 'Choose your service area';
+      });
+      return;
+    }
+    final areaParts = areaKey.split('|');
+    final requestedDistrictId = areaParts.first;
+    final requestedSubDistrictId = areaParts.sublist(1).join('|');
 
     setState(() {
       _isSaving = true;
@@ -145,6 +159,8 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
             vehicleColor: _colorController.text.trim(),
             idPhotoUrl: idPhotoUrl,
             profilePhotoUrl: profilePhotoUrl,
+            requestedDistrictId: requestedDistrictId,
+            requestedSubDistrictId: requestedSubDistrictId,
           );
       if (!mounted) return;
 
@@ -220,6 +236,30 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
             TextField(
               controller: _colorController,
               decoration: InputDecoration(labelText: l10n.vehicleColor),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _serviceAreaKey,
+              decoration: InputDecoration(
+                labelText: l10n.localeName.startsWith('ar')
+                    ? 'منطقة العمل'
+                    : 'Service area',
+              ),
+              items: [
+                for (final district in BabilRegions.districts)
+                  for (final sub in district.subDistricts)
+                    DropdownMenuItem(
+                      value: '${district.id}|${sub.id}',
+                      child: Text(
+                        l10n.localeName.startsWith('ar')
+                            ? sub.nameAr
+                            : sub.nameEn,
+                      ),
+                    ),
+              ],
+              onChanged: _isSaving
+                  ? null
+                  : (value) => setState(() => _serviceAreaKey = value),
             ),
             const SizedBox(height: 20),
             PhotoUploadTile(

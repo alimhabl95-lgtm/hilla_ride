@@ -6,6 +6,7 @@ import 'package:hilla_ride/core/services/fare_service.dart';
 import 'package:hilla_ride/core/services/notification_service.dart';
 import 'package:hilla_ride/core/widgets/ui/app_ui.dart';
 import 'package:hilla_ride/features/customer/customer_ride_actions.dart';
+import 'package:hilla_ride/features/customer/widgets/customer_ride_waiting_map_view.dart';
 import 'package:hilla_ride/features/shared/widgets/profile_avatar_circle.dart';
 import 'package:hilla_ride/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -60,45 +61,72 @@ class _DriverAssignedScreenState extends State<DriverAssignedScreen> {
 
           final driverId = ride.driverId;
           if (driverId == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xxl),
-                child: AppFloatingPanel(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          color: AppBrandAssets.brandTeal,
+            final waitingPanel = Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadii.xl),
+                ),
+                boxShadow: AppShadows.card,
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.sm,
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                  ),
+                  child: AppFloatingPanel(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const AppSheetHandle(),
+                        const SizedBox(height: AppSpacing.md),
+                        const SizedBox(
+                          width: 56,
+                          height: 56,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: AppBrandAssets.brandTeal,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxl),
-                      Text(
-                        ride.status == RideStatus.matched
-                            ? l10n.waitingDriverAccept
-                            : l10n.searchingDriver,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: AppBrandAssets.brandNavy,
+                        const SizedBox(height: AppSpacing.xxl),
+                        Text(
+                          ride.status == RideStatus.matched
+                              ? l10n.waitingDriverAccept
+                              : l10n.searchingDriver,
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: AppBrandAssets.brandNavy,
+                                  ),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (customerCanCancelRide(ride.status)) ...[
+                          const SizedBox(height: AppSpacing.xxxl),
+                          AppSecondaryButton(
+                            label: l10n.cancel,
+                            destructive: true,
+                            onPressed: () => cancelCustomerRideAndExit(
+                              context,
+                              widget.rideId,
                             ),
-                        textAlign: TextAlign.center,
-                      ),
-                      if (customerCanCancelRide(ride.status)) ...[
-                        const SizedBox(height: AppSpacing.xxxl),
-                        AppSecondaryButton(
-                          label: l10n.cancel,
-                          destructive: true,
-                          onPressed: () =>
-                              cancelCustomerRideAndExit(context, widget.rideId),
-                        ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
+            );
+
+            return CustomerRideWaitingMapView(
+              ride: ride,
+              appBarTitle:
+                  widget.embedded ? null : l10n.driverAssignedTitle,
+              bottomPanel: waitingPanel,
             );
           }
 

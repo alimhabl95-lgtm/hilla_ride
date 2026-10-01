@@ -12,10 +12,12 @@ class SavedPlacesBar extends StatefulWidget {
     super.key,
     required this.onPlaceSelected,
     this.compact = false,
+    this.alwaysShow = false,
   });
 
   final ValueChanged<PlaceResult> onPlaceSelected;
   final bool compact;
+  final bool alwaysShow;
 
   @override
   State<SavedPlacesBar> createState() => _SavedPlacesBarState();
@@ -68,14 +70,17 @@ class _SavedPlacesBarState extends State<SavedPlacesBar> {
   @override
   Widget build(BuildContext context) {
     if (_uid == null) return const SizedBox.shrink();
-    if (widget.compact && _savedPlaces.isEmpty) return const SizedBox.shrink();
+    if (widget.compact && !widget.alwaysShow && _savedPlaces.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final l10n = AppLocalizations.of(context)!;
+    final showHeader = !widget.compact || widget.alwaysShow;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!widget.compact)
+        if (showHeader)
           Row(
             children: [
               Icon(
@@ -90,7 +95,7 @@ class _SavedPlacesBarState extends State<SavedPlacesBar> {
               ),
             ],
           ),
-        if (!widget.compact) const SizedBox(height: 6),
+        if (showHeader) const SizedBox(height: 6),
         if (_savedPlaces.isEmpty)
           Text(
             l10n.savedPlacesEmptyHint,

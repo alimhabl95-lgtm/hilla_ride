@@ -18,17 +18,89 @@ class AnnouncementService {
         .where('audience', isEqualTo: audience)
         .limit(40)
         .snapshots()
-        .map((snapshot) {
-      final items = snapshot.docs
-          .map((doc) => Announcement.fromMap(doc.id, doc.data()))
-          .toList();
-      items.sort((a, b) {
-        final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return bTime.compareTo(aTime);
-      });
-      return items;
+        .map((snapshot) => _sortNewestFirst(
+              snapshot.docs
+                  .map((doc) => Announcement.fromMap(doc.id, doc.data()))
+                  .where((item) => item.isLiveAt(DateTime.now()))
+                  .toList(),
+            ));
+  }
+
+  static bool _isDriverAudience(String audience) {
+    switch (audience.trim().toLowerCase()) {
+      case 'drivers':
+      case 'alldrivers':
+      case 'driver':
+      case 'all':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  static bool _showOnDriverDashboardCard(Announcement item) {
+    return item.showOnDriverDashboard || item.showAsBanner;
+  }
+
+  static bool _isCustomerAudience(String audience) {
+    switch (audience.trim().toLowerCase()) {
+      case 'customers':
+      case 'allcustomers':
+      case 'customer':
+      case 'all':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /// Live customer home ads bar (Android). Management discounts / notices.
+  Stream<List<Announcement>> watchCustomerDashboardAnnouncements() {
+    return _firestore.collection('announcements').limit(80).snapshots().map(
+      (snapshot) {
+        final now = DateTime.now();
+        final items = snapshot.docs
+            .map((doc) => Announcement.fromMap(doc.id, doc.data()))
+            .where(
+              (item) =>
+                  _isCustomerAudience(item.audience) && item.isLiveAt(now),
+            )
+            .toList();
+        return _sortNewestFirst(items);
+      },
+    );
+  }
+
+  /// Live driver-dashboard carousel (Android). Includes dashboard + banner flags.
+  Stream<List<Announcement>> watchDriverDashboardAnnouncements() {
+    return _firestore.collection('announcements').limit(80).snapshots().map(
+      (snapshot) {
+        final now = DateTime.now();
+        final items = snapshot.docs
+            .map((doc) => Announcement.fromMap(doc.id, doc.data()))
+            .where(
+              (item) =>
+                  _isDriverAudience(item.audience) &&
+                  _showOnDriverDashboardCard(item) &&
+                  item.isLiveAt(now),
+            )
+            .toList();
+        return _sortNewestFirst(items);
+      },
+    );
+  }
+
+  List<Announcement> _sortNewestFirst(List<Announcement> items) {
+    items.sort((a, b) {
+      final aTime = a.startsAt ??
+          a.createdAt ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.startsAt ??
+          b.createdAt ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
     });
+    return items;
   }
 
   Stream<Set<String>> watchReadIds() async* {
