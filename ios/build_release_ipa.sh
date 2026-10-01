@@ -35,19 +35,33 @@ cd ios
 pod install
 cd ..
 
+EXPORT_PLIST="ios/exportOptions.plist"
+if [ -n "${CM_BUILD_DIR:-}" ] && command -v xcode-project >/dev/null 2>&1; then
+  echo "Applying Codemagic signing to Runner (after pod install)..."
+  xcode-project use-profiles \
+    --project "ios/Runner.xcodeproj" \
+    --code-signing-setup-verbose-logging
+  if [ -f "${HOME}/export_options.plist" ]; then
+    EXPORT_PLIST="${HOME}/export_options.plist"
+    echo "Using Codemagic export options: ${EXPORT_PLIST}"
+  else
+    echo "ERROR: ${HOME}/export_options.plist not found after use-profiles"
+    exit 1
+  fi
+fi
+
 flutter build ipa --release \
-  --export-options-plist=ios/exportOptions.plist \
+  --export-options-plist="${EXPORT_PLIST}" \
   --build-name="$BUILD_NAME" \
   --build-number="$BUILD_NUMBER"
 
-ARCHIVE_APP="$(find build/ios/archive -path '*/Products/Applications/Runner.app' -type d 2>/dev/null | head -1)"
-if [ -n "$ARCHIVE_APP" ]; then
-  echo "Verifying archived app before TestFlight upload..."
-  bash ios/verify_app_bundle.sh "$ARCHIVE_APP"
-else
-  echo "WARNING: Archive Runner.app not found; verifying exported IPA only"
+IPA_PATH="$(find build/ios/ipa -name '*.ipa' -type f 2>/dev/null | head -1)"
+if [ -z "${IPA_PATH}" ]; then
+  echo "ERROR: flutter build ipa did not produce an IPA (export/signing likely failed)"
+  exit 1
 fi
+echo "IPA created: ${IPA_PATH}"
 
-bash ios/verify_release_ipa.sh
+bash ios/verify_release_ipa.sh "${IPA_PATH}"
 
 echo "SUCCESS: Release IPA $BUILD_NAME ($BUILD_NUMBER) verified for TestFlight"

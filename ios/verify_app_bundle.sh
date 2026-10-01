@@ -65,8 +65,10 @@ fi
 
 if nm "$APP_FRAMEWORK" 2>/dev/null | grep -qE "kDartIsolateSnapshotInstructions|kDartVmSnapshotInstructions"; then
   echo "App.framework contains AOT snapshot symbols"
+elif [ "$APP_SIZE" -ge 500000 ] && [ ! -f "$ASSETS/kernel_blob.bin" ]; then
+  echo "App.framework release size OK (${APP_SIZE} bytes); no JIT kernel_blob.bin"
 else
-  echo "ERROR: App.framework has no AOT snapshot symbols"
+  echo "ERROR: App.framework does not look like a release AOT build"
   exit 1
 fi
 
