@@ -49,12 +49,13 @@ workflows:
         script: |
           set -euo pipefail
           keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
           keychain add-certificates
           echo "Code signing identities:"
           security find-identity -v -p codesigning || true
+          if ! security find-identity -v -p codesigning | grep -q "1)"; then
+            echo "ERROR: No code signing identity. Upload the distribution .p12 (private key) in Codemagic Team settings → Code signing identities, reference hilla_ride_distribution."
+            exit 1
+          fi
       - name: Build Flutter release IPA
         script: |
           set -euo pipefail
