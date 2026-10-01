@@ -45,10 +45,13 @@ workflows:
           test -f "$CM_BUILD_DIR/ios/Runner.xcodeproj/project.pbxproj"
           test -f "$CM_BUILD_DIR/ios/build_release_ipa.sh"
           flutter --version
-      - name: Set up keychain
+      - name: Set up code signing
         script: |
           set -euo pipefail
           keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
           keychain add-certificates
           echo "Code signing identities:"
           security find-identity -v -p codesigning || true

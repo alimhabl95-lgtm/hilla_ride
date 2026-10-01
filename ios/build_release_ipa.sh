@@ -12,7 +12,8 @@ rm -rf build ios/build ios/.symlinks ios/Flutter/ephemeral ios/Flutter/Flutter.f
 
 flutter pub get
 
-flutter build ios --release --config-only \
+# Config-only must not require Apple certs on CI (signing happens at ipa export).
+flutter build ios --release --config-only --no-codesign \
   --build-name="$BUILD_NAME" \
   --build-number="$BUILD_NUMBER"
 
