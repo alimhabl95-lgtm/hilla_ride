@@ -21,7 +21,7 @@ workflows:
       vars:
         BUNDLE_ID: com.hillaride.hillaRide
         BUILD_NAME: "1.1.0"
-        BUILD_NUMBER: "127"
+        BUILD_NUMBER: "130"
       flutter: stable
       xcode: latest
     triggering:
@@ -89,16 +89,9 @@ workflows:
         XCODE_PROJECT: hilla_ride_ios/HelloTukTuk.xcodeproj
         XCODE_SCHEME: HelloTukTuk
         MARKETING_VERSION: "2.2.0"
-        BUILD_NUMBER: "129"
+        BUILD_NUMBER: "130"
       xcode: latest
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: master
-          include: true
-        - pattern: main
-          include: true
+    # Manual start only — avoids duplicate TestFlight uploads alongside Flutter iOS.
     scripts:
       - name: Verify native Swift project
         script: |
