@@ -21,7 +21,7 @@ workflows:
       vars:
         BUNDLE_ID: com.hillaride.hillaRide
         BUILD_NAME: "1.1.0"
-        BUILD_NUMBER: "130"
+        BUILD_NUMBER: "131"
       flutter: stable
       xcode: latest
     triggering:
@@ -71,9 +71,8 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
-        beta_groups:
-          - Internal Testers
+        # Upload only. A missing beta group must not fail the build.
+        submit_to_testflight: false
 
   hello-tuk-tuk-native-ios:
     name: Hello Tuk-Tuk Native iOS
@@ -92,7 +91,7 @@ workflows:
         XCODE_PROJECT: hilla_ride_ios/HelloTukTuk.xcodeproj
         XCODE_SCHEME: HelloTukTuk
         MARKETING_VERSION: "2.2.0"
-        BUILD_NUMBER: "130"
+        BUILD_NUMBER: "131"
       xcode: latest
     # Manual start only — avoids duplicate TestFlight uploads alongside Flutter iOS.
     scripts:
@@ -176,6 +175,5 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
-        beta_groups:
-          - Internal Testers
+        # Upload only. A missing beta group must not fail the build.
+        submit_to_testflight: false
